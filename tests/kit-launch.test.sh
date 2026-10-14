@@ -53,6 +53,13 @@ printf '#!/bin/sh\necho "news from $1"\n' > "$H/bin/news.sh"; chmod +x "$H/bin/n
 printf 'news_cmd=~/bin/news.sh arg1\n' >> "$S/launcher.conf"
 out="$(pick '' news)"; has "news: runs news_cmd with its words" "news from arg1" "$out"
 
+# chat_args: extra arguments for [c] one chat only, never for kit-init or the team.
+printf 'chat_args=--allow-dangerously-skip-permissions --model haiku\n' >> "$S/launcher.conf"
+out="$(pick 'c\n' plain)"; has "chat_args on a plain chat" "RUN in $P/plain: claude --allow-dangerously-skip-permissions --model haiku" "$out"
+out="$(pick 'c\n' 'Kit App')"; has "chat_args on a kit project's chat" "RUN in $P/Kit App: claude --allow-dangerously-skip-permissions --model haiku" "$out"
+out="$(pick 's\n' plain)"; hasnt "chat_args not on kit-init" "--model haiku" "$out"
+sed -i '/^chat_args=/d' "$S/launcher.conf"
+
 # --- kit-word.sh
 RC="$H/.bashrc"; printf 'alias ll=ls\ntaken() { :; }\n' > "$RC"
 w() { env HOME="$H" SHELL=/bin/bash bash "$W" "$@" 2>&1; }

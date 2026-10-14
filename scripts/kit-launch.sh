@@ -17,6 +17,7 @@
 #   header_cmd=~/bin/kit-status.sh    optional: a command whose first output line replaces the kit/version
 #                                     line (e.g. to add your own notes about the kit); 3 s limit
 #   news_cmd=~/bin/kit-news.sh        optional: what `<word> news` runs
+#   chat_args=--model sonnet          optional: extra claude arguments for [c] one chat
 # Folders ending in -Test (trial copies), folders starting with _ (e.g. _archive), git worktrees (a .git
 # file, not a folder: a sibling's working copy of another project) and the kit's own folder are not listed.
 # Exit 0 done or quit, 1 no such project, 64 usage.
@@ -69,6 +70,11 @@ run() {
   exec "$@"
 }
 
+chat() {  # <project>: one plain Claude chat, with chat_args= when set
+  local -a extra=(); read -ra extra <<<"$(conf chat_args)"
+  run "$1" claude ${extra[@]+"${extra[@]}"}
+}
+
 start_team() {  # <project>
   local p="$1" st="$1/scripts/start-team.sh"
   echo "==> $(basename "$p"): starting its team"
@@ -81,7 +87,7 @@ team_or_chat() {
   read -r -p "    [t] team   [c] one Claude chat   [b] back : " a || return 1
   case "$(printf '%s' "$a" | tr -d '[:space:]')" in
     [tT]) start_team "$p" ;;
-    [cC]) run "$p" claude ;;
+    [cC]) chat "$p" ;;
     [bB]|"") return 2 ;;
     *) echo "    Pick t, c, or b."; return 2 ;;
   esac
@@ -93,7 +99,7 @@ set_up_or_chat() {
   read -r -p "    [s] set it up now   [c] just open a Claude chat there   [b] back : " a || return 1
   case "$a" in
     [sS]*) run "$p" claude "/orchestration-kit:kit-init" ;;
-    [cC]*) run "$p" claude ;;
+    [cC]*) chat "$p" ;;
     *) return 2 ;;
   esac
 }
@@ -125,7 +131,7 @@ list_projects() {
 
 list_projects
 case "${1:-}" in
-  -h|--help) sed -n "2,22p" "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n "2,23p" "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   --list)
     for d in "${PROJ[@]+"${PROJ[@]}"}"; do if has_kit "$d"; then echo "kit  $(basename "$d")"; else echo "-    $(basename "$d")"; fi; done
     exit 0 ;;
