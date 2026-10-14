@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status HUD Setup</title>
+<!-- Built by scripts/hud-guide.sh build from the HUD's own drawing code (plugins/status-hud/scripts/guide.ts). Do not edit by hand. -->
+<style>
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --tx: #1c2128; --mut: #5b6470; --line: #dde2e8;
+  --acc: #1f6feb; --accTx: #ffffff; --keep: #1a7f37; --rm: #cf222e; --chip: #eef1f5;
+  --hud: #0b0d10; --hudLine: #2a3038;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1216; --card: #171b21; --tx: #e6e9ed; --mut: #98a1ac; --line: #2a3038;
+    --acc: #4c8dff; --accTx: #0b0d10; --keep: #3fb950; --rm: #ff6b6b; --chip: #222831;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1216; --card: #171b21; --tx: #e6e9ed; --mut: #98a1ac; --line: #2a3038;
+  --acc: #4c8dff; --accTx: #0b0d10; --keep: #3fb950; --rm: #ff6b6b; --chip: #222831;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--tx); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 1240px; margin: 0 auto; padding: 28px 16px 120px; }
+h1 { font-size: 26px; margin: 0 0 6px; letter-spacing: -0.01em; }
+.lede { color: var(--mut); margin: 0 0 22px; max-width: 760px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.label { font-weight: 600; }
+.hint { color: var(--mut); font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--tx); padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--acc); color: var(--accTx); }
+.seg.keeprm button[aria-pressed="true"].rm { background: var(--rm); color: #fff; }
+.seg.keeprm button[aria-pressed="true"].keep { background: var(--keep); color: #fff; }
+.hudwrap { overflow-x: auto; background: var(--hud); border-radius: 10px; border: 1px solid var(--hudLine); padding: 14px 12px 10px; }
+.hud { position: relative; font: 12px/18px "Cascadia Mono", Consolas, "DejaVu Sans Mono", Menlo, ui-monospace, monospace; white-space: pre; width: max-content; }
+.hud .r { height: 30px; padding-top: 10px; }
+.hud .c { display: inline-block; width: 1ch; text-align: center; overflow: visible; transition: opacity .15s; }
+.hud .c.off { opacity: .12; }
+.hud .c.hot { outline: 1px solid #ffd33d; outline-offset: -1px; }
+.badge { position: absolute; transform: translateX(-2px); min-width: 15px; height: 13px; padding: 0 3px; border: 0; border-radius: 7px; background: #ffd33d; color: #111;
+  font: 700 9px/13px system-ui, sans-serif; text-align: center; cursor: pointer; box-shadow: 0 0 0 2px var(--hud); z-index: 2; }
+.badge.off { background: #6a727c; color: #e6e9ed; text-decoration: line-through; }
+.badge:focus-visible, .seg button:focus-visible, .item:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.areas { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 18px; }
+.area h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--mut); margin: 0 0 8px; }
+.item { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: start; padding: 10px 6px; border-top: 1px solid var(--line); border-radius: 6px; }
+.item:hover { background: var(--chip); }
+.num { width: 24px; height: 24px; border-radius: 12px; background: #ffd33d; color: #111; font: 700 12px/24px system-ui; text-align: center; }
+.item.off .num { background: #6a727c; color: #e6e9ed; }
+.item.off .nm { text-decoration: line-through; color: var(--mut); }
+.nm { font-weight: 600; }
+.what { color: var(--mut); font-size: 13px; }
+.tag { display: inline-block; font-size: 11px; background: var(--chip); color: var(--mut); border-radius: 6px; padding: 0 6px; margin-left: 6px; font-weight: 500; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); padding: 12px 16px; }
+.bar .in { max-width: 1240px; margin: 0 auto; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.bar code { flex: 1 1 380px; min-width: 0; font: 12px/1.4 ui-monospace, Consolas, monospace; background: var(--chip); border-radius: 6px; padding: 8px 10px; overflow-wrap: anywhere; }
+.btn { border: 0; border-radius: 8px; padding: 10px 16px; font: 600 14px system-ui; cursor: pointer; }
+.btn.primary { background: var(--acc); color: var(--accTx); }
+.btn.ghost { background: transparent; color: var(--tx); border: 1px solid var(--line); }
+.steps { margin: 0; padding-left: 20px; color: var(--mut); font-size: 14px; }
+.toast { color: var(--keep); font-weight: 600; font-size: 13px; min-width: 70px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Set up your status HUD</h1>
+  <p class="lede">The HUD is the panel above your main session's prompt. It shows every Claude session you run and how hard your machine is working. Each numbered item below can be kept or removed. This picture uses sample data, and some items only appear when they matter.</p>
+
+  <div class="card">
+    <div class="row" style="margin-bottom:12px">
+      <div><span class="label">What should each session's dot show?</span><div class="hint">The coloured dot at the start of every session row.</div></div>
+      <div class="seg" id="dotSeg" role="group" aria-label="Dot colour">
+        <button data-v="project">Its project (tab colour)</button>
+        <button data-v="account">Its Claude account</button>
+      </div>
+    </div>
+    <div class="hudwrap"><div class="hud" id="hud" aria-label="Sample status HUD with numbered items"></div></div>
+    <p class="hint" style="margin:8px 0 0">Click a number, or an item in the list, to remove it or bring it back. Scroll sideways if the picture is wider than your window.</p>
+  </div>
+
+  <div class="areas" id="areas"></div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="label" style="margin-bottom:6px">When you are done</div>
+    <ol class="steps">
+      <li>Press <b>Copy my choices</b> at the bottom of the page.</li>
+      <li>Paste it into your Claude chat and send it.</li>
+      <li>Claude applies it, and the HUD redraws from its next start. You can come back to this page any time.</li>
+    </ol>
+  </div>
+</main>
+
+<div class="bar"><div class="in">
+  <code id="out"></code>
+  <span class="toast" id="toast" role="status"></span>
+  <button class="btn ghost" id="reset">Reset</button>
+  <button class="btn primary" id="copy">Copy my choices</button>
+</div></div>
+
+<script>
+const DATA = /*__GUIDE_DATA__*/null;
+const PRESET = /*__PRESET__*/null;
+const DEFAULT_OFF = new Set();
+const state = { dot: 'account', off: new Set(DEFAULT_OFF) };
+function applyPreset(p) {
+  if (!p) return;
+  if (p.dotMode === 'project' || p.dotMode === 'account') state.dot = p.dotMode;
+  const known = new Set(DATA.items.map(i => i.id));
+  state.off = new Set(String(p.hideItems || '').split(',').map(s => s.trim()).filter(id => known.has(id)));
+}
+applyPreset(PRESET);
+const num = new Map(DATA.items.map((it, i) => [it.id, i + 1]));
+const owner = new Map(); // "row:col" -> item id
+for (const it of DATA.items) for (const a of it.at) for (let x = a.from; x < a.to; x++) { const k = a.row + ':' + x; if (!owner.has(k)) owner.set(k, it.id); }
+
+const hud = document.getElementById('hud');
+function drawHud() {
+  hud.textContent = '';
+  const g = DATA[state.dot];
+  g.forEach((row, y) => {
+    const r = document.createElement('div'); r.className = 'r';
+    row.forEach(([ch, fg, bg, bold], x) => {
+      const c = document.createElement('span'); c.className = 'c'; c.textContent = ch;
+      c.style.color = fg; if (bg) c.style.background = bg; if (bold) c.style.fontWeight = '700';
+      const id = owner.get(y + ':' + x); if (id) { c.dataset.id = id; if (state.off.has(id)) c.classList.add('off'); }
+      r.appendChild(c);
+    });
+    hud.appendChild(r);
+  });
+  // Numbers left to right per row; one that would touch the number before it moves right of it.
+  const lastRight = new Map();
+  const ch = hud.querySelector('.c')?.getBoundingClientRect().width || 7;
+  const placed = DATA.items.filter(it => it.at[0]).sort((p, q) => p.at[0].row - q.at[0].row || p.at[0].from - q.at[0].from);
+  for (const it of placed) {
+    const a = it.at[0];
+    const b = document.createElement('button'); b.className = 'badge' + (state.off.has(it.id) ? ' off' : '');
+    b.textContent = num.get(it.id); b.title = it.name + (state.off.has(it.id) ? ' (removed)' : '');
+    b.setAttribute('aria-label', num.get(it.id) + ': ' + it.name + (state.off.has(it.id) ? ', removed' : ', kept'));
+    b.style.top = (a.row * 30 - 2) + 'px';
+    b.onclick = () => toggle(it.id);
+    b.onmouseenter = () => hot(it.id, true); b.onmouseleave = () => hot(it.id, false);
+    hud.appendChild(b);
+    const left = Math.max(a.from * ch, (lastRight.get(a.row) ?? -99) + 3);
+    b.style.left = left + 'px';
+    lastRight.set(a.row, left + b.getBoundingClientRect().width);
+  }
+}
+function hot(id, on) { hud.querySelectorAll('.c[data-id="' + id + '"]').forEach(c => c.classList.toggle('hot', on)); }
+
+const areas = document.getElementById('areas');
+function drawList() {
+  areas.textContent = '';
+  const byArea = new Map();
+  for (const it of DATA.items) { if (!byArea.has(it.area)) byArea.set(it.area, []); byArea.get(it.area).push(it); }
+  for (const [area, items] of byArea) {
+    const sec = document.createElement('section'); sec.className = 'card area';
+    const h = document.createElement('h2'); h.textContent = area; sec.appendChild(h);
+    for (const it of items) {
+      const off = state.off.has(it.id);
+      const row = document.createElement('div'); row.className = 'item' + (off ? ' off' : '');
+      row.onmouseenter = () => hot(it.id, true); row.onmouseleave = () => hot(it.id, false);
+      const n = document.createElement('div'); n.className = 'num'; n.textContent = num.get(it.id);
+      const body = document.createElement('div');
+      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = it.name;
+      if (it.when) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = it.when; nm.appendChild(t); }
+      if (!it.at.length) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = 'not in this picture'; nm.appendChild(t); }
+      const w = document.createElement('div'); w.className = 'what'; w.textContent = it.what;
+      body.append(nm, w);
+      const seg = document.createElement('div'); seg.className = 'seg keeprm'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', it.name);
+      for (const [v, label] of [['keep', 'Keep'], ['rm', 'Remove']]) {
+        const b = document.createElement('button'); b.className = v; b.textContent = label;
+        b.setAttribute('aria-pressed', String((v === 'rm') === off));
+        b.onclick = () => { if ((v === 'rm') !== state.off.has(it.id)) toggle(it.id); };
+        seg.appendChild(b);
+      }
+      row.append(n, body, seg); sec.appendChild(row);
+    }
+    areas.appendChild(sec);
+  }
+}
+
+function choices() {
+  const o = { dotMode: state.dot, hideItems: DATA.items.filter(i => state.off.has(i.id)).map(i => i.id).join(',') };
+  return 'Apply my status HUD choices (orchestration-kit: bash scripts/hud-guide.sh apply in the kit): ' + JSON.stringify(o);
+}
+function render() {
+  drawHud(); drawList();
+  document.querySelectorAll('#dotSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === state.dot)));
+  document.getElementById('out').textContent = choices();
+}
+function toggle(id) { if (state.off.has(id)) state.off.delete(id); else state.off.add(id); render(); }
+document.querySelectorAll('#dotSeg button').forEach(b => b.onclick = () => { state.dot = b.dataset.v; render(); });
+document.getElementById('reset').onclick = () => { state.dot = 'account'; state.off = new Set(DEFAULT_OFF); applyPreset(PRESET); render(); };
+document.getElementById('copy').onclick = async () => {
+  const text = choices(); const t = document.getElementById('toast');
+  try { await navigator.clipboard.writeText(text); }
+  catch { const r = document.createRange(); r.selectNodeContents(document.getElementById('out')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand('copy'); }
+  t.textContent = 'Copied'; setTimeout(() => { t.textContent = ''; }, 2500);
+};
+render();
+</script>
+</body>
+</html>
