@@ -31,7 +31,11 @@ function wrap(text: string, n: number): string[] {
 export const kfmt = (t: number): string => `${Math.round(t / 1000)}K`
 const gb = (v: number, d = 1): string => v.toFixed(d)
 
-export type Chip = { label: string; fg: Col; bg: Col; press?: string }
+/** `alert`: a warning to act on, its urgency (1 = most urgent); alerts are drawn apart, at the right, most urgent first. */
+export type Chip = { label: string; fg: Col; bg: Col; press?: string; alert?: number }
+
+/** Whether an item is drawn: every item is on unless its id is in `hideItems` (README: Items). */
+const shows = (cfg: Config, id: string): boolean => !cfg.hide.has(id)
 
 /** Hidden when quiet mode is not configured, or when its script is missing here and it is not already ON (so an ON flag can still be turned off). */
 const quietChipShown = (snap: Snapshot): boolean => snap.quietMode !== null && (snap.quietAvail !== false || snap.quietMode === true)
@@ -39,7 +43,7 @@ const quietChipShown = (snap: Snapshot): boolean => snap.quietMode !== null && (
 export function chips(v: View): Chip[] {
   const out: Chip[] = []
   const { snap, cfg } = v
-  if (quietChipShown(snap)) {
+  if (quietChipShown(snap) && shows(cfg, 'work-mode')) {
     const on = snap.quietMode === true
     const tog = canToggle(cfg)
     // A failed press stays on the chip (red, still pressable to retry) until it expires or the next press works.
@@ -48,27 +52,43 @@ export function chips(v: View): Chip[] {
     out.push({ label: ` ${name}${err ? ' ✖ failed' : ''}${tog ? ' ⏻' : ''} `, fg: err || on ? C.white : C.bg, bg: err ? C.rD : on ? C.orange : C.green, ...(tog ? { press: 'quiet' } : {}) })
   }
   const host = snap.host
-  if (host?.commit) {
-    const lv = commitLevel(host.commit.usedPct, cfg)
-    if (lv !== 'ok') out.push({ label: ` ⚠ Windows commit ${Math.round(host.commit.usedPct)}% `, fg: C.white, bg: lv === 'red' ? C.rD : C.aD })
+  if (shows(cfg, 'count')) out.push({ label: ` ${snap.sessions.length} sessions `, fg: C.tx, bg: C.gray })
+  if (shows(cfg, 'warnings')) {
+    // Most urgent first: Windows memory (all of WSL stops at 100%), a session past the report mark (hand it over
+    // soon), then a high load (watch).
+    if (host?.commit) {
+      const lv = commitLevel(host.commit.usedPct, cfg)
+      if (lv !== 'ok') out.push({ label: ` ⚠ Windows commit ${Math.round(host.commit.usedPct)}% `, fg: C.white, bg: lv === 'red' ? C.rD : C.aD, alert: 1 })
+    }
+    const over = snap.sessions.filter(s => s.tokens >= cfg.reportMark)
+    if (over.length > 0) out.push({ label: ` ≥${kfmt(cfg.reportMark)}: ${over.map(s => s.name).join(' ')} `, fg: C.white, bg: C.rD, alert: 2 })
+    if (host && loadLevel(host.load[0], host.threads, cfg) === 'red') out.push({ label: ` load ${host.load[0].toFixed(1)} high `, fg: C.white, bg: C.rD, alert: 3 })
   }
-  const over = snap.sessions.filter(s => s.tokens >= cfg.reportMark)
-  if (over.length > 0) out.push({ label: ` ≥${kfmt(cfg.reportMark)}: ${over.map(s => s.name).join(' ')} `, fg: C.white, bg: C.rD })
-  if (host && loadLevel(host.load[0], host.threads, cfg) === 'red') out.push({ label: ` load ${host.load[0].toFixed(1)} high `, fg: C.white, bg: C.rD })
-  out.push({ label: ` ${snap.sessions.length} sessions `, fg: C.tx, bg: C.gray })
   return out
 }
 
+/** Chips in two groups: information from the left, alerts against the right edge, so the two never mix. */
 function chipLine(v: View, width: number, left: string, right: string): Line {
-  const line: Line = [one(left, C.dim)]
+  const all = chips(v)
+  const alerts = all.filter(c => c.alert !== undefined).sort((a, b) => (a.alert ?? 0) - (b.alert ?? 0))
+  const info = all.filter(c => c.alert === undefined)
   let used = left.length + right.length
-  for (const c of chips(v)) {
-    const w = c.label.length + 1
-    if (used + w > width) break
-    line.push(one(c.label, c.fg, c.bg, true, c.press), one(' ', C.tx))
-    used += w
+  // Alerts claim their room first (they matter most), then information fills what is left.
+  const shownAlerts: Chip[] = []
+  for (const c of alerts) {
+    if (used + c.label.length + 1 > width) break
+    shownAlerts.push(c)
+    used += c.label.length + 1
   }
-  line.push(one(' '.repeat(Math.max(0, width - used)), C.tx), one(right, C.dim))
+  const line: Line = [one(left, C.dim)]
+  for (const c of info) {
+    if (used + c.label.length + 1 > width) break
+    line.push(one(c.label, c.fg, c.bg, true, c.press), one(' ', C.tx))
+    used += c.label.length + 1
+  }
+  line.push(one(' '.repeat(Math.max(0, width - used)), C.tx))
+  for (const c of shownAlerts) line.push(one(' ', C.tx), one(c.label, c.fg, c.bg, true, c.press))
+  line.push(one(right, C.dim))
   return line
 }
 
@@ -103,6 +123,12 @@ export function meters(v: View, max: number): Meter[] {
     const used = d.totalGb >= 1000 ? `${gb(d.usedGb / 1024)}` : `${Math.round(d.usedGb)}`
     out.push({ label: trunc(d.mount === '/' ? 'DISK' : (d.mount.split('/').pop() || d.mount).toUpperCase(), 5), f, fg: hot, text: `${used}/${total} ${Math.round(f * 100)}%`, textFg: hot, mark: -1 })
   }
+  // Switched-off meters go first: CPU/RAM/WIN/GPU/VRAM by name, the first disk as "disk", any other as "disk2".
+  const STD: Record<string, string> = { CPU: 'cpu', RAM: 'ram', WIN: 'win', GPU: 'gpu', VRAM: 'vram' }
+  let firstDisk = true
+  const keep = out.filter(m => shows(v.cfg, STD[m.label] ?? (firstDisk ? ((firstDisk = false), 'disk') : 'disk2')))
+  out.length = 0
+  out.push(...keep)
   // Too many for the rows: drop disks beyond the first, then VRAM, before anything else.
   const drop = (pred: (m: Meter, i: number) => boolean): void => {
     const i = out.findIndex(pred)
@@ -131,38 +157,57 @@ export function modelBadge(model: string): [string, Col] {
 /** A busy session's mark turns clockwise through the four corners (▘ ▝ ▗ ▖), one step per half second. */
 export const spin = (now: number): string => '▘▝▗▖'.charAt(Math.floor(now / 500) % 4)
 
-/** One session row: acct dot, name, context bar + K, state glyph, activity. Flashes red after crossing the report mark. */
+/** The row's dot: the Claude account (blue 1, purple 2) or, with `dotMode: project`, the session's project color. */
+export function dotColor(v: View, h: Heartbeat): Col {
+  if (v.cfg.dotMode === 'project') return h.color || C.dim
+  return h.account === 2 ? C.purple : C.blue
+}
+
+/** One session row: dot, name, context bar + K, state glyph, activity; each part can be switched off. Flashes red after crossing the report mark. */
 export function sessionRow(v: View, h: Heartbeat, w: number, selected = false): Scr {
   const s = new Scr(w, 1)
+  const on = (id: string): boolean => shows(v.cfg, id)
   const lv = fillLevel(h.tokens, v.cfg)
   const flashing = isFlashing(v.flash[h.id], v.now) && flashPhase(v.now)
   const bg = flashing ? C.rD : selected ? C.gray : null
   const fg = flashing ? C.white : LV[lv]
   for (let x = 0; x < w; x++) s.put(x, 0, ' ', C.tx, bg)
   const st = h.state === 'busy' ? [spin(v.now), C.green] : h.state === 'shell' ? ['$', C.orange] : ['○', C.dim]
-  s.put(0, 0, '●', h.account === 2 ? C.purple : C.blue, bg)
-  s.put(2, 0, pad(trunc(h.name, 7), 7), flashing ? C.white : h.state === 'idle' ? C.dim : C.tx, bg, true)
-  let x = 10
-  if (w >= 30) {
+  let x = 0
+  if (on('dot')) {
+    s.put(0, 0, '●', dotColor(v, h), bg)
+    x = 2
+  }
+  s.put(x, 0, pad(trunc(h.name, 7), 7), flashing ? C.white : h.state === 'idle' ? C.dim : C.tx, bg, true)
+  x += 8
+  if (on('model') && w >= 30) {
     const [b, c] = modelBadge(h.model)
     s.put(x, 0, b, flashing ? C.white : c, bg, true)
     x += 4
   }
-  if (w >= 24) {
+  if (on('bar') && w >= 24) {
     const mark = Math.round((v.cfg.reportMark / h.window) * 8)
     bar(s, x, 0, 8, h.tokens / h.window, fg, mark)
     if (flashing) for (let i = 0; i < 8; i++) s.cells[0]![x + i]!.bg = bg
     x += 9
   }
-  s.put(x, 0, `${lpad(kfmt(h.tokens), 5)}${lv === 'red' ? '!' : lv === 'amber' ? '~' : ' '}`, fg, bg, true)
-  x += 7
-  s.put(x, 0, st[0] as string, flashing ? C.white : (st[1] as Col), bg, true)
-  x += 2
-  if (w - x > 6) s.put(x, 0, trunc(h.activity, w - x), flashing ? C.white : C.dim, bg)
+  if (on('tokens')) {
+    s.put(x, 0, `${lpad(kfmt(h.tokens), 5)}${lv === 'red' ? '!' : lv === 'amber' ? '~' : ' '}`, fg, bg, true)
+    x += 7
+  }
+  if (on('state')) {
+    s.put(x, 0, st[0] as string, flashing ? C.white : (st[1] as Col), bg, true)
+    x += 2
+  }
+  if (on('activity') && w - x > 6) s.put(x, 0, trunc(h.activity, w - x), flashing ? C.white : C.dim, bg)
   return s
 }
 
-const acctSummary = (ss: readonly Heartbeat[]): string => {
+const acctSummary = (ss: readonly Heartbeat[], cfg: Config): string => {
+  if (cfg.dotMode === 'project') {
+    const n = new Set(ss.map(s => s.project || '?')).size
+    return `SESSIONS ${ss.length} · ${n} project${n === 1 ? '' : 's'}`
+  }
   const a1 = ss.filter(s => s.account !== 2).length
   return `SESSIONS ${ss.length} · acct 1 ×${a1} · acct 2 ×${ss.length - a1}`
 }
@@ -177,10 +222,11 @@ export function drawBand(v: View, cols: number, maxRows: number): Line[] {
   const dim = C.dim
   s.put(0, 0, `┌${'─'.repeat(W - 2)}┐`, dim)
   s.put(LX, 0, '┬', dim)
-  s.put(2, 0, ` HOST · ${v.snap.host?.threads ?? '?'} threads `, C.gold, null, true)
-  s.put(LX + 2, 0, ` ${acctSummary(ss)} `, C.gold, null, true)
+  const on = (id: string): boolean => shows(v.cfg, id)
+  if (on('host-title')) s.put(2, 0, ` HOST · ${v.snap.host?.threads ?? '?'} threads `, C.gold, null, true)
+  if (on('sessions-title')) s.put(LX + 2, 0, ` ${acctSummary(ss, v.cfg)} `, C.gold, null, true)
   const tag = ' STATUS HUD '
-  s.put(W - 2 - tag.length, 0, tag, dim)
+  if (on('frame-title')) s.put(W - 2 - tag.length, 0, tag, dim)
   for (let y = 1; y <= 6; y++) {
     s.put(0, y, '│', dim)
     s.put(LX, y, '│', dim)
@@ -193,30 +239,40 @@ export function drawBand(v: View, cols: number, maxRows: number): Line[] {
   const ms = meters(v, 6)
   ms.forEach((m, i) => {
     meterRow(s, 2, 1 + i, m.label, m.f, m.fg, m.text, 14, m.textFg, m.mark)
-    if (m.hist && LX - 2 - 32 >= 8) spark(s, 34, 1 + i, m.hist.d, Math.min(12, LX - 36), m.hist.lo, m.hist.hi, m.fg)
+    if (m.hist && on('history') && LX - 2 - 32 >= 8) spark(s, 34, 1 + i, m.hist.d, Math.min(12, LX - 36), m.hist.lo, m.hist.hi, m.fg)
   })
   if (!v.snap.host) s.put(2, 2, 'waiting for host reading…', dim)
 
   const rx = LX + 2
   const area = W - rx - 2
   const win = ss[0]?.window ?? 1_000_000
-  s.put(rx, 1, `CONTEXT of ${win >= 1_000_000 ? `${win / 1_000_000}M` : kfmt(win)}`, dim)
-  s.put(rx + 15, 1, '■', C.green)
-  s.put(rx + 17, 1, `<${kfmt(v.cfg.amberMark)}`, dim)
-  s.put(rx + 24, 1, '■', C.amber)
-  s.put(rx + 26, 1, `${kfmt(v.cfg.amberMark)}-${kfmt(v.cfg.reportMark)}`, dim)
-  s.put(rx + 37, 1, '■', C.red)
-  s.put(rx + 39, 1, `≥${kfmt(v.cfg.reportMark)}`, dim)
-  // The state key: what the mark after each session's tokens means (busy turns, see spin).
-  let kx = rx + 39 + `≥${kfmt(v.cfg.reportMark)}`.length + 3
-  for (const [mark, col, text] of [['▘', C.green, 'busy'], ['$', C.orange, 'shell'], ['○', C.dim, 'idle']] as const) {
-    if (kx + mark.length + 1 + text.length > rx + area) break
+  // The key row: the context colors, then (project dots) which color is which project; a key that does not fit is left out.
+  let kx = rx
+  const key = (mark: string, col: Col, text: string): void => {
+    if (kx + mark.length + text.length + 3 > W - 2) return
     s.put(kx, 1, mark, col)
     kx = s.put(kx + mark.length + 1, 1, text, dim) + 2
   }
+  if (on('context-key')) {
+    kx = s.put(kx, 1, `CONTEXT of ${win >= 1_000_000 ? `${win / 1_000_000}M` : kfmt(win)}`, dim) + 2
+    key('■', C.green, `<${kfmt(v.cfg.amberMark)}`)
+    key('■', C.amber, `${kfmt(v.cfg.amberMark)}-${kfmt(v.cfg.reportMark)}`)
+    key('■', C.red, `≥${kfmt(v.cfg.reportMark)}`)
+  }
+  if (v.cfg.dotMode === 'project' && on('dot-key') && on('dot')) {
+    const seen = new Map<string, Col>()
+    for (const h of ss) if (h.project && !seen.has(h.project)) seen.set(h.project, h.color || C.dim)
+    for (const [name, col] of seen) key('●', col, trunc(name, 14))
+  }
+  if (on('state-key')) {
+    key('▘', C.green, 'busy')
+    key('$', C.orange, 'shell')
+    key('○', C.dim, 'idle')
+  }
   const cap = Math.max(0, area)
-  const colW = cap >= 126 ? Math.floor((cap - 2) / 2) : cap
-  const nCols = cap >= 126 ? 2 : 1
+  const two = cap >= 126 && on('column2')
+  const colW = two ? Math.floor((cap - 2) / 2) : cap
+  const nCols = two ? 2 : 1
   const slots = 5 * nCols
   const shown = ss.length > slots ? slots - 1 : ss.length
   for (let i = 0; i < shown; i++) {
@@ -262,7 +318,7 @@ export function drawCompact(v: View, W: number): Line[] {
     const g = h.state === 'busy' ? spin(v.now) : h.state === 'shell' ? '$' : '○'
     if (x + txt.length + 4 > W) break
     s.put(x, 1, ' ', C.tx, bg)
-    s.put(x + 1, 1, '●', h.account === 2 ? C.purple : C.blue, bg)
+    s.put(x + 1, 1, shows(v.cfg, 'dot') ? '●' : ' ', dotColor(v, h), bg)
     s.put(x + 2, 1, txt, flashing ? C.white : h.state === 'idle' ? C.dim : LV[lv], bg, true)
     s.put(x + 2 + txt.length, 1, g, C.tx, bg, true)
     s.put(x + 3 + txt.length, 1, ' ', C.tx, bg)
@@ -309,31 +365,36 @@ export function drawPane(v: View, cols: number): Line[] {
   ms.forEach((x, i) => meterRow(m, 1, i, x.label, x.f, x.fg, x.text, barW, x.textFg, x.mark))
   if (!host) m.put(1, 0, 'waiting for host reading…', C.dim)
   for (let y = 0; y < m.h; y++) lines.push([seg(m, y)])
-  if (host) {
+  if (host && shows(v.cfg, 'history')) {
     const g = new Scr(W, 3)
     g.put(1, 0, `LOAD HISTORY   avg ${host.load.map(x => x.toFixed(1)).join(' / ')}`, C.dim)
     graph2(g, 1, 1, host.hist.load, W - 2, 0, Math.max(host.threads, 1), LV[loadLevel(host.load[0], host.threads, v.cfg)])
     for (let y = 0; y < 3; y++) lines.push([seg(g, y)])
   }
-  lines.push(sep(W, acctSummary(ss)))
+  lines.push(sep(W, acctSummary(ss, v.cfg)))
   ss.forEach((h, i) => lines.push([seg(sessionRow(v, h, W - 2, i === v.sel), 0, `sel:${i}`)]))
   const cur = ss[clamp(v.sel, 0, Math.max(0, ss.length - 1))]
   if (cur) {
     const lv = fillLevel(cur.tokens, v.cfg)
     const t = new Scr(W, 3)
     t.put(1, 0, `▸ ${cur.name}`, C.gold, null, true)
-    t.put(4 + cur.name.length, 0, `${cur.state} · ${kfmt(cur.tokens)} of ${kfmt(cur.window)} · acct ${cur.account} · ${cur.model}`, C.dim)
+    t.put(4 + cur.name.length, 0, `${cur.state} · ${kfmt(cur.tokens)} of ${kfmt(cur.window)} · ${v.cfg.dotMode === 'project' ? cur.project || 'no project' : `acct ${cur.account}`} · ${cur.model}`, C.dim)
     t.put(1, 1, trunc(cur.activity, W - 2), C.tx)
     t.put(1, 2, `context ${Math.round((cur.tokens / cur.window) * 100)}% ${lv === 'red' ? '(report now)' : lv === 'amber' ? '(hand over soon)' : '(ok)'}`, LV[lv])
     for (let y = 0; y < 3; y++) lines.push([seg(t, y)])
   }
   lines.push(sep(W, 'MODE'))
-  const cl = chips(v)
+  const all = chips(v)
+  // Information first, then the alerts on a row of their own, most urgent first: the two never mix.
+  const cl = [...all.filter(c => c.alert === undefined), ...all.filter(c => c.alert !== undefined).sort((a, b) => (a.alert ?? 0) - (b.alert ?? 0))]
   let row: Line = [one(' ', C.tx)]
   let used = 1
+  let inAlerts = false
   for (const c of cl) {
     const w = c.label.length + 1
-    if (used + w > W && row.length > 1) {
+    const breakToAlerts = c.alert !== undefined && !inAlerts
+    if (c.alert !== undefined) inAlerts = true
+    if ((used + w > W || breakToAlerts) && row.length > 1) {
       lines.push(row)
       row = [one(' ', C.tx)]
       used = 1

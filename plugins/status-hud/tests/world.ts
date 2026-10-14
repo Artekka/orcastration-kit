@@ -5,12 +5,12 @@ import { SAMPLE_OUT } from './fakeio'
 type On = Parameters<typeof mock.clock>[0]
 
 /** A mocked machine beneath the plugin: files, processes, session facts, env, store, clock. */
-export function world(on: On, o: { name?: string; acct?: string; quietFlag?: string } = {}) {
+export function world(on: On, o: { name?: string; acct?: string; quietFlag?: string; repo?: string; env?: Record<string, string> } = {}) {
   const files = new Map<string, string>()
   const ran: string[][] = []
   const usage = { tokens: 100_000, window: 1_000_000 }
   const clock = mock.clock(on, { now: 5_000_000 })
-  mock.env(on, { HOME: '/home/u' })
+  mock.env(on, { HOME: '/home/u', ...o.env })
   const stored: Record<string, unknown> = {}
   on('store.get', async (_$, e) => ({ value: stored[e.key] }))
   on('store.set', async (_$, e) => {
@@ -59,6 +59,8 @@ export function world(on: On, o: { name?: string; acct?: string; quietFlag?: str
       return out('')
     }
     if (argv[0] === 'test') return out('', 1)
+    // git rev-parse --git-common-dir: the session's main checkout (o.repo), else not a repo.
+    if (argv[0] === 'git') return o.repo ? out(`${o.repo}/.git\n`) : out('', 128)
     if (argv[0] === 'mkdir' || argv[0] === 'mv') return out('')
     const script = String(argv[2] ?? '')
     if (script.includes('chmod 600')) {

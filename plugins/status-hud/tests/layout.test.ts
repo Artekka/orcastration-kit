@@ -113,20 +113,83 @@ test('the pane explains the chip in one caption line; the band does not spend a 
   expect(hidden).not.toContain('holds NEW')
 })
 
-test('model badge after the name: OPS yellow, SNT blue, HKU green, GEM purple, else three letters in gray', async () => {
-  expect(modelBadge('claude-opus-5-5[1m]')).toEqual(['OPS', '#e8b030'])
-  expect(modelBadge('claude-sonnet-5-5')).toEqual(['SNT', '#4cd0e0'])
-  expect(modelBadge('claude-haiku-5-5')).toEqual(['HKU', '#4fd160'])
-  expect(modelBadge('gemini-3.8-flash')).toEqual(['GEM', '#b98cf0'])
-  expect(modelBadge('claude-fable-5-1')).toEqual(['FAB', '#8a9bb0'])
-  expect(modelBadge('')).toEqual(['   ', '#8a9bb0'])
-  const row = (model: string, w: number): string => sessionRow(view(), { ...S('Orca', 100), model }, w).runs(0).map(r => r.text).join('')
-  expect(row('claude-sonnet-5-5', 70)).toMatch(/Orca +SNT/)
-  expect(row('opus', 70)).toMatch(/Orca +OPS/)
-  const badge = sessionRow(view(), { ...S('Orca', 100), model: 'opus' }, 70).runs(0).find(r => r.text.includes('OPS'))
-  expect(badge?.fg).toBe('#e8b030')
-  expect(row('opus', 28)).not.toContain('OPS')   // too narrow: the badge gives way first
-  for (const cols of [180, 120, 100]) for (const l of drawBand(view(), cols, 10)) expect(widthOf(l)).toBeLessThanOrEqual(cols)
+// ---- project dots, item switches, alerts ------------------------------------------------------------------
+
+const projSnap = { ...snap, sessions: sessions.map((h, i) => ({ ...h, project: i % 2 ? 'book-shop' : 'lunch-diary', color: i % 2 ? '#16a085' : '#d35400' })) }
+const bandText = (v: View): string => drawBand(v, 180, 10).map(l => lineText(l)).join('\n')
+
+test('dots: by account by default, by the session\'s project color with dotMode: project', async () => {
+  const proj = parseConfig({ dotMode: 'project' }, '/h')
+  const dot = (c: typeof cfg, h: Partial<Heartbeat>): string => sessionRow(view({ cfg: c }), { ...S('Mars', 10), ...h }, 70).cells[0]![0]!.fg
+  expect(dot(cfg, { account: 2, color: '#16a085' })).toBe('#b98cf0')
+  expect(dot(proj, { account: 2, color: '#16a085' })).toBe('#16a085')
+  // a session that reported no color: a grey dot, never another project's
+  expect(dot(proj, {})).toBe(C_DIM)
+  // the band's key names each project in its color, the title counts projects instead of accounts
+  const pv = bandText(view({ snap: projSnap, cfg: proj }))
+  expect(pv).toContain('● lunch-diary')
+  expect(pv).toContain('● book-shop')
+  expect(pv).toContain('SESSIONS 10 · 2 projects')
+  expect(pv).not.toContain('acct 1')
+  // the default look is unchanged: account title, no project key
+  const av = bandText(view({ snap: projSnap }))
+  expect(av).toContain('acct 1 ×')
+  expect(av).not.toContain('lunch-diary')
+  // the pane's detail line names the project
+  expect(drawPane(view({ snap: projSnap, cfg: proj }), 60).map(lineText).join('\n')).toContain('lunch-diary')
+})
+const C_DIM = sessionRow(view(), S('Mars', 10, 'idle'), 70).runs(0).find(r => r.text.includes('Mars'))!.fg
+
+test('hideItems switches items off by id; unknown ids change nothing', async () => {
+  const hide = (ids: string): string => bandText(view({ cfg: parseConfig({ quietModeOnCmd: 'a', quietModeOffCmd: 'b', hideItems: ids }, '/h') }))
+  const full = hide('')
+  expect(hide('nonsense')).toBe(full)
+  for (const want of ['HOST · 28 threads', 'SESSIONS 10', 'STATUS HUD', 'CONTEXT of 1M', 'CPU', 'RAM', 'WIN', 'GPU', 'VRAM', 'DISK', '10 sessions', 'WORK mode', 'Windows commit']) expect(full).toContain(want)
+  expect(hide('host-title')).not.toContain('HOST · 28')
+  expect(hide('sessions-title')).not.toContain('SESSIONS 10')
+  expect(hide('frame-title')).not.toContain('STATUS HUD')
+  expect(hide('context-key')).not.toContain('CONTEXT of')
+  expect(full).toContain('○ idle')
+  expect(hide('state-key')).not.toContain('○ idle')
+  expect(hide('cpu')).not.toContain('CPU')
+  expect(hide('ram,win,gpu,vram')).not.toMatch(/RAM|WIN |GPU|VRAM/)
+  expect(hide('count')).not.toContain('10 sessions')
+  expect(hide('work-mode')).not.toContain('WORK mode')
+  expect(hide('warnings')).not.toContain('Windows commit')
+  expect(full).toMatch(/[▁▂▃▄▅▆▇]/)
+  expect(hide('history')).not.toMatch(/[▁▂▃▄▅▆▇]/)
+  // the second column: off shows one column and "+N more"
+  expect(hide('column2')).toContain('more (/hud pane)')
+  expect(full).not.toContain('more (/hud pane)')
+  // row parts
+  const row = (ids: string): string => sessionRow(view({ cfg: parseConfig({ hideItems: ids }, '/h') }), S('Mars', 100), 70).runs(0).map(x => x.text).join('')
+  expect(row('').startsWith('● Mars')).toBe(true)
+  expect(row('dot').startsWith('Mars')).toBe(true)
+  expect(row('tokens')).not.toContain('100K')
+  expect(row('activity')).not.toContain('doing a long')
+  expect(row('')).toContain('OPS')
+  expect(row('model')).not.toContain('OPS')
+  expect(row('model,bar,tokens,state,activity').trim()).toBe('● Mars')
+})
+
+test('alerts sit at the right of the chip line, most urgent first; information stays left', async () => {
+  // snap: commit 88% (amber warning), load 28.3 of 28 threads (high), and sessions past the report mark
+  const cs = chips(view())
+  const alerts = cs.filter(c => c.alert !== undefined).map(c => c.label.trim().split(' ')[0])
+  expect(alerts).toEqual(['⚠', '≥350K:', 'load'])
+  expect(cs.find(c => c.label.includes('sessions'))?.alert).toBe(undefined)
+  const line = lineText(drawBand(view(), 200, 10)[8]!)
+  expect(line.indexOf('10 sessions')).toBeLessThan(line.indexOf('⚠ Windows commit'))
+  expect(line.indexOf('⚠ Windows commit')).toBeLessThan(line.indexOf('≥350K'))
+  expect(line.indexOf('≥350K')).toBeLessThan(line.indexOf('load 28.3 high'))
+  expect(line.trimEnd().endsWith('high │')).toBe(true)
+  expect(Array.from(line).length).toBe(200)
+  // the pane: information on its rows, then the alerts on a row of their own
+  const pane = drawPane(view(), 80).map(lineText)
+  const infoRow = pane.findIndex(l => l.includes('10 sessions'))
+  const alertRow = pane.findIndex(l => l.includes('Windows commit'))
+  expect(alertRow).toBeGreaterThan(infoRow)
+  expect(pane[alertRow]).not.toContain('sessions ')
 })
 
 test('a busy session\'s mark turns clockwise, one step per half second; shell and idle stay still', async () => {
@@ -145,4 +208,20 @@ test('the band\'s key says what the state marks mean', async () => {
   expect(key).toContain('$ shell')
   expect(key).toContain('○ idle')
   for (const cols of [120, 100]) for (const l of drawBand(view(), cols, 10)) expect(widthOf(l)).toBeLessThanOrEqual(cols)
+})
+
+test('model badge after the name: OPS yellow, SNT blue, HKU green, GEM purple, else three letters in gray', async () => {
+  expect(modelBadge('claude-opus-5-5[1m]')).toEqual(['OPS', '#e8b030'])
+  expect(modelBadge('claude-sonnet-5-5')).toEqual(['SNT', '#4cd0e0'])
+  expect(modelBadge('claude-haiku-5-5')).toEqual(['HKU', '#4fd160'])
+  expect(modelBadge('gemini-3.8-flash')).toEqual(['GEM', '#b98cf0'])
+  expect(modelBadge('claude-fable-5-1')).toEqual(['FAB', '#8a9bb0'])
+  expect(modelBadge('')).toEqual(['   ', '#8a9bb0'])
+  const row = (model: string, w: number): string => sessionRow(view(), { ...S('Orca', 100), model }, w).runs(0).map(r => r.text).join('')
+  expect(row('claude-sonnet-5-5', 70)).toMatch(/Orca +SNT/)
+  expect(row('opus', 70)).toMatch(/Orca +OPS/)
+  const badge = sessionRow(view(), { ...S('Orca', 100), model: 'opus' }, 70).runs(0).find(r => r.text.includes('OPS'))
+  expect(badge?.fg).toBe('#e8b030')
+  expect(row('opus', 28)).not.toContain('OPS')   // too narrow: the badge gives way first
+  for (const cols of [180, 120, 100]) for (const l of drawBand(view(), cols, 10)) expect(widthOf(l)).toBeLessThanOrEqual(cols)
 })

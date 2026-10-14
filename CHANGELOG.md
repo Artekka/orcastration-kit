@@ -4,6 +4,9 @@ Newest first.
 
 ## Unreleased
 
+- **New, status HUD: project dots.** `dotMode: project` colors each session's dot by its project (the main checkout of its directory, so a sibling in its own worktree counts), so one HUD tells several projects' teams apart; the key row then names each project in its color and the sessions title counts projects. The color is the session's own tab color when its launcher set `CLAUDE_TAB_COLOR`, else the color the launcher recorded for the project in `<kitRuntimeDir>/tab-colors`, else the team block's `tab_color:`, else a fixed color from the project's name; a missing file is skipped. Other sessions' rows keep their project and color when read. Default `account`: the look does not change.
+- **New, status HUD: item switches.** `hideItems` turns off any drawn item by id (README: Items), e.g. `history,context-key`. Default: none.
+- **Changed, status HUD: alerts apart from information.** Warnings now sit against the right edge of the chip line (on a row of their own in the pane), most urgent first: Windows commit, past the report mark, high load. The session count moves left, with the other information.
 - **Changed: the GitHub repository is now `Artekka/orcastration-kit`** (was `claude-orchestration-kit`). Install with `claude plugin marketplace add Artekka/orcastration-kit`; the plugin id (`orchestration-kit@artekka-kits`), its slash commands and `~/.orchestration-kit/` do not change. GitHub redirects the old URL, so existing installs keep working. README, GETTING-STARTED, CONTRIBUTING, SECURITY, the issue-template link and the Code of Conduct contact link use the new name; the plugin manifest gains `homepage` and `repository`.
 - **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
 - **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)
