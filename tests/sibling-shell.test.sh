@@ -18,7 +18,7 @@ sandbox; n=$(nameFor W1d); W "$n" --model haiku
 eq "W1 default prompt is the orient skill" "--name|$n|--model|haiku|/orchestration-kit:orient|" "$(argv_of 1)"
 
 # 1b. --mode: the permission flags sit between --name and --model, exactly where lib-launch.sh puts them.
-for m in normal accept-edits auto; do
+for m in normal accept-edits auto bypass-available; do
   sandbox; n=$(nameFor W1m); W "$n" --mode "$m" --model 'sonnet[1m]' "go"
   want="--name|$n|$(launch_mode_flags "$m" | sed 's/ $//' | tr ' ' '|')|"
   [ "$m" = normal ] && want="--name|$n|"

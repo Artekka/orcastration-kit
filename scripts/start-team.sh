@@ -10,7 +10,7 @@
 #
 # Usage:
 #   scripts/start-team.sh [--dry-run] [--siblings N] [--seat NAME] [--prefix PFX]
-#                         [--mode normal|accept-edits|auto] [--model M] [--effort E]
+#                         [--mode normal|accept-edits|auto|bypass-available] [--model M] [--effort E]
 #                         [--terminal BACKEND|auto|list] [--repo DIR]
 #   --terminal list   print every backend and whether it is available here, then exit
 #   --account N|DIR   launch the whole team on that Claude Code account (docs/MULTI-ACCOUNT.md)
@@ -46,7 +46,7 @@ while [ $# -gt 0 ]; do
     --siblings) shift; f_n="${1:?--siblings needs a number}" ;;
     --seat) shift; f_seat="${1:?--seat needs a name}" ;;
     --prefix) shift; f_prefix="${1:?--prefix needs a name prefix}" ;;
-    --mode) shift; f_mode="${1:?--mode needs normal|accept-edits|auto}" ;;
+    --mode) shift; f_mode="${1:?--mode needs normal|accept-edits|auto|bypass-available}" ;;
     --account) shift; f_account="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
     # f_model_set / f_effort_set record "given", apart from "empty": `--model=` is a given, invalid value.
     --model) need_value $# --model "a model id, e.g. opus[1m]"; shift; f_model="$1"; f_model_set=1 ;;

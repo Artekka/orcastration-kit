@@ -80,7 +80,8 @@ Team — `scripts/start-team.sh` and `scripts/recycle-sibling.sh` read this bloc
 it; without it the defaults are seat `Orca`, siblings `Sib1`..`Sib2`, normal permissions). Keep
 the `team:` line unindented and the keys indented. `permission_mode` is one of `normal`
 (asks before risky actions), `accept-edits` (`--permission-mode acceptEdits`), `auto`
-(`--permission-mode auto`); `start-team.sh --mode X` saves it here so recycles reuse it.
+(`--permission-mode auto`), `bypass-available` (`--allow-dangerously-skip-permissions`: starts
+like `normal`; Shift+Tab can then switch to bypass, which has no permission checks at all); `start-team.sh --mode X` saves it here so recycles reuse it.
 `worktrees` is `advised` (every session is instructed to work in its own git worktree; nothing
 blocks it) or `enforced` (the kit's PreToolUse hook blocks file edits in the main checkout, except
 `docs/orchestration/**`, the log and the status doc — needs the `.kit-hooks` marker). Keep

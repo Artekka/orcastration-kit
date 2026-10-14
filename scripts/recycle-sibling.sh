@@ -23,7 +23,7 @@
 # You can change the team's names, permission mode or terminal at any time — just ask Claude.
 #
 # Usage:
-#   scripts/recycle-sibling.sh [--dry-run] [--mode normal|accept-edits|auto] [--account N|DIR]
+#   scripts/recycle-sibling.sh [--dry-run] [--mode normal|accept-edits|auto|bypass-available] [--account N|DIR]
 #                              [--model M] [--effort E] [--new-tab] [--force]
 #                              [--terminal BACKEND|auto|list] [--repo DIR] <Name> [prompt]
 #     prompt defaults to /orchestration-kit:orient, or /orchestration-kit:orchestrate for the seat.
@@ -65,7 +65,7 @@ while [ $# -gt 0 ]; do
     --new-tab) FORCE_NEW_TAB=1 ;;
     --force) FORCE=1 ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
-    --mode) shift; MODE="${1:?--mode needs normal|accept-edits|auto}" ;;
+    --mode) shift; MODE="${1:?--mode needs normal|accept-edits|auto|bypass-available}" ;;
     --account) shift; ACCOUNT="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
     # MODEL_SET / EFFORT_SET record "given", apart from "empty": `--model=` is a given, invalid value.
     --model) need_value $# --model "a model id, e.g. opus[1m]"; shift; MODEL="$1"; MODEL_SET=1 ;;
