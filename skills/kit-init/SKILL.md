@@ -102,7 +102,13 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    fi
    ```
    On Yes, commit `.claude/settings.json` if the install changed it (explicit path), and tell the human: "The HUD appears in the seat's window from its next start; `/hud band`, `/hud pane` or `/hud off` switch it, `/hud quiet` toggles quiet mode."
-10. **Offer the tour (last thing, whatever the HUD answer was)** — ask in plain text, one line: "Want the tour? `HOW-IT-WORKS.md` explains the whole loop in one diagram: the seat, the board, builders in their own worktrees, independent checks, trains, and every setting you can change." On Yes, give the link `https://github.com/Artekka/orcastration-kit/blob/main/HOW-IT-WORKS.md` (the same page ships as `docs/how-it-works.html` in the plugin) and summarize the loop in five lines. On No, say it stays linked from the README and `docs/GETTING-STARTED.md`.
+10. **Your start word (once per machine)** — skip this step when `bash "${CLAUDE_PLUGIN_ROOT}/scripts/kit-word.sh" show` already prints a word. Otherwise ask in plain text, one line: "Pick a word to start the kit from any terminal: typing it lists your projects, starts a project's team, or sets the kit up on a new one, so you never type the scripts' paths. For example `team`, `go`, or a name you like. Or say skip." The folder the picker lists is this repo's parent folder unless the human names another. Install it, and say what the script printed:
+    ```bash
+    WORD=<their word>; PROJECTS="$(dirname "$(git rev-parse --show-toplevel)")"
+    bash "${CLAUDE_PLUGIN_ROOT}/scripts/kit-word.sh" install "$WORD" --projects "$PROJECTS"
+    ```
+    It refuses a word that already names a command, alias or function and says which; ask for another word, or add `--replace` only when the human says to take that one over. It adds one marked block to `~/.bashrc` (`~/.zshrc` under zsh); `kit-word.sh remove` takes it out. Tell the human it works in new terminals (or after `source ~/.bashrc`).
+11. **Offer the tour (last thing, whatever the HUD answer was)** — ask in plain text, one line: "Want the tour? `HOW-IT-WORKS.md` explains the whole loop in one diagram: the seat, the board, builders in their own worktrees, independent checks, trains, and every setting you can change." On Yes, give the link `https://github.com/Artekka/orcastration-kit/blob/main/HOW-IT-WORKS.md` (the same page ships as `docs/how-it-works.html` in the plugin) and summarize the loop in five lines. On No, say it stays linked from the README and `docs/GETTING-STARTED.md`.
 
 ## Rules
 

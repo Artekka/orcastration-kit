@@ -4,6 +4,7 @@ Newest first.
 
 ## Unreleased
 
+- **New: your own start word.** `kit-init` asks once per machine for a word (e.g. `go`); typing it in any terminal lists your projects and the installed kit's version, starts a project's team or one Claude chat, or sets the kit up on a project that lacks it. `scripts/kit-word.sh install|remove|show` manages it (one marked block in `~/.bashrc` / `~/.zshrc`); `scripts/kit-launch.sh` is the picker. Optional `before_start=`, `header_cmd=` and `news_cmd=` in `~/.orchestration-kit/launcher.conf`. Tests: `tests/kit-launch.test.sh`.
 - **Changed: the GitHub repository is now `Artekka/orcastration-kit`** (was `claude-orchestration-kit`). Install with `claude plugin marketplace add Artekka/orcastration-kit`; the plugin id (`orchestration-kit@artekka-kits`), its slash commands and `~/.orchestration-kit/` do not change. GitHub redirects the old URL, so existing installs keep working. README, GETTING-STARTED, CONTRIBUTING, SECURITY, the issue-template link and the Code of Conduct contact link use the new name; the plugin manifest gains `homepage` and `repository`.
 - **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
 - **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)
