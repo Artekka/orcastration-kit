@@ -367,6 +367,30 @@ launch_init() {
     wsl-*) case "$LAUNCH_REPO" in *[\;\"\'\ ]*)
       echo "repo path must not contain spaces or ; \" ' on WSL (wt.exe/conhost command lines): $LAUNCH_REPO" >&2; exit 64 ;; esac ;;
   esac
+  # Windows Terminal tab style (team block `tab_profile:` / `tab_color:`). Without a profile, wt.exe styles a
+  # tab that runs wsl.exe like a plain console (the C:\ icon, the default colors), not like the distro's tabs.
+  LAUNCH_WT_PROFILE=""; LAUNCH_TAB_COLOR=""
+  if [ "$LAUNCH_BACKEND" = wsl-wt ]; then
+    case "${TEAM_TAB_PROFILE:-}" in none) ;; "") LAUNCH_WT_PROFILE="$LAUNCH_DISTRO" ;; *) LAUNCH_WT_PROFILE="$TEAM_TAB_PROFILE" ;; esac
+    case "${TEAM_TAB_COLOR:-auto}" in none) ;; auto) LAUNCH_TAB_COLOR="$(_launch_project_color)" ;; *) LAUNCH_TAB_COLOR="$TEAM_TAB_COLOR" ;; esac
+  fi
+}
+
+# One tab color per repo, so the seat's and every sibling's tab match and two projects differ. The first
+# launch picks one no other repo holds and records it in ${KIT_STATE_DIR:-~/.orchestration-kit}/runtime/
+# tab-colors, one line per repo: "<repo path><TAB>#rrggbb" (other tools, e.g. a status line, may read it).
+# Edit that line, or set `tab_color:` in the team block, to change it.
+_launch_project_color() {
+  local f="${KIT_STATE_DIR:-$HOME/.orchestration-kit}/runtime/tab-colors" c have free=()
+  local palette=("#c0392b" "#d35400" "#b7950b" "#27ae60" "#16a085" "#2980b9" "#8e44ad" "#c2185b" "#5d4037" "#455a64" "#00838f" "#6a1b9a")
+  mkdir -p "$(dirname "$f")" && touch "$f" 2>/dev/null || return 0
+  have="$(awk -F'\t' -v r="$LAUNCH_REPO" '$1 == r { print $2; exit }' "$f")"
+  if [ -n "$have" ]; then printf '%s' "$have"; return 0; fi
+  for c in "${palette[@]}"; do cut -f2 "$f" | grep -qixF -- "$c" || free+=("$c"); done
+  [ "${#free[@]}" -gt 0 ] || free=("${palette[@]}")
+  c="${free[RANDOM % ${#free[@]}]}"
+  printf '%s\t%s\n' "$LAUNCH_REPO" "$c" >> "$f"
+  printf '%s' "$c"
 }
 
 # The part identified by pgrep: `claude --name N [flags] prompt` (or the test override).
@@ -399,7 +423,14 @@ _launch_q_cmd() {  # cmd.exe: the global prompt whitelist already excludes its m
 launch_cmd() {
   local q=_launch_q_posix
   case "$LAUNCH_BACKEND" in wsl-*) q=_launch_q_wsl ;; esac
-  printf 'cd %s && %s%s' "$(printf '%q' "$LAUNCH_REPO")" "$LAUNCH_NVM" "$(_launch_core "$1" "$2" "$q")"
+  # Windows Terminal draws 24-bit color but does not say so (no COLORTERM), so Claude Code would round every hex
+  # color to the 256-color palette. CLAUDE_TAB_COLOR=#rrggbb tells the session (e.g. a status line) its tab's color.
+  local style=""
+  if [ "$LAUNCH_BACKEND" = wsl-wt ]; then
+    style="export COLORTERM=truecolor && "
+    [ -z "${LAUNCH_TAB_COLOR:-}" ] || style="export COLORTERM=truecolor CLAUDE_TAB_COLOR=$LAUNCH_TAB_COLOR && "
+  fi
+  printf 'cd %s && %s%s%s' "$(printf '%q' "$LAUNCH_REPO")" "$style" "$LAUNCH_NVM" "$(_launch_core "$1" "$2" "$q")"
 }
 
 # Git Bash: a cmd.exe command line (Windows path, native Windows claude).
@@ -423,7 +454,11 @@ _launch_argv() {  # <name> <prompt>
   local name="$1" prompt="$2" cmd emu bin
   case "$LAUNCH_BACKEND" in
     wsl-wt)
-      LAUNCH_ARGV=("$LAUNCH_WT" -w 0 new-tab --title "$name" wsl.exe -d "$LAUNCH_DISTRO" --cd "$LAUNCH_REPO" -e bash -lc "$(launch_cmd "$name" "$prompt")") ;;
+      LAUNCH_ARGV=("$LAUNCH_WT" -w 0 new-tab)
+      [ -z "${LAUNCH_WT_PROFILE:-}" ] || LAUNCH_ARGV+=(-p "$LAUNCH_WT_PROFILE")
+      LAUNCH_ARGV+=(--title "$name")
+      [ -z "${LAUNCH_TAB_COLOR:-}" ] || LAUNCH_ARGV+=(--tabColor "$LAUNCH_TAB_COLOR")
+      LAUNCH_ARGV+=(wsl.exe -d "$LAUNCH_DISTRO" --cd "$LAUNCH_REPO" -e bash -lc "$(launch_cmd "$name" "$prompt")") ;;
     wsl-conhost)
       LAUNCH_ARGV=("$LAUNCH_PS" -NoProfile -Command "$(_launch_ps_cmd "$name" "$prompt")") ;;
     tmux)
@@ -636,19 +671,23 @@ launch_recycle_inplace() {
 
 # Optional `team:` block in docs/orchestration/ORCHESTRATION.md: an unindented `team:` line,
 # then indented `key: value` lines. Sets TEAM_SEAT TEAM_PREFIX TEAM_N TEAM_MODE TEAM_TERMINAL
-# TEAM_MODEL TEAM_EFFORT (empty when absent; template placeholders like <Orca> are ignored for the
+# TEAM_NAMES (a comma list, no spaces) TEAM_NUMBERED (letters numbering the pool: w -> w1-Mars)
+# TEAM_TAB_PROFILE TEAM_TAB_COLOR TEAM_MODEL TEAM_EFFORT (empty when absent; template placeholders like <Orca> are ignored for the
 # name/mode keys, but an invalid model/effort EXITS 64, since silently launching on the default model
 # is the failure this block exists to prevent).
 launch_team_conf() {  # <repo>
   local conf="$1/docs/orchestration/ORCHESTRATION.md" k v
   # shellcheck disable=SC2034  # TEAM_CONF is read by start-team.sh
   TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""; TEAM_TERMINAL=""; TEAM_MODEL=""; TEAM_EFFORT=""; TEAM_MAX=""
+  TEAM_NAMES=""; TEAM_NUMBERED=""; TEAM_TAB_PROFILE=""; TEAM_TAB_COLOR=""
   [ -f "$conf" ] || return 0
   while IFS='=' read -r k v; do
     case "$k" in
       seat) TEAM_SEAT="$v" ;; prefix) TEAM_PREFIX="$v" ;; siblings) TEAM_N="$v" ;;
       permission_mode) TEAM_MODE="$v" ;; terminal) TEAM_TERMINAL="$v" ;;
       model) TEAM_MODEL="$v" ;; effort) TEAM_EFFORT="$v" ;; max_sessions) TEAM_MAX="$v" ;;
+      names) TEAM_NAMES="$v" ;; numbered) TEAM_NUMBERED="$v" ;;
+      tab_profile) TEAM_TAB_PROFILE="$v" ;; tab_color) TEAM_TAB_COLOR="$v" ;;
     esac
   done < <(awk '
     /^team:[[:space:]]*$/ { on=1; next }
@@ -658,6 +697,8 @@ launch_team_conf() {  # <repo>
   launch_valid_name "$TEAM_PREFIX" || TEAM_PREFIX=""
   [[ "$TEAM_N" =~ ^[0-9]$ ]] || TEAM_N=""
   [[ "$TEAM_MAX" =~ ^[1-9][0-9]*$ ]] || TEAM_MAX=""
+  [[ "$TEAM_TAB_PROFILE" =~ ^[A-Za-z0-9._-]+$ ]] || TEAM_TAB_PROFILE=""
+  [[ "$TEAM_TAB_COLOR" =~ ^(auto|none|#[0-9A-Fa-f]{6})$ ]] || TEAM_TAB_COLOR=""
   launch_valid_mode "$TEAM_MODE" || TEAM_MODE=""
   if [ -n "$TEAM_MODEL" ] && ! launch_valid_model "$TEAM_MODEL"; then
     echo "team block: model '$TEAM_MODEL' is not valid (opus[1m], sonnet[1m], haiku or a full model id; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64

@@ -4,6 +4,7 @@ Newest first.
 
 ## Unreleased
 
+- **New: Windows Terminal tab style on WSL.** Tabs now open with the distro's own profile (`-p Ubuntu`), so they look like your other Linux tabs instead of a plain console (the `C:\` icon), and with one tab color per repo (`--tabColor`), shared by the seat and its siblings and different between projects. The color is picked once and recorded in `~/.orchestration-kit/runtime/tab-colors` (one `<repo path><TAB>#rrggbb` line per repo), and each tab's session gets `CLAUDE_TAB_COLOR=#rrggbb` and `COLORTERM=truecolor` (Windows Terminal draws 24-bit color but does not say so). `tab_profile:` and `tab_color:` in the team block override either (`none` turns it off). Tests: `tests/tab-style.test.sh`.
 - **Changed: the GitHub repository is now `Artekka/orcastration-kit`** (was `claude-orchestration-kit`). Install with `claude plugin marketplace add Artekka/orcastration-kit`; the plugin id (`orchestration-kit@artekka-kits`), its slash commands and `~/.orchestration-kit/` do not change. GitHub redirects the old URL, so existing installs keep working. README, GETTING-STARTED, CONTRIBUTING, SECURITY, the issue-template link and the Code of Conduct contact link use the new name; the plugin manifest gains `homepage` and `repository`.
 - **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
 - **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)
