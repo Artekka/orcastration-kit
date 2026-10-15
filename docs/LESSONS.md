@@ -488,3 +488,15 @@ came from a verifier finding or a falsify run that went red where the builder ex
     something slightly different. Keep the probe free of calls that exist on only one side (or
     pick the call at run time), print one line per action at each input level (empty, half,
     full), and diff the two outputs line by line.
+
+86. **"Every item is covered" comes from a script over the list, never from memory.** A write-back
+    reported that every item on a list was ruled, tested and migrated; a script over the same list
+    then found one item missed and one never ruled. Before claiming full coverage, loop over the
+    list's real source (the file, the table, the grep) and print each item with where it is
+    covered; quote that output, including its count.
+
+87. **When a repair pass runs before a check, report the check's count before the repair too.** A
+    local cleanup (a relax, a smooth, an auto-fix) ran before a metric and turned its red into a
+    visible artifact the metric no longer measured (folds became wrinkles) while the gate read
+    green. Print the metric before and after the repair; a large drop is a finding to look at,
+    not a pass (see 62: measure on the output).
