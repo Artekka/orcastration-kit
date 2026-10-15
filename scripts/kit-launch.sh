@@ -18,7 +18,8 @@
 #                                     line (e.g. to add your own notes about the kit); 3 s limit
 #   news_cmd=~/bin/kit-news.sh        optional: what `<word> news` runs
 #   update_cmd=~/bin/kit-update.sh    optional: the menu gains [u] update the kit, which runs it in this
-#                                     terminal (e.g. a Claude chat that runs /orchestration-kit:kit-update)
+#                                     terminal (e.g. a Claude chat that runs /orchestration-kit:kit-update);
+#                                     exit 2 from it means "nothing to update": the menu stays open
 #   chat_args=--model sonnet          optional: extra claude arguments for [c] one chat
 # Folders ending in -Test (trial copies), folders starting with _ (e.g. _archive), git worktrees (a .git
 # file, not a folder: a sibling's working copy of another project) and the kit's own folder are not listed.
@@ -106,10 +107,10 @@ set_up_or_chat() {
   esac
 }
 
-update_kit() {  # runs update_cmd= in this terminal (KIT_LAUNCH_DRY=1 prints it)
+update_kit() {  # runs update_cmd= in this terminal (KIT_LAUNCH_DRY=1 prints it); 2 = nothing to update
   local -a cmd; read -ra cmd <<<"$(conf update_cmd)"
-  if [ -n "${KIT_LAUNCH_DRY:-}" ]; then printf 'UPDATE %s\n' "${cmd[*]}"; return 0; fi
-  exec "${cmd[@]}"
+  if [ -n "${KIT_LAUNCH_DRY:-}" ] && [ -z "${KIT_LAUNCH_RUN_UPDATE:-}" ]; then printf 'UPDATE %s\n' "${cmd[*]}"; return 0; fi
+  "${cmd[@]}"
 }
 
 open_project() { if has_kit "$1"; then team_or_chat "$1"; else set_up_or_chat "$1"; fi; }
@@ -173,7 +174,8 @@ while :; do
   case "$c" in
     [qQ]) exit 0 ;;
     [nN]) new_project; rc=$?; [ "$rc" -eq 2 ] || exit "$rc" ;;
-    [uU]) if [ -n "$(conf update_cmd)" ]; then update_kit; exit $?; else echo "  Pick a number, n, or q."; fi ;;
+    [uU]) if [ -n "$(conf update_cmd)" ]; then update_kit; rc=$?; [ "$rc" -eq 2 ] || exit "$rc"
+          else echo "  Pick a number, n, or q."; fi ;;
     *)
       if [[ "$c" =~ ^[0-9]+$ ]] && [ "$c" -ge 1 ] && [ "$c" -le "${#PROJ[@]}" ]; then
         open_project "${PROJ[$((c-1))]}"; rc=$?; [ "$rc" -eq 2 ] || exit "$rc"

@@ -45,6 +45,13 @@ out="$(pick 'u\nq\n')"; has "update: u without update_cmd is not a choice" "Pick
 printf 'update_cmd=~/bin/kit-up.sh --now\n' >> "$S/launcher.conf"
 out="$(pick 'q\n')"; has "update: [u] in the menu" "[u] update the kit" "$out"
 out="$(pick 'u\n')"; has "update: u runs update_cmd, ~ expanded" "UPDATE $H/bin/kit-up.sh --now" "$out"
+# update_cmd exit 2 = nothing to update: its message shows and the menu stays open
+mkdir -p "$H/bin"; printf '#!/bin/sh\necho "You are on the latest."\nexit 2\n' > "$H/bin/kit-up.sh"; chmod +x "$H/bin/kit-up.sh"
+out="$(printf 'u\nq\n' | env HOME="$H" KIT_LAUNCH_DRY=1 KIT_LAUNCH_RUN_UPDATE=1 bash "$L" 2>&1)"; rc=$?
+has "update: nothing-to-do message" "You are on the latest." "$out"; rc_is "update: back to the menu, then quit" 0 $rc
+[ "$(printf '%s' "$out" | grep -c 'pick a project')" -ge 2 ]; rc_is "update: the menu shows again" 0 $?
+printf '#!/bin/sh\nexit 5\n' > "$H/bin/kit-up.sh"
+printf 'u\n' | env HOME="$H" KIT_LAUNCH_DRY=1 KIT_LAUNCH_RUN_UPDATE=1 bash "$L" >/dev/null 2>&1; rc_is "update: other exits pass through" 5 $?
 sed -i '/^update_cmd=/d' "$S/launcher.conf"
 # header_cmd replaces the kit line; a silent or failing one falls back to the version.
 mkdir -p "$H/bin"; printf '#!/bin/sh\necho "My kit 1.0 + 2 notes"\necho second line\n' > "$H/bin/head.sh"; chmod +x "$H/bin/head.sh"
