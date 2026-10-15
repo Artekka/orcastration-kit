@@ -359,3 +359,17 @@ came from a verifier finding or a falsify run that went red where the builder ex
     names themselves. When the guard is layered (a name check, then a content check), patch
     the earlier layer out in-process and show the later one still goes red on its own: a
     layered guard whose inner layer never fires alone is one guard, not two.
+
+66. **A check that compares a clamped accessor can never fail: compare the underlying value.**
+    A getter that caps its result at a maximum (`min(value, max)`) reads exactly "max" whether
+    the stored value is at the cap or far past it, so a test asserting "does not exceed the max"
+    through that getter passes on every overflow it was written to catch. Assert on the raw
+    stored value, and falsify by pushing the raw value past the cap: if the check stays green,
+    it is reading the clamp.
+
+67. **A probe number that feeds a human ruling is cross-checked by a second path first.** A
+    probe meant to measure a "full" store filled it to half: one accessor counted per unit, the
+    other the total of two units. The number it reported shaped a design ruling, which then had
+    to be re-asked when a real run disagreed by a factor of several. Before a probe's number goes
+    to the person deciding, reproduce it another way (a fixture built by the real code path, or a
+    real run) and say in the report that both agree.
