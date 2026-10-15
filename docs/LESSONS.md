@@ -421,3 +421,33 @@ came from a verifier finding or a falsify run that went red where the builder ex
     to a different place, and the measurement followed it. Pin landmarks to something the input
     cannot reshape (a skeleton's joints, a certified reference basis), and fail closed when they
     are missing (see 62: draw them on the output too).
+
+75. **A falsify mutant removes or replaces the guarded line; a diff that only adds lines is a
+    no-op.** A mutant meant to disable a check added a line beside it and left the check itself
+    in place, so the guard still ran and the "mutant" proved nothing. Before running a mutant,
+    read its diff: it must show the guarded line as removed (`-`) or changed. A diff with only
+    `+` lines does not disable anything (see 48 and 70).
+
+76. **After a scripted marker-to-marker cut, grep for the lines it removed.** A script that
+    deleted everything between two markers also swallowed three settings that sat inside the
+    range; nothing failed until a probe run showed the settings missing. After any cut by
+    pattern or marker, list the removed lines (`git diff | grep '^-'`) and check each one was
+    meant to go, before the next step builds on the file.
+
+77. **A context-fill measure reads YOUR transcript, picked by your own session id, never the
+    newest file.** The script measures whichever transcript it is given. A fresh session that
+    took the newest transcript in the folder measured a sibling's 173K as its own. Take your
+    identity from your own listing (the agent listing's first line, or your env block), find
+    the transcript that belongs to it, and measure that one.
+
+78. **A lock helper's release removes only the exact line it wrote, and its default owner is
+    unique per run.** A release that deleted the lock without comparing owners could free a
+    lock another run had taken since; fixed default owner names let two unnamed runs each
+    believe they held it. Write an owner unique to the run (tool, host and process id) unless
+    the caller names one, and on release or trap compare the whole owner line before removing
+    anything. Never use a real session's name as the default (see 73).
+
+79. **Quote context fill from the measuring script's output, never from memory.** A verifier
+    reported about 175K in a status line while its real fill was 300K, past the report mark,
+    and kept working. Every fill number in a READY, report or handover is the script's
+    `current` line pasted from a run made in that same turn.
