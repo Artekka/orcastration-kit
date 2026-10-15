@@ -78,6 +78,16 @@ has "run: project report after" "new: start-team.sh" "$out"
 out="$("$U" run --yes 2>&1)"; has "run --yes: no question, already newest" "already the newest" "$out"
 hasnt "run: no HUD update when not installed" "status-hud" "$(cat "$TMP/claude.log")"
 out="$(STUB_RC=1 "$U" run --yes 2>&1)"; rc_is "run: a failed refresh stops" 1 $?; has "run: says what failed" "could not refresh the marketplace" "$out"
+# --- same version, newer content (a local git marketplace): status says so, --reinstall reinstalls
+git -C "$MP" init -q && git -C "$MP" -c user.name=t -c user.email=t@t commit -q --allow-empty -m one
+offer 1.1; installed 1.1 "$TMP/cache/1.1"; sha="$(git -C "$MP" rev-parse HEAD)"
+sed -i "s|\"version\": \"1.1\"}|\"version\": \"1.1\", \"gitCommitSha\": \"$sha\"}|" "$P/installed_plugins.json"
+out="$("$U" status)"; rc_is "status: same commit is up to date" 0 $?
+git -C "$MP" -c user.name=t -c user.email=t@t commit -q --allow-empty -m two
+out="$("$U" status)"; rc_is "status: same version, newer commit" 10 $?; has "status: says reinstall" "run --reinstall" "$out"
+: > "$TMP/claude.log"; out="$("$U" run --yes --reinstall 2>&1)"; log="$(cat "$TMP/claude.log")"
+has "reinstall: uninstalls" "plugin uninstall orchestration-kit@mk" "$log"; has "reinstall: installs" "plugin install orchestration-kit@mk" "$log"
+hasnt "reinstall: no plain update" "plugin update orchestration-kit@mk" "$log"; has "reinstall: says so" "reinstalled from mk" "$out"
 out="$("$U" 2>&1)"; rc_is "usage" 64 $?
 # the script list must match what kit-init copies
 init="$(sed -n 's/^ *for f in \(.*\); do SRC="\$K\/scripts.*/\1/p' "$ROOT/skills/kit-init/SKILL.md")"

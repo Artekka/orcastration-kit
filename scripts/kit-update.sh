@@ -5,15 +5,19 @@
 #
 # Usage:
 #   kit-update.sh status [--fetch]    the installed version and the newest one the marketplace offers;
-#                                     --fetch refreshes the marketplace first (network). Exit 0 up to
-#                                     date, 10 an update is available, 1 the kit is not installed
-#   kit-update.sh run [--yes] [--projects DIR]
+#                                     --fetch refreshes the marketplace first (network). A marketplace
+#                                     that is a local git folder whose commit differs from the installed
+#                                     one at the same version counts as newer (run --reinstall). Exit 0
+#                                     up to date, 10 an update is available, 1 the kit is not installed
+#   kit-update.sh run [--yes] [--reinstall] [--projects DIR]
 #                                     1. says how many Claude sessions are open (they keep the old
 #                                        version until restarted) and asks before going on (--yes: no ask)
 #                                     2. claude plugin marketplace update <marketplace>
 #                                     3. claude plugin update orchestration-kit@<marketplace>, and
 #                                        status-hud@<marketplace> when it is installed
 #                                     4. the project report below
+#                                     --reinstall: uninstall and install instead of update, for a kit
+#                                     changed without a version bump (Claude Code installs by version)
 #   kit-update.sh projects [--projects DIR]
 #                                     projects with the kit set up whose copies of the kit's session
 #                                     scripts differ from the installed kit (kit-init copies them once
@@ -57,6 +61,10 @@ available() {  # the version the marketplace's local copy offers
   [ -n "$v" ] || v="$(json "j.get('version')" "$loc/.claude-plugin/plugin.json")"
   printf '%s' "$v"
 }
+source_commit() {  # the marketplace folder's git commit, when it is a local git folder
+  local loc; loc="$(json "j['$(marketplace)'].get('installLocation')" "$CFG/plugins/known_marketplaces.json")"
+  [ -n "$loc" ] && git -C "$loc" rev-parse HEAD 2>/dev/null
+}
 newer() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$2" ]; }  # <a> <b>: b is newer
 
 projects_dir() {
@@ -73,6 +81,10 @@ cmd_status() {
   local have want; have="$(installed version)"; want="$(available)"
   if [ -n "$want" ] && newer "$have" "$want"; then
     echo "$PLUGIN $have installed; $want available"; return 10
+  fi
+  local src inst; src="$(source_commit)"; inst="$(installed gitCommitSha)"
+  if [ -n "$src" ] && [ -n "$inst" ] && [ "$src" != "$inst" ] && [ "$want" = "$have" ]; then
+    echo "$PLUGIN $have installed; the same version with newer changes (${src:0:7}): run --reinstall"; return 10
   fi
   echo "$PLUGIN $have installed; up to date${want:+ ($want)}"
 }
@@ -113,9 +125,9 @@ cmd_refresh() {
 }
 
 cmd_run() {
-  local yes=0 dir="" mp before after s a
+  local yes=0 re=0 dir="" mp before after s a
   while [ $# -gt 0 ]; do
-    case "$1" in --yes) yes=1 ;; --projects) shift; dir="${1:?--projects needs a folder}" ;; *) usage ;; esac; shift
+    case "$1" in --yes) yes=1 ;; --reinstall) re=1 ;; --projects) shift; dir="${1:?--projects needs a folder}" ;; *) usage ;; esac; shift
   done
   [ -n "$dir" ] || dir="$(projects_dir)"
   [ -n "$(installed_key)" ] || die "$PLUGIN is not installed"
@@ -129,12 +141,18 @@ cmd_run() {
     case "$a" in [yY]*) ;; *) echo "Not updated."; return 1 ;; esac
   fi
   claude plugin marketplace update "$mp" || die "could not refresh the marketplace $mp"
-  claude plugin update "$PLUGIN@$mp" || die "the plugin update failed; $PLUGIN $before is still installed"
+  if [ "$re" -eq 1 ]; then
+    claude plugin uninstall "$PLUGIN@$mp" || die "could not uninstall $PLUGIN@$mp; $PLUGIN $before is still installed"
+    claude plugin install "$PLUGIN@$mp" || die "the reinstall failed: install it with: claude plugin install $PLUGIN@$mp"
+  else
+    claude plugin update "$PLUGIN@$mp" || die "the plugin update failed; $PLUGIN $before is still installed"
+  fi
   if [ -n "$(json "j['plugins'].get('status-hud@$mp')" "$CFG/plugins/installed_plugins.json")" ]; then
     claude plugin update "status-hud@$mp" || echo "kit-update: the status HUD did not update; it keeps working as it was" >&2
   fi
   after="$(installed version)"
-  if [ "$after" = "$before" ]; then echo "==> $PLUGIN $after: already the newest."
+  if [ "$re" -eq 1 ]; then echo "==> $PLUGIN $after reinstalled from $mp. Restart open sessions to use it."
+  elif [ "$after" = "$before" ]; then echo "==> $PLUGIN $after: already the newest."
   else echo "==> $PLUGIN $before -> $after. Restart open sessions to use it; the old version stays installed until then."; fi
   cmd_projects "$dir"
 }

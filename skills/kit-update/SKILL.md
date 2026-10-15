@@ -19,7 +19,9 @@ One confirmed update, never an automatic one: open sessions keep the version the
    ```bash
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/kit-update.sh" run --yes
    ```
-   Report its lines. A failure leaves the old version installed; say so and show the error.
+   When step 1 said "the same version with newer changes" (a kit installed from a local folder that changed
+   without a version bump), add `--reinstall`: Claude Code installs by version, so a plain update would keep
+   the old copy. Report its lines. A failure leaves the old version installed; say so and show the error.
 4. **Projects** — the run ends with the projects whose copies of the kit's session scripts (`scripts/start-team.sh` and the others kit-init copies once) differ from the new kit. If it lists any, ask once: "Refresh those copies? Each replaced file is kept as `<file>.bak-<date>`." On yes, for each listed project:
    ```bash
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/kit-update.sh" refresh <project folder>
