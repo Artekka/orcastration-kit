@@ -321,3 +321,41 @@ correcting the orchestrator, or a sibling correcting itself.*
 60. **A guard that cries wolf gets deleted.** Measure a marker/heuristic set against the real
     corpus before shipping it: a first-choice marker matched three files, two of which were
     unrelated. Precision is what keeps a guard alive long enough to catch anything.
+
+## Guards, gate logs and worktree git (harvest 2026-10-15)
+
+*One orchestrated day of tool-building rows, each read by a sibling verifier. Every lesson below
+came from a verifier finding or a falsify run that went red where the builder expected green.*
+
+61. **A guard that scans state must run before any step that erases what it scans** — or that
+    step must record what it erased, and the guard reads the record. A guard scanning a mesh's
+    shape keys for forbidden names ran after a bake step that deletes shape keys, so it could
+    never fire; it printed green on every input. Only mutating the *writer* (feeding it a
+    forbidden key) showed it. Order the pipeline so the scan sees the input, and prove each guard
+    red by mutating what produces its input, not just the guard itself.
+
+62. **A measuring guard draws its measured landmarks on the output it judges.** A proportion
+    check passed a ratio of 0.16 because its slice sample was too sparse to land on the feature
+    it claimed to measure; the number looked plausible and the log looked clean. Only an overlay
+    of the sampled points on the rendered output showed they missed the feature. A measurement
+    nobody can see is a measurement nobody can check: emit the overlay with the verdict.
+
+63. **Write the gate log's SHA line inside the throttled command, after the slot is acquired.**
+    A header written before the wait for a gate slot can name a commit the tree no longer holds
+    by the time the gate runs (a rebase or a new commit lands during the wait), so a green log
+    vouches for the wrong SHA. Print `SHA $(git rev-parse HEAD)` as the first line the throttled
+    command itself runs; the verifier compares the slot time against the reflog. Extends 32.
+
+64. **In multi-worktree sessions run every git write as `git -C <worktree>`.** The shell's
+    working directory can reset to the shared checkout between commands, so a bare `git commit`,
+    `checkout` or `merge` meant for a worktree lands in the shared tree instead — one stray
+    checkout detached the shared main. Name the tree on every write; reads may stay bare.
+    Extends 2 (worktree isolation) and 30 (guard the shared checkout's HEAD).
+
+65. **Falsify a path or name filter with its escape variants, and prove each layer bites on
+    its own.** A name denylist missed a forbidden item whose name it never anticipated; the
+    whitelist that replaced it checked only the first path segment, so `allowed/../forbidden`
+    passed. Plant `..`, absolute-path and case variants of every forbidden name, not just the
+    names themselves. When the guard is layered (a name check, then a content check), patch
+    the earlier layer out in-process and show the later one still goes red on its own: a
+    layered guard whose inner layer never fires alone is one guard, not two.
