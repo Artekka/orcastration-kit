@@ -144,10 +144,16 @@ automatically) — add to the project's `.claude/settings.json`:
 
 ## Upgrade
 
+Ask Claude "update the kit" (`/orchestration-kit:kit-update`): it says what changed, updates on your yes, and
+lists projects whose copied session scripts are now older. Or by hand:
+
 ```bash
+bash ~/.claude/plugins/cache/artekka-kits/orchestration-kit/<version>/scripts/kit-update.sh status --fetch   # is there a newer one?
 claude plugin marketplace update artekka-kits
 claude plugin update orchestration-kit
 ```
+
+Open sessions keep the version they started with until you restart them.
 
 Read `CHANGELOG.md` for what changed. New lessons/hardenings = minor bump. A breaking
 board-format/protocol change = major bump with a migration note. After upgrading, re-run
