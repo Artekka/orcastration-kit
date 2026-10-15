@@ -373,3 +373,51 @@ came from a verifier finding or a falsify run that went red where the builder ex
     to be re-asked when a real run disagreed by a factor of several. Before a probe's number goes
     to the person deciding, reproduce it another way (a fixture built by the real code path, or a
     real run) and say in the report that both agree.
+
+68. **A guard measured in fractions of a total takes the total only from parts that cannot be
+    stretched.** A shape guard expressed its limits as fractions of the model's overall height,
+    read from the lowest to the highest point. An added base part lowered the lowest point by a few
+    centimetres, which grew the "height" and shrank every ratio under its limit, so a model the
+    guard should refuse passed. Take the reference length from parts the input cannot extend (named
+    anchors, a fixed skeleton), or refuse any input whose reference parts are not the expected ones.
+
+69. **An input mutant proves it changed the measured feature before its PASS or FAIL counts.** A
+    falsify run fed a deliberately bad input to a guard and the guard passed it, which looked
+    like a hole; another run "passed" correctly, which looked like proof. In both, the mutation
+    had not changed the feature the guard measures. Log the measured value before and after the
+    mutation next to the verdict: a mutant that moved nothing is no evidence either way (see 21
+    and 48 for code mutants).
+
+70. **For a code mutant, predict the exact failure message it should cause, not just red or
+    green.** A mutant that removes one check can turn the run red through a different check that
+    happens to fire too, and a bare "went red" accepts that as proof. Write down which named
+    check should fail and with what message, then compare. A red that arrives through another
+    check, or a check whose flip is hidden behind an earlier failure, is reported as an unclean
+    falsify, not a pass.
+
+71. **"Old data" fixtures are built by the OLD code, in its own worktree.** A migration test
+    loads saved data from before a format change. Fixtures written by the new code in "old
+    mode" carry the new code's assumptions and can pass a migration that real old saves would
+    break. Check out the commit before the change in a separate worktree, produce the fixtures
+    there, record that commit in the fixture's header, and only then test the new code on them.
+
+72. **A claim of "within plus or minus N percent" is checked per row, not on the total.** A
+    re-tune reported every total within -4 to +2 percent of the old numbers; one of the sources
+    feeding a total had moved +60 percent, cancelled out by others. Report the change for each
+    source separately and apply the tolerance to each row; a total within tolerance proves only
+    that the errors cancel.
+
+73. **Test a lock's atomicity on the filesystem where the real lock lives.** A race test for a
+    create-if-absent lock ran in a local temp folder and passed; the real lock file sits on a
+    network-style mount (a 9p or SMB share), where exclusive create can behave differently. Run
+    the race, and its falsify, with the temp folder on that same mount, and use a temp path with
+    the same shape as the real one (spaces included): a test that only ever ran on local disk
+    says nothing about the mount, and a path without spaces hides quoting bugs in the test
+    itself.
+
+74. **A measuring guard must not let the measured object choose its own landmarks.** A guard
+    that found its reference points by a heuristic (the largest step in a profile, the widest
+    slice) could be steered by the mesh it judged: a small shape change moved the "largest step"
+    to a different place, and the measurement followed it. Pin landmarks to something the input
+    cannot reshape (a skeleton's joints, a certified reference basis), and fail closed when they
+    are missing (see 62: draw them on the output too).
