@@ -469,3 +469,22 @@ came from a verifier finding or a falsify run that went red where the builder ex
 82. **Never chain a commit after a gate with `;`.** `run-gate; git commit ...` commits even when
     the gate fails, and the log then shows a green-looking commit on red code. Join them with
     `&&`, or run the gate, read its pass line, and commit in a separate step (see 63).
+
+83. **A byte-identical before/after comparison counts only after a mutant shows it can differ.**
+    "The report is identical" proves nothing if the comparison never reads the part that changed
+    (the wrong file, a cached copy, a section the generator skips). Before quoting a zero-line
+    diff as proof, change one input that must move the output, rerun, and see the diff go
+    non-empty (see 80).
+
+84. **A test that takes its expected value from the constant it guards cannot fail on that
+    constant.** A check computed "what should happen" from the same setting the code used, so
+    setting it to zero moved the code and the expectation together and the check stayed green.
+    Write the ruled value into the test itself. To falsify, mutate the constant AND, separately,
+    delete the call it drives; both must turn the check red (see 70 and 75).
+
+85. **For a parity review, run one probe script unchanged on the base and on the tip, and diff
+    per action and per input level, never per total.** Two probes written for each side, or a
+    probe that sums its results, let opposite differences cancel and let each side measure
+    something slightly different. Keep the probe free of calls that exist on only one side (or
+    pick the call at run time), print one line per action at each input level (empty, half,
+    full), and diff the two outputs line by line.
