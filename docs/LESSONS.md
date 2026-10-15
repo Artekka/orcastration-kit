@@ -451,3 +451,21 @@ came from a verifier finding or a falsify run that went red where the builder ex
     reported about 175K in a status line while its real fill was 300K, past the report mark,
     and kept working. Every fill number in a READY, report or handover is the script's
     `current` line pasted from a run made in that same turn.
+
+80. **Parity with the old version is proved on the whole report, not on the numbers you picked.**
+    A change meant to leave the results as they were passed every per-number check, and a
+    reviewer still found rules that behaved differently. When the goal is "same as before", write
+    the old code's full output once (a report, a probe of every rule) and `diff` the new one
+    against it; zero lines of difference is the proof. Then make the diff fail on purpose (a
+    mutant) so the comparison is known to see a change (see 40 and 72).
+
+81. **After moving a threshold or a scale, sweep every run-time input the rules read, not only
+    the default.** A rescale matched the old results with the default inputs and diverged once a
+    state value the player controls (a fill level, a count, a carried amount) was at half or
+    full: some rules still read a value that included that input on the new scale. List each
+    input that feeds a rule, probe at its empty, middle and full values on both versions, and
+    compare per rule (see 66: never read through a clamped accessor).
+
+82. **Never chain a commit after a gate with `;`.** `run-gate; git commit ...` commits even when
+    the gate fails, and the log then shows a green-looking commit on red code. Join them with
+    `&&`, or run the gate, read its pass line, and commit in a separate step (see 63).
