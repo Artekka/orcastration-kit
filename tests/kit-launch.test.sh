@@ -39,6 +39,13 @@ hasnt "worktree not listed" "kit-app-wt" "$(pick 'q\n')"
 printf 'before_start=~/bin/trust.sh --if-mine\n' >> "$S/launcher.conf"
 out="$(pick 'c\n' plain)"; has "before_start runs with the folder" "BEFORE $H/bin/trust.sh --if-mine $P/plain" "$out"
 sed -i '/^before_start=/d' "$S/launcher.conf"
+# update_cmd: [u] appears only when set, and runs it
+out="$(pick 'q\n')"; hasnt "update: no [u] without update_cmd" "[u]" "$out"
+out="$(pick 'u\nq\n')"; has "update: u without update_cmd is not a choice" "Pick a number, n, or q." "$out"
+printf 'update_cmd=~/bin/kit-up.sh --now\n' >> "$S/launcher.conf"
+out="$(pick 'q\n')"; has "update: [u] in the menu" "[u] update the kit" "$out"
+out="$(pick 'u\n')"; has "update: u runs update_cmd, ~ expanded" "UPDATE $H/bin/kit-up.sh --now" "$out"
+sed -i '/^update_cmd=/d' "$S/launcher.conf"
 # header_cmd replaces the kit line; a silent or failing one falls back to the version.
 mkdir -p "$H/bin"; printf '#!/bin/sh\necho "My kit 1.0 + 2 notes"\necho second line\n' > "$H/bin/head.sh"; chmod +x "$H/bin/head.sh"
 printf 'header_cmd=~/bin/head.sh\n' >> "$S/launcher.conf"
