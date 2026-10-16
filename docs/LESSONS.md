@@ -566,6 +566,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     result by the same factor again; the total was off by that factor and every check stayed
     green. Either drive the call site itself, or check the exact call text (grep the line,
     count the factor's occurrences per site), and falsify by doubling the factor at one site.
+    Next to a per-site check, also assert the exact total number of call sites, so a site added
+    elsewhere cannot go unchecked, and falsify by adding one extra call in another function.
 
 94. **Before proposing how to satisfy a refusing check, trace where the check takes its input.**
     A guard refused an object and the first fix proposed edited the stored data it was assumed to
@@ -600,7 +602,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     the full playthrough saw it. For each guard site, say what object it guards and which
     object the guard compares against, and plant a case per kind (no guard, wrong guard, right
     guard) in the lint; falsify by pasting the guard onto the other kind and checking it goes
-    red (see 70 and 97).
+    red (see 70 and 97). A guard counts only where it controls the use: plant cases where the
+    guard is nested away from the use, is a no-op (`if G: pass`) or is joined by `and not G`,
+    and require the lint to flag each.
 
 99. **A refit that wins back broken bars can quietly move the bars it does not score.** A
     geometry refit repaired the failing measurements while a neighbouring measurement it never
@@ -620,3 +624,30 @@ came from a verifier finding or a falsify run that went red where the builder ex
     reverted. Pin or remove one path per run and record which pin moved the number; apply each
     option as a patch script to a temporary copy of the tree, so a proposal milestone commits
     no game change (see 96).
+
+102. **A gate that truncates error output can hide the reds a mutant should cause.** A falsify
+    run was scored from a gate's shortened output (the first lines of the failure), and a
+    mutant that did turn a guard red looked as if it survived because its message fell past the
+    cut. Score every falsify result from the untruncated log (the full output file, not the
+    gate's summary), and quote the count of red lines found there (see 95).
+
+103. **Size a parallel fan-out by free memory, not by cores.** A fan-out was sized by the
+    processor count, started many heavy processes at once and ran the machine out of memory
+    close to a crash. Start at most two heavy processes, and start each only when the free
+    memory reported by the system is at least 3 GB; wait otherwise (see 88).
+
+104. **Stopping a background shell task leaves its child processes running.** A task was
+    stopped and the engine process it had started kept running, holding memory and a lock.
+    Record each heavy run's process id at launch (a file next to its log) and stop it by that
+    exact id; never by a name match, which can also kill your own shell or another session's
+    run.
+
+105. **A READ of a factor in a shared function lists every caller.** A review confirmed a
+    factor was applied correctly in the function that owns it, without listing who calls the
+    function, and one caller applied the same factor again or skipped it. Grep every caller,
+    quote the list, and state for each whether it applies the factor itself (see 93).
+
+106. **After every delivery, assert the delivered file's md5 against its source.** A file was
+    copied to its destination and used on the belief that the copy was the source; an older or
+    partial copy had been left there. Compare the md5 of the delivered file with the source's
+    in the same command that delivers it, and fail the step when they differ.
