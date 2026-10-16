@@ -592,3 +592,31 @@ came from a verifier finding or a falsify run that went red where the builder ex
     engine fact it names in a minimal script, and prove the fix with a check that can fail (a
     mutant that restores the bug turns it red), not with a green run of the long scenario (see 70
     and 75).
+
+98. **A liveness guard compares to the thing it guards; pasted for another kind of object it
+    silently aborts.** A guard written for one kind of node (a level) was copied to guard a
+    different kind (a child overlay that is never the level), so the guard failed every time
+    and the scripted run quietly stopped; the lint and the smoke test stayed green and only
+    the full playthrough saw it. For each guard site, say what object it guards and which
+    object the guard compares against, and plant a case per kind (no guard, wrong guard, right
+    guard) in the lint; falsify by pasting the guard onto the other kind and checking it goes
+    red (see 70 and 97).
+
+99. **A refit that wins back broken bars can quietly move the bars it does not score.** A
+    geometry refit repaired the failing measurements while a neighbouring measurement it never
+    scored drifted past its limit (a notch went from −1.4 to −1.8 mm). Put every bar that
+    must hold into the refit's cost, not only the ones that failed, and report all bars
+    before and after the refit (see 62 and 94).
+
+100. **Before wiring an effect to an event, prove the event can fire where the effect lives.**
+    An effect was hooked to a clock tick that does not run on the screen the effect belongs
+    to, so the hook was dead code that only a probe could reach. Name the event, name the
+    screen or state the effect lives in, and show a run in which the event fires there (a
+    log line from the real path, not from the probe) before building on it (see 93).
+
+101. **Prove a cause by pinning one path at a time, and measure options as patch scripts on the
+    probe's temp copy.** Several candidate causes were changed together, so a better result
+    could not be attributed; and trying options by editing the game left changes to be
+    reverted. Pin or remove one path per run and record which pin moved the number; apply each
+    option as a patch script to a temporary copy of the tree, so a proposal milestone commits
+    no game change (see 96).
