@@ -651,3 +651,11 @@ came from a verifier finding or a falsify run that went red where the builder ex
     copied to its destination and used on the belief that the copy was the source; an older or
     partial copy had been left there. Compare the md5 of the delivered file with the source's
     in the same command that delivers it, and fail the step when they differ.
+
+107. **Before a long optimization against extrapolated targets, check the targets can be met
+    together.** An optimizer was set to hit several targets (a fill, an aspect ratio, a
+    ratio against the source range), each extrapolated on its own beyond the measured range.
+    The separate curves drifted apart, no solution met them all, and the run stalled for hours
+    on a target nothing could satisfy. Before the long run, evaluate every target at the
+    extremes and at the points beyond the measured range, and test that one candidate (or a
+    cheap relaxation) can satisfy them all at once; if not, reconcile the targets first (see 99).
