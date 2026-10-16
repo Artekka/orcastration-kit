@@ -521,6 +521,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     visible artifact the metric no longer measured (folds became wrinkles) while the gate read
     green. Print the metric before and after the repair; a large drop is a finding to look at,
     not a pass (see 62: measure on the output).
+    The same blindness hides in the check's zone: a check whose zone sits inside the zone a fix
+    just cleaned passes by construction. Report a wider, independent read of the same output
+    next to it, and keep the human-eye check as the evidence.
 
 88. **After a machine crash, audit before assigning any work.** A crash left a rebased branch
     unpushed in one worktree, shared memory files uncommitted, gate logs gone with the temp
@@ -547,6 +550,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     the check on the rejected artifact itself (the picture, the file, the saved run) before
     calling it a guard for that complaint; if it stays green there, it does not guard it (see
     69 and 75).
+    Before building a check for a reviewer's complaint, measure what actually differs between the
+    rejected output and an accepted one: a "slimmer" complaint was a thicker waist, not narrower
+    hips, and the planned hip check would have passed the rejected image.
 
 92. **When inheriting a row, list its scratch files by modification time against the branch tip.**
     A builder took over a row from a session that ended abruptly; its scratch folder held
@@ -560,3 +566,29 @@ came from a verifier finding or a falsify run that went red where the builder ex
     result by the same factor again; the total was off by that factor and every check stayed
     green. Either drive the call site itself, or check the exact call text (grep the line,
     count the factor's occurrences per site), and falsify by doubling the factor at one site.
+
+94. **Before proposing how to satisfy a refusing check, trace where the check takes its input.**
+    A guard refused an object and the first fix proposed edited the stored data it was assumed to
+    read; the guard actually read a live, derived value (an evaluated result, not the stored
+    field), so the edit changed nothing. Read the check's own code to the point where its input
+    enters, name that input, and only then propose a change to it (see 67).
+
+95. **A probe or mutant whose selection is empty passes vacuously: make it abort on an empty
+    pick.** A mutant that was meant to alter "every item matching X" matched none, changed
+    nothing, and the check stayed green, which read as a guard that held. Count what the
+    selection picked and abort with a message when the count is zero; report the count next to
+    the verdict (see 69).
+
+96. **A gap you have not isolated is "not explained", never "noise"; a quantity is "display
+    only" only after every consumer is traced.** A small unexplained difference between two runs
+    was written off as noise, and a value labelled display-only fed a rule two calls away.
+    Write "not explained" until the gap has been reproduced and attributed to a named cause; call
+    a value display-only only after listing every reader of it (grep each consumer, quote the
+    list) (see 72 and 81).
+
+97. **A failure that depends on the path cannot be bisected by one run per commit.** A crash
+    appeared only on some routes through a long scenario, so a good run on a commit proved
+    nothing and a bisect pointed at three different commits. Read the crash frame, reproduce the
+    engine fact it names in a minimal script, and prove the fix with a check that can fail (a
+    mutant that restores the bug turns it red), not with a green run of the long scenario (see 70
+    and 75).
