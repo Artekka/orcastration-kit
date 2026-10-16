@@ -345,6 +345,11 @@ came from a verifier finding or a falsify run that went red where the builder ex
     by the time the gate runs (a rebase or a new commit lands during the wait), so a green log
     vouches for the wrong SHA. Print `SHA $(git rev-parse HEAD)` as the first line the throttled
     command itself runs; the verifier compares the slot time against the reflog. Extends 32.
+    The same wait decides what is tested: a gate queue copies the tree when its slot frees, not
+    when the run was queued, so edits made while waiting are what gets tested (and what the log
+    vouches for). Do not edit the tree while a queued gate waits, or run it from a snapshot made
+    at queue time.
+
 
 64. **In multi-worktree sessions run every git write as `git -C <worktree>`.** The shell's
     working directory can reset to the shared checkout between commands, so a bare `git commit`,
@@ -387,6 +392,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     had not changed the feature the guard measures. Log the measured value before and after the
     mutation next to the verdict: a mutant that moved nothing is no evidence either way (see 21
     and 48 for code mutants).
+    The same holds for a probe: before trusting a probe's number, or a mutant's verdict, show
+    that it moves the quantity the check reads. A probe that changes a neighbouring value
+    reports nothing about the one under test.
+
 
 70. **For a code mutant, predict the exact failure message it should cause, not just red or
     green.** A mutant that removes one check can turn the run red through a different check that
@@ -465,6 +474,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     full: some rules still read a value that included that input on the new scale. List each
     input that feeds a rule, probe at its empty, middle and full values on both versions, and
     compare per rule (see 66: never read through a clamped accessor).
+    A scenario that holds two inputs equal cannot tell them apart: when two readings of a rule
+    differ only where two inputs differ (one counts a value once, the other twice), vary the
+    input that separates the readings, or both readings pass on the pinned case.
+
 
 82. **Never chain a commit after a gate with `;`.** `run-gate; git commit ...` commits even when
     the gate fails, and the log then shows a green-looking commit on red code. Join them with
@@ -481,6 +494,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     setting it to zero moved the code and the expectation together and the check stayed green.
     Write the ruled value into the test itself. To falsify, mutate the constant AND, separately,
     delete the call it drives; both must turn the check red (see 70 and 75).
+    The same goes for an oracle that calls the function it checks: its expected value changes
+    with any change to that function, so it passes every change. Take the expected value from
+    the ruling or from a value written down before the change, never from the code under test.
+
 
 85. **For a parity review, run one probe script unchanged on the base and on the tip, and diff
     per action and per input level, never per total.** Two probes written for each side, or a
@@ -494,6 +511,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     then found one item missed and one never ruled. Before claiming full coverage, loop over the
     list's real source (the file, the table, the grep) and print each item with where it is
     covered; quote that output, including its count.
+    A test that trusts the data's own tags cannot catch a mis-tagged entry: rebuild the
+    population from the file itself (the real column, the real text) instead of from a tag the
+    entry carries, then compare the two counts.
+
 
 87. **When a repair pass runs before a check, report the check's count before the repair too.** A
     local cleanup (a relax, a smooth, an auto-fix) ran before a metric and turned its red into a
@@ -519,3 +540,23 @@ came from a verifier finding or a falsify run that went red where the builder ex
     metric passed a view that was turned 15–20° from the one asked for. Measure at full
     resolution with a number, and check each property separately (style is not geometry: the
     angle, the outline and the proportions each get their own metric).
+
+91. **Prove a new check red on the artifact the human actually rejected, not only on a made-up
+    broken case.** A check passed a hand-built bad example and still passed the very output a
+    reviewer had refused, because the invented case failed in a way the real one did not. Run
+    the check on the rejected artifact itself (the picture, the file, the saved run) before
+    calling it a guard for that complaint; if it stays green there, it does not guard it (see
+    69 and 75).
+
+92. **When inheriting a row, list its scratch files by modification time against the branch tip.**
+    A builder took over a row from a session that ended abruptly; its scratch folder held
+    attempts newer than the last commit, never logged, one of them the working version of a
+    step the branch still lacked. Before starting, list the row's scratch and output files
+    sorted by time next to the tip's commit time: any file newer than the tip is an unlogged
+    attempt, to be read, logged or discarded on purpose (see 88).
+
+93. **A check that never runs the call site cannot see a site that applies a factor twice.**
+    A test checked a helper's result and the helper was right, while one caller multiplied the
+    result by the same factor again; the total was off by that factor and every check stayed
+    green. Either drive the call site itself, or check the exact call text (grep the line,
+    count the factor's occurrences per site), and falsify by doubling the factor at one site.
