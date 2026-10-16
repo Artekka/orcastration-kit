@@ -500,3 +500,22 @@ came from a verifier finding or a falsify run that went red where the builder ex
     visible artifact the metric no longer measured (folds became wrinkles) while the gate read
     green. Print the metric before and after the repair; a large drop is a finding to look at,
     not a pass (see 62: measure on the output).
+
+88. **After a machine crash, audit before assigning any work.** A crash left a rebased branch
+    unpushed in one worktree, shared memory files uncommitted, gate logs gone with the temp
+    folder, and a lock naming a dead session. Before any sibling gets work: check every worktree
+    for dirty files and unpushed commits (push a rebase under a new branch name, never a
+    force-push), commit shared memory left behind, treat every gate log under a temp folder as
+    lost and re-run those gates, check each lock against a live owner, and hold the siblings
+    until the audit is done.
+
+89. **Relay only a settled human ruling to a builder.** The seat forwarded each step of the
+    human's thinking as it came in, and one builder got five specs in fifteen minutes, each
+    superseding the last. Collect the whole answer first, ask "is that final?", then send the
+    builder one spec.
+
+90. **A visual check done on thumbnails is not a check; give each property its own measured
+    check.** A review passed images that looked right at contact-sheet size, and a line-style
+    metric passed a view that was turned 15–20° from the one asked for. Measure at full
+    resolution with a number, and check each property separately (style is not geometry: the
+    angle, the outline and the proportions each get their own metric).
