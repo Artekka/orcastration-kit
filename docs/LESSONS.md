@@ -403,6 +403,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     check should fail and with what message, then compare. A red that arrives through another
     check, or a check whose flip is hidden behind an earlier failure, is reported as an unclean
     falsify, not a pass.
+    Predict only the guard's own effect line: the message or value the guard itself emits when
+    it fires. What the program does after the guard has fired is a guess, so it is written down
+    as a guess and never scored as part of the falsify.
 
 71. **"Old data" fixtures are built by the OLD code, in its own worktree.** A migration test
     loads saved data from before a format change. Fixtures written by the new code in "old
@@ -553,6 +556,11 @@ came from a verifier finding or a falsify run that went red where the builder ex
     Before building a check for a reviewer's complaint, measure what actually differs between the
     rejected output and an accepted one: a "slimmer" complaint was a thicker waist, not narrower
     hips, and the planned hip check would have passed the rejected image.
+    A hole or regression count proves nothing until it has run on the real failing case. Check
+    that its window covers the whole claim (the crop, every layer the complaint is about) and
+    that it counts leaks open to the edge, not only enclosed holes: a count over a cropped or
+    single-layer window, or one that fills only closed gaps, read zero on the very output that
+    was refused.
 
 92. **When inheriting a row, list its scratch files by modification time against the branch tip.**
     A builder took over a row from a session that ended abruptly; its scratch folder held
@@ -624,6 +632,11 @@ came from a verifier finding or a falsify run that went red where the builder ex
     reverted. Pin or remove one path per run and record which pin moved the number; apply each
     option as a patch script to a temporary copy of the tree, so a proposal milestone commits
     no game change (see 96).
+    When a defect survives a fix to one stage of a pipeline, swap components before the next
+    fix: hold one stage, vary the other (A/B renders or runs), and see which stage carries the
+    defect. A scalar meter can confirm a wrong cause: a meter computed in the wrong space or
+    over zones of mixed scale moved with each fix while the defect stayed, and several refits
+    were spent on a stage that was not at fault (see 90).
 
 102. **A gate that truncates error output can hide the reds a mutant should cause.** A falsify
     run was scored from a gate's shortened output (the first lines of the failure), and a
@@ -659,3 +672,11 @@ came from a verifier finding or a falsify run that went red where the builder ex
     on a target nothing could satisfy. Before the long run, evaluate every target at the
     extremes and at the points beyond the measured range, and test that one candidate (or a
     cheap relaxation) can satisfy them all at once; if not, reconcile the targets first (see 99).
+
+108. **Run a long background chain as one script, memory-gated per step, with a status file per
+    step.** A chain of heavy gate steps was started as separate background commands; the
+    system's low-memory reaper killed it partway, and nothing showed which step had finished,
+    which was running and which never started. Put the chain in one script that waits for free
+    memory before each step and writes each step's own status file (started, exit code, end
+    time) next to its log, so a reaped chain shows exactly where it stopped and can resume
+    from there (see 103 and 104).
