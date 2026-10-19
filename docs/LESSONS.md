@@ -715,3 +715,62 @@ came from a verifier finding or a falsify run that went red where the builder ex
     that note with the settings in force, so a mismatch could never be caught. Wherever a stamp
     exists, add the reader that compares it with the live values and fails on any difference,
     and prove that reader red by changing one setting (see 83).
+
+112. **Before pinning an anchor per frame to a measured extreme, measure the motion the pin adds.**
+    A walk animation's feet were pinned frame by frame to the lowest pixel of each frame. The
+    source drifted about 2 px; the pins made the feet bounce 6 to 7 px, because each frame's
+    lowest pixel moves with the pose. Measure the anchor's motion in the source, then in the
+    pinned result, and pin to a value that is steady across frames (a median over the
+    animation, per direction) when the pinned result moves more than the source (see 90).
+
+113. **Measure a "missing" step's output at every later stage before rewriting it.** A step
+    thought to do nothing was about to be rewritten; it was firing and only under-correcting
+    (it lifted a far leg to 0.93 of the target), a later gamma grade doubled the remaining gap,
+    and the last stage reported ok for a frame it had got wrong. Read the step's own output
+    and each later stage's input and output for a few items before changing it; fix the stage
+    where the gap appears, not the one that looks idle.
+
+114. **After a batch fix, a mask-only composite plus an md5 count proves the fix touched only what
+    it should.** A fix meant to change 30 of 288 frames was first applied by re-running the
+    whole pipeline, which changed 6 to 47 px per frame outside the fixed area on frames it
+    should not have touched. Composite the fixed result into the old frame through the fix's
+    mask only, then count by md5 how many outputs differ from before: the count must equal
+    the number meant to change (here 30 changed, 258 identical), and the differing pixels must
+    lie inside the mask (see 83).
+
+115. **A fix whose trigger appears only after another fix is removed cannot go red alone: stack
+    the mutants.** Two fixes covered for each other, so switching off one left the run green
+    and the test looked weak. Switch them off in steps from one saved state (A off; A and B
+    off; all off), say in the prediction which step should turn which check red, and score
+    each step from its own result (see 101 and 109).
+
+116. **Judge a guide on every view before spending a long job on it.** A pose guide looked right
+    from the front and was wrong from the side; the fault was found only after the slow
+    job had run. Before any slow or scarce job (a GPU run, a render, a bake), look at the guide
+    from each view the output will be judged in, and reject it there first (see 107).
+
+117. **A pick-by-eye sheet shows the candidate between fixed anchors, at one scale, on one
+    baseline.** Candidates drawn at different sizes and baselines, with numbers printed on the
+    picture, could not be told apart by eye. Put the candidate between its fixed neighbours,
+    at one scale and a shared baseline; put zoom-ins and measurements in the written
+    note, not on the sheet.
+
+118. **Re-run every guard after the last step that changes what it looks at.** A check counted
+    defects part-way through a pipeline and passed; a later step reshaped the geometry and the
+    final output failed the same check. A guard's count is valid only for the stage it
+    ran at: place the guard after the last step that moves its input, or run it again there
+    and quote that count (see 61 and 87).
+
+119. **When the look is the requirement, a headless check of the model is not the check; read the
+    drawn pixels and add a mutant only the pixel read can kill.** A test confirmed that a glow
+    was scheduled with the right numbers and passed while the drawn glow came out white at
+    night, because one draw mode skips the scene's tint; a divided-out multiplier was never
+    checked on the drawn result either. A pin that stores a value beside the draw call, or
+    calls the update itself, cannot see the effect. Read the rendered pixels inside the
+    subject's own mask, and prove the check red by mutating the effect itself (its colour,
+    its draw order), not the number the pin reads (see 84 and 100).
+
+120. **A probe run that dies part-way gives no results: rerun the whole set.** A long run of
+    probes crashed after some had finished, and the finished ones were quoted as findings.
+    If a run is cut off, none of its numbers count; rerun the whole set and quote only from a complete run
+    (see 95).
