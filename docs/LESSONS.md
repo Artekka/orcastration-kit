@@ -364,6 +364,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     names themselves. When the guard is layered (a name check, then a content check), patch
     the earlier layer out in-process and show the later one still goes red on its own: a
     layered guard whose inner layer never fires alone is one guard, not two.
+    The same holds for finding paths in files: a search by spelling (one drive letter, one
+    prefix) misses relative paths such as `../../x` and paths on other drives. Resolve every
+    path-like string to the place it points and judge the target, not how it is written.
 
 66. **A check that compares a clamped accessor can never fail: compare the underlying value.**
     A getter that caps its result at a maximum (`min(value, max)`) reads exactly "max" whether
@@ -378,6 +381,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     to be re-asked when a real run disagreed by a factor of several. Before a probe's number goes
     to the person deciding, reproduce it another way (a fixture built by the real code path, or a
     real run) and say in the report that both agree.
+    Give the number at full precision whenever someone will set a limit from it. A value
+    reported as "0.030" was really 0.030329; the reviewer set the limit at 0.03, and the real
+    value failed it. Quote the script's own output, unrounded, and round only in prose that sets
+    no limit.
 
 68. **A guard measured in fractions of a total takes the total only from parts that cannot be
     stretched.** A shape guard expressed its limits as fractions of the model's overall height,
@@ -470,6 +477,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     the old code's full output once (a report, a probe of every rule) and `diff` the new one
     against it; zero lines of difference is the proof. Then make the diff fail on purpose (a
     mutant) so the comparison is known to see a change (see 40 and 72).
+    Sample the odd moments as well as the usual one. A "nothing changed" check looked at the
+    normal case only, while the change showed only at night, or on single frames. Probe every
+    regime the rules read (time of day, per-frame versus per-snapshot, the rare branches), not
+    only the moment where the check is convenient (see 81).
 
 81. **After moving a threshold or a scale, sweep every run-time input the rules read, not only
     the default.** A rescale matched the old results with the default inputs and diverged once a
@@ -500,6 +511,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     The same goes for an oracle that calls the function it checks: its expected value changes
     with any change to that function, so it passes every change. Take the expected value from
     the ruling or from a value written down before the change, never from the code under test.
+    A helper in the test that re-implements the code's formula is the same oracle: a bug copied
+    into both stays green. Where the formula cannot be avoided, also pin one case with its value
+    written out by hand.
 
 
 85. **For a parity review, run one probe script unchanged on the base and on the tip, and diff
@@ -546,6 +560,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     metric passed a view that was turned 15–20° from the one asked for. Measure at full
     resolution with a number, and check each property separately (style is not geometry: the
     angle, the outline and the proportions each get their own metric).
+    Check in the same view as the final output. A shape check passed on a flat, simplified
+    render while the real pictures, made through the normal camera, moved 3 to 4 pixels. Measure
+    with the camera, projection and resolution the delivered output uses, or show first that the
+    cheaper view gives the same numbers.
 
 91. **Prove a new check red on the artifact the human actually rejected, not only on a made-up
     broken case.** A check passed a hand-built bad example and still passed the very output a
@@ -680,3 +698,20 @@ came from a verifier finding or a falsify run that went red where the builder ex
     memory before each step and writes each step's own status file (started, exit code, end
     time) next to its log, so a reaped chain shows exactly where it stopped and can resume
     from there (see 103 and 104).
+
+109. **A planted bug proves a new test only if the old tests miss it.** To show a new test works, a
+    bug was planted and the test went red, but the existing tests went red on that same bug, so
+    the new test added nothing that was not already guarded. Run each planted bug against the
+    old suite too and record both results: the new test earns its place only on a bug the old
+    suite leaves green (see 70 and 75).
+
+110. **Falsify a check in the mode the real gate runs it.** A check had a quick mode and a
+    strict mode and ran in the quick one by default, where it could not fail. Prove a check red
+    with the same flags, environment and mode the gate itself uses, and make the gate name that
+    mode explicitly instead of relying on a default.
+
+111. **A stamp that records how something was made counts only if something reads it and stops on a
+    mismatch.** A tool wrote the settings it used next to its output, and nothing ever compared
+    that note with the settings in force, so a mismatch could never be caught. Wherever a stamp
+    exists, add the reader that compares it with the live values and fails on any difference,
+    and prove that reader red by changing one setting (see 83).
