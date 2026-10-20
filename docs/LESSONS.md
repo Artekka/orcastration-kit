@@ -826,6 +826,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     clean real data has branches nobody has proved: its checks survived mutants and a bad
     copy was never tried. Plant a bad copy for each branch (a missing slot, a wrong
     reference) and require the validator to refuse it (see 98 and 109).
+    When the planted fault drops a record, first count the places that point at it (every
+    reference, link or index entry that names it) and predict that many faults. A checker that
+    reports a different count has a finding: it misses a dangling link, or reports one twice
+    (see 70).
 
 125. **A pass line is conditional on exactly the checks it claims; a span with no checks
     says only "no error logged".** A pass line printed unconditionally stays green when its
@@ -873,6 +877,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     limit can survive a mutant on one side while the other side holds it red. Falsify each
     side separately: one mutant that breaks the lower limit, one that breaks the upper, and
     report both results (see 70).
+    The same holds for a rule with several trigger paths. A rule that fires on path X or path
+    Y is proven only when one single-change mutant on each path turns red: a guard proven
+    through one path left the other one unguarded. List the paths the rule names and give
+    each its own mutant.
 
 133. **An automated quick reply to a person can invent facts or promise work nobody
     started; correct it in the full answer and never build on it.** A channel that answers
@@ -885,3 +893,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     questions.** When the foundation of a design is undecided, a set of detailed questions
     asks the person to rule on parts of something that may change. Send a single proposal
     for the base first; open the detailed questions after it is agreed, one per real fork.
+
+135. **Every async UI action gets one check with a deliberately late stub.** A test stub that
+    resolves at once hides in-flight races: a redraw while a save or a remote call was still
+    pending re-armed a button, and the instant stub never left a window for it. For each
+    async action, add one check whose stub resolves late, fire a redraw (or the rebuild the
+    real screen does) before it resolves, and assert the in-flight state holds: the control
+    stays disabled, nothing is sent twice, the result lands once.
