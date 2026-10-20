@@ -270,6 +270,8 @@ correcting the orchestrator, or a sibling correcting itself.*
     as a behavioral one. *Provenance:* a header fixed an over-claim about code scope and
     introduced a fresh one about test coverage **in the same edit** — the tidy sentence
     arrives first, and repairing a claim feels careful enough to skip checking the new one.
+    A pin that only prints a value the builder claims is the same over-claim: mutate the
+    claim away and predict GREEN; a mutant that survives is the finding.
 
 52. **The hedge is the untidy part, and a write-up wants a clean rule — whoever is writing.**
     An orchestrator turned a builder's "I ran no sweep" into "patience saved a sibling's
@@ -367,6 +369,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     The same holds for finding paths in files: a search by spelling (one drive letter, one
     prefix) misses relative paths such as `../../x` and paths on other drives. Resolve every
     path-like string to the place it points and judge the target, not how it is written.
+    A name-tied exemption is falsified with real in-between data placed under the protected
+    name, before any hand-shaped body.
 
 66. **A check that compares a clamped accessor can never fail: compare the underlying value.**
     A getter that caps its result at a maximum (`min(value, max)`) reads exactly "max" whether
@@ -655,28 +659,48 @@ came from a verifier finding or a falsify run that went red where the builder ex
     defect. A scalar meter can confirm a wrong cause: a meter computed in the wrong space or
     over zones of mixed scale moved with each fix while the defect stayed, and several refits
     were spent on a stage that was not at fault (see 90).
+    Before an A/B, read the settings the existing evidence was produced with (an earlier
+    sheet was already rendered with shadows off), so the comparison varies only what you
+    mean to vary.
 
 102. **A gate that truncates error output can hide the reds a mutant should cause.** A falsify
     run was scored from a gate's shortened output (the first lines of the failure), and a
     mutant that did turn a guard red looked as if it survived because its message fell past the
     cut. Score every falsify result from the untruncated log (the full output file, not the
     gate's summary), and quote the count of red lines found there (see 95).
+    Wrappers that delete the run log on failure hide the very lines a mutant should leave:
+    run each mutant through the wrapper (for the exit status) and through a runner that
+    keeps the log (for the lines), including the timed-out case. A timeout on a shared gate
+    slot means load, not a failure: rerun with a longer limit before scoring it.
 
 103. **Size a parallel fan-out by free memory, not by cores.** A fan-out was sized by the
     processor count, started many heavy processes at once and ran the machine out of memory
     close to a crash. Start at most two heavy processes, and start each only when the free
     memory reported by the system is at least 3 GB; wait otherwise (see 88).
+    On a shared GPU or similar scarce device, gate each job on the CURRENT baseline before
+    it starts, not only on a peak limit: a sampler that reads once a second cannot stop a
+    load spike, and a neighbour that just finished may still hold its memory. Memory-mapped
+    arrays still count in resident size: two mapped files diffed together read as the sum of
+    both, so budget each process as frames x size x item size for everything open at once,
+    and stream one frame at a time.
 
 104. **Stopping a background shell task leaves its child processes running.** A task was
     stopped and the engine process it had started kept running, holding memory and a lock.
     Record each heavy run's process id at launch (a file next to its log) and stop it by that
     exact id; never by a name match, which can also kill your own shell or another session's
     run.
+    The same holds for a wrapper (a shell launcher, a detached start): killing the program
+    leaves the wrapper alive, so at the end of a session list your own processes by start
+    time and stop the wrappers too. When a row moves to another agent mid-run, kill your
+    queued gate chain by id and check the throttle queue for leftover tickets.
 
 105. **A READ of a factor in a shared function lists every caller.** A review confirmed a
     factor was applied correctly in the function that owns it, without listing who calls the
     function, and one caller applied the same factor again or skipped it. Grep every caller,
     quote the list, and state for each whether it applies the factor itself (see 93).
+    The same applies to a claim that code never runs or is dead: cite a full caller grep on
+    the object's real class (subclass overrides included) or a probe; "runs but is never
+    seen" is a separate verdict.
 
 106. **After every delivery, assert the delivered file's md5 against its source.** A file was
     copied to its destination and used on the belief that the copy was the source; an older or
@@ -774,3 +798,90 @@ came from a verifier finding or a falsify run that went red where the builder ex
     probes crashed after some had finished, and the finished ones were quoted as findings.
     If a run is cut off, none of its numbers count; rerun the whole set and quote only from a complete run
     (see 95).
+
+121. **A metric that ranks things must be run on the reference pair it is meant to rank,
+    and on wrong references.** A person's by-eye read contradicted a similarity meter that
+    ranked a candidate level with the larger reference while reading 64 percent. Before
+    trusting a metric, score it on a pair whose order is known: every right pair must beat
+    every wrong pair (a shifted frame, the other view), and the margin is reported. A meter
+    that cannot separate known pairs is broken; fix or drop it before it ranks candidates
+    (see 69).
+
+122. **Before a ladder of edits, test the largest step on the hardest case; calibrate an
+    edit check with a null edit and a mutant.** A method's size ceiling only shows on its
+    largest step, so trying small steps first hides it. And a check with a quantisation
+    floor (the smallest change it can see) is trusted only after it passes a null edit (no
+    change) and fails a mutant (a known-bad change); a fail without that calibration may be
+    the floor itself.
+
+123. **A shape gate on an edited outline is relative to the original over the same rows,
+    checked at several scales, and reported as a pass fraction.** Absolute curvature bars
+    flag the figure's own bends where the defect sits, so compare against the original over
+    the same rows. One scale misses flat-bottomed defects: check several scales and prove
+    the gate red with a planted flat-bottom mutant. When a bar sits at the measure's noise
+    floor it passes only in pockets of the parameter grid (4 of 54 here): report the pass
+    fraction, never just "pass" (see 110).
+
+124. **A validator needs a pin that feeds it a planted fault.** A validator run only on
+    clean real data has branches nobody has proved: its checks survived mutants and a bad
+    copy was never tried. Plant a bad copy for each branch (a missing slot, a wrong
+    reference) and require the validator to refuse it (see 98 and 109).
+
+125. **A pass line is conditional on exactly the checks it claims; a span with no checks
+    says only "no error logged".** A pass line printed unconditionally stays green when its
+    checks fail. Make each pass line depend on the failure count of its own checks, and when
+    adding a pin, count the unconditional ok prints (20 of 20 were found). A span that holds
+    no check of its own prints "ok" only for "no error was logged": say so, and back it with
+    a logger that counts errors only (see 102).
+
+126. **Rebase only before the first push; after it, cherry-pick onto the pushed tip and
+    re-gate.** A rebase after a push forces a force-push or leaves two histories. Before the
+    push, rebase freely; once pushed, move later work by cherry-pick onto the pushed tip and
+    run the gate again at the new tip, so no force-push is needed (see 88).
+
+127. **Compensating a non-deterministic generator's drift needs two rounds that agree
+    first.** A generator that pulls its output back toward its own bias drifts differently
+    each run. A one-shot compensation over-corrected (a thigh +1.9 became -2.1). Measure the
+    drift in two independent rounds, compensate only when they agree, and compensate once at
+    most.
+
+128. **A design row's seam table includes the owner's earlier rulings on the topic,
+    built or not.** Before a design is proposed, grep the decisions file for rulings on the
+    topic, including ones never built. An unbuilt ruling reframes the row: a proposal that
+    ignores it reopens a settled question. Open the document with what already exists.
+
+129. **Parallel builders in one worktree: exclusive file lists, shared hooks committed
+    first, one locked test runner; silent side effects and singletons get their own
+    checks.** Give each builder an exclusive file list, let the lead commit the shared hooks
+    first, and run tests through a single runner under a file lock. A claim kept true by a
+    silent side effect (a parity draw that keeps two streams aligned) needs its own assert
+    and a mutant that removes the effect. Tests that share one process restore any singleton
+    state they touch.
+
+130. **Flip a policy constant once before calling a change green.** A constant that sets
+    a policy (a floor, a cap) is moved once to another value and the suite rerun: the pins
+    that go red are the scenario-bound ones, tied to the value rather than to the rule. Five
+    pins went red when a floor moved from 12 to 8; each is either rewritten relative to the
+    constant or named as bound.
+
+131. **A steadiness check measures at one fixed scale per route.** A pipeline that
+    normalises each frame (to the same height, say) hides exactly the drift a size or
+    steadiness check is looking for. Measure at one fixed scale per route, and before
+    reading a result confirm no stage resized the frames individually (see 112).
+
+132. **A two-sided bound needs a mutant per side.** A check with a lower and an upper
+    limit can survive a mutant on one side while the other side holds it red. Falsify each
+    side separately: one mutant that breaks the lower limit, one that breaks the upper, and
+    report both results (see 70).
+
+133. **An automated quick reply to a person can invent facts or promise work nobody
+    started; correct it in the full answer and never build on it.** A channel that answers
+    instantly on the coordinator's behalf stated facts that were false and said work was
+    under way when none had been started. The coordinator reads every such reply, corrects
+    it in the full answer, and builds only on what the person actually said, not on what the
+    quick reply claimed.
+
+134. **While the base model is not agreed, send one proposal, not a fan-out of
+    questions.** When the foundation of a design is undecided, a set of detailed questions
+    asks the person to rule on parts of something that may change. Send a single proposal
+    for the base first; open the detailed questions after it is agreed, one per real fork.
