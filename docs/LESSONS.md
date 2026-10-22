@@ -243,6 +243,10 @@ correcting the orchestrator, or a sibling correcting itself.*
     *incidentally* — one file built typed literals while its neighbor used a cast. Decide
     explicitly whether a guard covers types, and write down which backstop you are relying
     on. Relying on one without knowing it is the failure.
+    The same holds for a checker that accepts a helper by its name: a reviewer passed a call
+    because the helper's name promised the right thing, while the helper returned something
+    else. Open what the helper returns (read its body or call it on a known case), not just
+    what it is called.
 
 47. **A restore check must assert TWO things: tree clean AND the fix still present.** A
     mutation-restore run against a baseline that never carried the fix is a **delete**, not
@@ -568,6 +572,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     render while the real pictures, made through the normal camera, moved 3 to 4 pixels. Measure
     with the camera, projection and resolution the delivered output uses, or show first that the
     cheaper view gives the same numbers.
+    The converse also holds: after a batch passes its number checks, still look at every changed
+    picture or artifact at full size. A count or a size metric passed a frame that was flipped and
+    another with stray specks; numbers measure what they were built for, and only the look sees
+    the rest.
 
 91. **Prove a new check red on the artifact the human actually rejected, not only on a made-up
     broken case.** A check passed a hand-built bad example and still passed the very output a
@@ -872,6 +880,11 @@ came from a verifier finding or a falsify run that went red where the builder ex
     normalises each frame (to the same height, say) hides exactly the drift a size or
     steadiness check is looking for. Measure at one fixed scale per route, and before
     reading a result confirm no stage resized the frames individually (see 112).
+    A batch step that derives a setting from the whole set (a median size, a shared box) must
+    keep the old set's setting when new items join, or adding items quietly changes the old
+    outputs and the new ones. Pass the setting in from the original set, prove a run with the
+    new items alone equals a run with all of them, and check that the setting really reaches
+    the step (an environment value can be dropped on the way into another program).
 
 132. **A two-sided bound needs a mutant per side.** A check with a lower and an upper
     limit can survive a mutant on one side while the other side holds it red. Falsify each
@@ -900,3 +913,35 @@ came from a verifier finding or a falsify run that went red where the builder ex
     async action, add one check whose stub resolves late, fire a redraw (or the rebuild the
     real screen does) before it resolves, and assert the in-flight state holds: the control
     stays disabled, nothing is sent twice, the result lands once.
+
+136. **Before a long round of redoing work toward a person's target, put today's result beside
+    that person's own reference.** A round of re-posing was aimed at a coordinator's summary of
+    what the owner wanted; set beside the owner's own reference picture, the summary had the
+    wrong detail and the round chased it. Make one layout sheet with the current result next
+    to the owner's reference before the long round starts; a summary of a wish is not the
+    target (see 107 and 116).
+
+137. **When a new random draw shifts a seeded run, compare the old code against the old code
+    plus only that one draw.** Adding one draw to a seeded sequence moves every draw after it,
+    so a long run took a different path and stopped somewhere new, which read as a new bug.
+    Build the old code plus only the new draw and run both on the same seeds: if they match,
+    the change is drift from the shifted sequence, not a fault; compare the kinds of outcome,
+    not the seeds (see 101).
+
+138. **Fix a chance flake by forcing the roll at the step, not by counting repeats.** A test
+    failed now and then because a random roll under a chance changed the outcome, and "passed
+    3 of 3 runs alone" proved nothing because the roll barely varied there. Force the roll at
+    the step (set the seed or the value right before it) and show the test fails exactly when
+    the roll is under the chance and passes otherwise; then make the test hold the roll it
+    needs (see 97).
+
+139. **A test that passes only because an earlier test reset the state hides an order bug.**
+    A check passed in the full suite because a test before it emptied the shared state; run
+    after a different test it failed, and alone it passed again. Run a new or suspect test
+    alone and after the tests around it, and report a flake as "k fails in N runs" with N
+    stated, never as "flaky" (see 138).
+
+140. **Sort by the parsed value, never by the raw text.** A list stamped in two date formats
+    was sorted as text, so newer items landed among older ones and the "latest" pick was
+    wrong. Parse each key to its value (a time, a number) before sorting, and test the sort
+    with mixed formats.
