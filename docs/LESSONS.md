@@ -334,8 +334,8 @@ correcting the orchestrator, or a sibling correcting itself.*
 came from a verifier finding or a falsify run that went red where the builder expected green.*
 
 61. **A guard that scans state must run before any step that erases what it scans** — or that
-    step must record what it erased, and the guard reads the record. A guard scanning a mesh's
-    shape keys for forbidden names ran after a bake step that deletes shape keys, so it could
+    step must record what it erased, and the guard reads the record. A guard scanning a model's
+    named parts for forbidden names ran after an export step that deletes those parts, so it could
     never fire; it printed green on every input. Only mutating the *writer* (feeding it a
     forbidden key) showed it. Order the pipeline so the scan sees the input, and prove each guard
     red by mutating what produces its input, not just the guard itself.
@@ -444,7 +444,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
 
 74. **A measuring guard must not let the measured object choose its own landmarks.** A guard
     that found its reference points by a heuristic (the largest step in a profile, the widest
-    slice) could be steered by the mesh it judged: a small shape change moved the "largest step"
+    slice) could be steered by the input it judged: a small shape change moved the "largest step"
     to a different place, and the measurement followed it. Pin landmarks to something the input
     cannot reshape (a skeleton's joints, a certified reference basis), and fail closed when they
     are missing (see 62: draw them on the output too).
@@ -492,7 +492,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
 
 81. **After moving a threshold or a scale, sweep every run-time input the rules read, not only
     the default.** A rescale matched the old results with the default inputs and diverged once a
-    state value the player controls (a fill level, a count, a carried amount) was at half or
+    state value the user controls (a fill level, a count, a carried amount) was at half or
     full: some rules still read a value that included that input on the new scale. List each
     input that feeds a rule, probe at its empty, middle and full values on both versions, and
     compare per rule (see 66: never read through a clamped accessor).
@@ -584,8 +584,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     calling it a guard for that complaint; if it stays green there, it does not guard it (see
     69 and 75).
     Before building a check for a reviewer's complaint, measure what actually differs between the
-    rejected output and an accepted one: a "slimmer" complaint was a thicker waist, not narrower
-    hips, and the planned hip check would have passed the rejected image.
+    rejected output and an accepted one: a "too wide" complaint was a taller header, not wider
+    columns, and the planned column check would have passed the rejected output.
     A hole or regression count proves nothing until it has run on the real failing case. Check
     that its window covers the whole claim (the crop, every layer the complaint is about) and
     that it counts leaks open to the edge, not only enclosed holes: a count over a cropped or
@@ -658,10 +658,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
 
 101. **Prove a cause by pinning one path at a time, and measure options as patch scripts on the
     probe's temp copy.** Several candidate causes were changed together, so a better result
-    could not be attributed; and trying options by editing the game left changes to be
+    could not be attributed; and trying options by editing the product left changes to be
     reverted. Pin or remove one path per run and record which pin moved the number; apply each
     option as a patch script to a temporary copy of the tree, so a proposal milestone commits
-    no game change (see 96).
+    no product change (see 96).
     When a defect survives a fix to one stage of a pipeline, swap components before the next
     fix: hold one stage, vary the other (A/B renders or runs), and see which stage carries the
     defect. A scalar meter can confirm a wrong cause: a meter computed in the wrong space or
@@ -749,9 +749,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     and prove that reader red by changing one setting (see 83).
 
 112. **Before pinning an anchor per frame to a measured extreme, measure the motion the pin adds.**
-    A walk animation's feet were pinned frame by frame to the lowest pixel of each frame. The
-    source drifted about 2 px; the pins made the feet bounce 6 to 7 px, because each frame's
-    lowest pixel moves with the pose. Measure the anchor's motion in the source, then in the
+    An animation's ground point was pinned frame by frame to the lowest pixel of each frame. The
+    source drifted about 2 px; the pins made the result bounce 6 to 7 px, because each frame's
+    lowest pixel moves with the content. Measure the anchor's motion in the source, then in the
     pinned result, and pin to a value that is steady across frames (a median over the
     animation, per direction) when the pinned result moves more than the source (see 90).
 
@@ -776,7 +776,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
     off; all off), say in the prediction which step should turn which check red, and score
     each step from its own result (see 101 and 109).
 
-116. **Judge a guide on every view before spending a long job on it.** A pose guide looked right
+116. **Judge a guide on every view before spending a long job on it.** A reference guide looked right
     from the front and was wrong from the side; the fault was found only after the slow
     job had run. Before any slow or scarce job (a GPU run, a render, a bake), look at the guide
     from each view the output will be judged in, and reject it there first (see 107).
@@ -853,7 +853,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
 
 127. **Compensating a non-deterministic generator's drift needs two rounds that agree
     first.** A generator that pulls its output back toward its own bias drifts differently
-    each run. A one-shot compensation over-corrected (a thigh +1.9 became -2.1). Measure the
+    each run. A one-shot compensation over-corrected (a width +1.9 became -2.1). Measure the
     drift in two independent rounds, compensate only when they agree, and compensate once at
     most.
 
