@@ -4,6 +4,7 @@ Newest first.
 
 ## Unreleased
 
+- **Changed: a lighter seat skill.** `orchestrate`'s deploy, log and recycle/handover steps moved to `deploy-and-log.md` and `recycle-and-handover.md` beside its SKILL.md; the seat reads them only before a deploy, a log entry, a recycle or a handover. Every seat start loads about 850 tokens less; the pinned rules stay in SKILL.md.
 - **Changed: the GitHub repository is now `Artekka/orcastration-kit`** (was `claude-orchestration-kit`). Install with `claude plugin marketplace add Artekka/orcastration-kit`; the plugin id (`orchestration-kit@artekka-kits`), its slash commands and `~/.orchestration-kit/` do not change. GitHub redirects the old URL, so existing installs keep working. README, GETTING-STARTED, CONTRIBUTING, SECURITY, the issue-template link and the Code of Conduct contact link use the new name; the plugin manifest gains `homepage` and `repository`.
 - **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
 - **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)
