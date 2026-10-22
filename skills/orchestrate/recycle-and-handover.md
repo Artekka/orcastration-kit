@@ -1,0 +1,17 @@
+# orchestrate: recycling siblings and handing over the seat
+
+Read by the seat before it recycles a sibling or hands over the seat (SKILL.md §9, §10). Section numbers match SKILL.md.
+
+## 9 · Sibling lifecycle
+
+| Signal | Action |
+|---|---|
+| Sibling self-reports fill at the prompt mark; incoherent status; stale claim | SendMessage **"run /orchestration-kit:retro now"** + board note. A row already in flight finishes first |
+| Sibling replies **"retro complete … background: none"** | ONLY NOW recycle (a reply without `background: none` → ask what is still running; subagents are invisible to any process check). **Look at live work in its OWN tool call first**: `bash scripts/recycle-sibling.sh <Name> --dry-run` prints `live work` (the old session's live shells). The real run refuses with exit 3 while any are live; wait, or have the owner stop them; `--force` only when you know they are disposable. Then: `bash scripts/recycle-sibling.sh <Name> ["/orchestration-kit:orient-brief <ROW>"] --model <lane model, §3a> [--effort <e>]` (no `--model` = the default, never the old session's). **In place** when the old `claude` runs under `scripts/sibling-shell.sh` (every tab `start-team.sh`/`recycle-sibling.sh` opens does): the script writes the wrapper a hand-off file in `~/.orchestration-kit/sessions/<Name>.next`, SIGTERMs only the old `claude`, and the wrapper starts the fresh one in the SAME tab (summary says `mode: in-place`). A Name with no old process, an old one started by hand, `--new-tab`, or a 60 s timeout opens a NEW tab that runs the wrapper (launch fresh → wait → SIGTERM old), so every session moves over at its next recycle. Seat self-recycle (`recycle-sibling.sh <seat>` from the seat's own shell): the script prints `log: <path>`, detaches a copy that restarts the seat IN PLACE and SIGTERMs this session ~2 s later, so write the banner and let subagents finish first; a failed copy is diagnosed from that log, and no `setsid` (macOS) = `mode: new-tab`. `--dry-run` prints the `mode:` (and `detach:`) it would use. Script exits 2 (no usable terminal: `manual`) → tell the human "terminal <Name> is safe to close — relaunch it with `claude --name <Name> --model <lane model> "/orchestration-kit:orient"` (a bare `/clear` keeps that terminal's OLD model; if you must `/clear`, run `/model <lane model>` first, then `/orchestration-kit:orient`)" |
+| Fresh sibling sends READY | Assign the next DAG node (check `seen:` before giving it a READ) |
+
+Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro complete" → recycle, one terminal at a time. Never pre-announce a clear.
+
+## 10 · Seat handover
+
+- At handover: finish only what is already in verify → wait for every subagent and background shell YOU started (their completion notices; the recycle would kill or orphan them, and its live-work check cannot see subagents) → write the **handover block** under the banner (slots, in-flight rows + SHAs, READs owed, human's queue) → run your own `/orchestration-kit:retro` → `bash scripts/recycle-sibling.sh <SeatName> /orchestration-kit:orchestrate --model 'opus[1m]'` (the fresh seat opens first, then this one is SIGTERMed), or tell the human: "seat retro complete — close this terminal and relaunch it with `claude --name Orca --model 'opus[1m]' /orchestration-kit:orchestrate` (a bare `/clear` keeps the OLD model; if you must `/clear`, run `/model opus[1m]` first)".
