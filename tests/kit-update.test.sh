@@ -73,6 +73,12 @@ log="$(cat "$TMP/claude.log")"
 has "run: refreshes the marketplace" "plugin marketplace update mk" "$log"; has "run: updates the kit" "plugin update orchestration-kit@mk" "$log"
 has "run: updates the HUD when installed" "plugin update status-hud@mk" "$log"
 has "run: before -> after" "orchestration-kit 1.0 -> 1.1" "$out"; has "run: restart advice" "Restart open sessions" "$out"
+# the HUD's installed copy is refreshed from the folder when it is behind at the same version (a directory marketplace)
+mkdir -p "$MP/plugins/status-hud/lib" "$TMP/hudcache/lib"; echo new > "$MP/plugins/status-hud/lib/a.ts"; echo old > "$TMP/hudcache/lib/a.ts"; echo stale > "$TMP/hudcache/lib/gone.ts"
+sed -i "s|\"installPath\": \"/x\"|\"installPath\": \"$TMP/hudcache\"|" "$P/installed_plugins.json"
+out="$("$U" run --yes 2>&1)"; has "run: HUD copy refreshed" "installed copy was behind" "$out"
+has "run: HUD file copied" "new" "$(cat "$TMP/hudcache/lib/a.ts")"; [ ! -e "$TMP/hudcache/lib/gone.ts" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL run: stale HUD file not removed"; }
+out="$("$U" run --yes 2>&1)"; hasnt "run: identical HUD copy is left alone" "installed copy was behind" "$out"
 has "run: project report after" "new: start-team.sh" "$out"
 : > "$TMP/claude.log"; installed 1.1 "$TMP/cache/1.1"
 out="$("$U" run --yes 2>&1)"; has "run --yes: no question, already newest" "already the newest" "$out"

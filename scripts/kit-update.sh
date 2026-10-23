@@ -13,7 +13,8 @@
 #                                     1. says how many Claude sessions are open (they keep the old
 #                                        version until restarted) and asks before going on (--yes: no ask)
 #                                     2. claude plugin marketplace update <marketplace>
-#                                     3. claude plugin update orchestration-kit@<marketplace>, and
+#                                     3. claude plugin update orchestration-kit@<marketplace>, and (the HUD's installed
+#                                        copy refreshed from the folder when it is behind at the same version)
 #                                        status-hud@<marketplace> when it is installed
 #                                     4. the project report below
 #                                     --reinstall: uninstall and install instead of update, for a kit
@@ -66,6 +67,18 @@ source_commit() {  # the marketplace folder's git commit, when it is a local git
   [ -n "$loc" ] && git -C "$loc" rev-parse HEAD 2>/dev/null
 }
 newer() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$2" ]; }  # <a> <b>: b is newer
+
+sync_hud() {  # <marketplace>: a directory marketplace keeps the HUD's installed copy by version, so changes that keep
+  # the version never reach it through `plugin update`; copy the folder over the installed copy when they differ.
+  local mp="$1" loc src dst
+  loc="$(json "j['$mp'].get('installLocation')" "$CFG/plugins/known_marketplaces.json")"; src="$loc/plugins/status-hud"
+  dst="$(json "next((p.get('installPath') for p in j['plugins'].get('status-hud@$mp', [])), '')" "$CFG/plugins/installed_plugins.json")"
+  [ -n "$loc" ] && [ -d "$src" ] && [ -n "$dst" ] && [ -d "$dst" ] || return 0
+  [ "$(cd "$src" && pwd -P)" != "$(cd "$dst" && pwd -P)" ] || return 0
+  if diff -rq -x node_modules -x .git "$src" "$dst" >/dev/null 2>&1; then return 0; fi
+  rm -rf "${dst:?}"/* "${dst:?}"/.[!.]* 2>/dev/null
+  cp -a "$src"/. "$dst"/ && echo "status-hud: the installed copy was behind the folder (same version, newer files); refreshed"
+}
 
 projects_dir() {
   local d=""
@@ -149,6 +162,7 @@ cmd_run() {
   fi
   if [ -n "$(json "j['plugins'].get('status-hud@$mp')" "$CFG/plugins/installed_plugins.json")" ]; then
     claude plugin update "status-hud@$mp" || echo "kit-update: the status HUD did not update; it keeps working as it was" >&2
+    sync_hud "$mp"
   fi
   after="$(installed version)"
   if [ "$re" -eq 1 ]; then echo "==> $PLUGIN $after reinstalled from $mp. Restart open sessions to use it."
