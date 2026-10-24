@@ -68,6 +68,8 @@ kit's whole reason to exist.
 13. **Re-verify subagent claims at reconcile.** "Pre-existing failure", "flake", and
     "done" are claims, not facts, until the reconciler re-runs the named suite in
     isolation and sees it with its own eyes.
+    For a check that runs outside the main test, run it on an untouched copy of the base too and
+    report only the failures the change adds; a failure the base also shows is not the change's.
     *Provenance:* origin-project memory `feedback_verify_subagent_failure_claims`.
 
 ## Scope discipline
@@ -215,6 +217,8 @@ correcting the orchestrator, or a sibling correcting itself.*
     re-enumeration found **eight** and **thirteen**. An illustration placed inside a
     requirement gets read AS the requirement. Name the enumeration as the artifact you
     want, and have the verifier rebuild it from scratch rather than check the builder's.
+    Before trusting a text scan to build the list, test its pattern on the real file: a tag pattern
+    that allowed only letters missed the tags that held digits, and the list came up short.
     *Provenance:* origin project — one row guarded 3 of 8 sites, another fixed 6 of 19 comments.
 
 43. **A term-sweep converges only when every hit gets a written verdict.** Iterative
@@ -253,6 +257,8 @@ correcting the orchestrator, or a sibling correcting itself.*
     a restore — and it prints `nothing to commit, working tree clean` plus a GREEN gate on
     the *pre-fix* SHA. Clean status alone cannot distinguish restored from deleted. Always
     commit GREEN before mutating.
+    After undoing a planted bug, wipe the compiled cache (Python's `__pycache__`), or a compiled
+    copy of the bug can still run against the restored source.
 
 48. **A mutant that reds for the wrong reason is not evidence.** A "mutant" that *inserted*
     a duplicate step rather than *relocating* one produced a red — but proved only
@@ -355,6 +361,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     when the run was queued, so edits made while waiting are what gets tested (and what the log
     vouches for). Do not edit the tree while a queued gate waits, or run it from a snapshot made
     at queue time.
+    Commit before the gate run, so the SHA line names the saved version and the log vouches for a
+    tree with no uncommitted edits.
 
 
 64. **In multi-worktree sessions run every git write as `git -C <worktree>`.** The shell's
@@ -421,6 +429,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     Predict only the guard's own effect line: the message or value the guard itself emits when
     it fires. What the program does after the guard has fired is a guess, so it is written down
     as a guess and never scored as part of the falsify.
+    Say which checks still run after the first failure: a run that stops at its first red never
+    reaches the later checks, so a prediction that counts on them cannot be scored.
 
 71. **"Old data" fixtures are built by the OLD code, in its own worktree.** A migration test
     loads saved data from before a format change. Fixtures written by the new code in "old
@@ -448,18 +458,24 @@ came from a verifier finding or a falsify run that went red where the builder ex
     to a different place, and the measurement followed it. Pin landmarks to something the input
     cannot reshape (a skeleton's joints, a certified reference basis), and fail closed when they
     are missing (see 62: draw them on the output too).
+    A check that re-centres on the shape it measures follows that shape the same way: test it on
+    known-bad pictures before trusting it (one such check passed arms drawn far too thick).
 
 75. **A falsify mutant removes or replaces the guarded line; a diff that only adds lines is a
     no-op.** A mutant meant to disable a check added a line beside it and left the check itself
     in place, so the guard still ran and the "mutant" proved nothing. Before running a mutant,
     read its diff: it must show the guarded line as removed (`-`) or changed. A diff with only
     `+` lines does not disable anything (see 48 and 70).
+    Keep the falsify record (the mutant's diff, the prediction, the red line seen) in a commit
+    message on the branch, and keep the mutated files, so a reviewer can rerun it.
 
 76. **After a scripted marker-to-marker cut, grep for the lines it removed.** A script that
     deleted everything between two markers also swallowed three settings that sat inside the
     range; nothing failed until a probe run showed the settings missing. After any cut by
     pattern or marker, list the removed lines (`git diff | grep '^-'`) and check each one was
     meant to go, before the next step builds on the file.
+    The same goes for a find-and-replace that splices text into the middle of a line: edit whole
+    lines, then read the diff to see each changed line in full.
 
 77. **A context-fill measure reads YOUR transcript, picked by your own session id, never the
     newest file.** The script measures whichever transcript it is given. A fresh session that
@@ -670,6 +686,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     Before an A/B, read the settings the existing evidence was produced with (an earlier
     sheet was already rendered with shadows off), so the comparison varies only what you
     mean to vary.
+    The same flaw in the same spot on every seed comes from the input, not the random draw: check
+    the input picture before fixing the outputs.
 
 102. **A gate that truncates error output can hide the reds a mutant should cause.** A falsify
     run was scored from a gate's shortened output (the first lines of the failure), and a
@@ -680,6 +698,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     run each mutant through the wrapper (for the exit status) and through a runner that
     keeps the log (for the lines), including the timed-out case. A timeout on a shared gate
     slot means load, not a failure: rerun with a longer limit before scoring it.
+    Count failures from the full log, never from a cut-down list: a list cut at 40 lines hid 16 of
+    56 failures.
 
 103. **Size a parallel fan-out by free memory, not by cores.** A fan-out was sized by the
     processor count, started many heavy processes at once and ran the machine out of memory
@@ -709,6 +729,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     The same applies to a claim that code never runs or is dead: cite a full caller grep on
     the object's real class (subclass overrides included) or a probe; "runs but is never
     seen" is a separate verdict.
+    The same goes for "X unchanged" lines in records (a changelog, a decision log): cite the search
+    behind each one.
 
 106. **After every delivery, assert the delivered file's md5 against its source.** A file was
     copied to its destination and used on the belief that the copy was the source; an older or
@@ -821,6 +843,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     floor (the smallest change it can see) is trusted only after it passes a null edit (no
     change) and fails a mutant (a known-bad change); a fail without that calibration may be
     the floor itself.
+    Run a new picture check on the picture already accepted first; if that one fails, the check is
+    wrong, not the picture.
 
 123. **A shape gate on an edited outline is relative to the original over the same rows,
     checked at several scales, and reported as a pass fraction.** Absolute curvature bars
@@ -945,3 +969,20 @@ came from a verifier finding or a falsify run that went red where the builder ex
     was sorted as text, so newer items landed among older ones and the "latest" pick was
     wrong. Parse each key to its value (a time, a number) before sorting, and test the sort
     with mixed formats.
+
+141. **A new colour key must stay distinct from every existing key after every transform the tool
+    applies.** A key chosen distinct in its raw value collided with an old key once the tool's fade
+    to black was applied, so two regions read as one. Check each new key against all existing keys
+    at every stage that transforms colours (fades, tints, quantising), not only at the value
+    written.
+
+142. **Before calling a seeded number steady, vary every seed that feeds it and measure the
+    spread.** A tolerance band was set on a number after varying one seed; a second group of seeds
+    nobody varied moved it well outside the band. List every seed site that feeds the number, vary
+    them all, and set any band from the measured spread; prefer an exact check on a path with no
+    random draws to a "within N percent" check (see 72 and 137).
+
+143. **A count that two branches each raise by one merges to a single raise, with no conflict.** Two
+    branches each raised an expected-count line from N to N+1; the merge saw the same edit on both
+    sides and kept one, so the expected count fell one short of the checks that now ran. Recount
+    every such number after each merge or rebase that brings in another branch (see 16).
