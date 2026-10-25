@@ -460,6 +460,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     are missing (see 62: draw them on the output too).
     A check that re-centres on the shape it measures follows that shape the same way: test it on
     known-bad pictures before trusting it (one such check passed arms drawn far too thick).
+    Containment is the same trap: "the child stays inside its box" measured against the box's own
+    edge passes when the overflowing child widens that box. Measure against an edge the defect
+    cannot move (the screen, a fixed parent, a width set in the test).
 
 75. **A falsify mutant removes or replaces the guarded line; a diff that only adds lines is a
     no-op.** A mutant meant to disable a check added a line beside it and left the check itself
@@ -823,6 +826,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     calls the update itself, cannot see the effect. Read the rendered pixels inside the
     subject's own mask, and prove the check red by mutating the effect itself (its colour,
     its draw order), not the number the pin reads (see 84 and 100).
+    A headless browser on virtual time draws no frames, so animation-frame and resize-observer
+    callbacks may never run there. A fix that lives in such a callback is checked by reading its
+    code (or in a real browser), and the report says which; a green headless run proves nothing
+    about it.
 
 120. **A probe run that dies part-way gives no results: rerun the whole set.** A long run of
     probes crashed after some had finished, and the finished ones were quoted as findings.
@@ -845,6 +852,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     the floor itself.
     Run a new picture check on the picture already accepted first; if that one fails, the check is
     wrong, not the picture.
+    A "fits" check (one row, no overflow, no wrap) runs on the real worst case: the largest count of
+    items and the longest label the data holds, not a small fixture. A layout that fits five short
+    entries can wrap at twelve long ones while the fixture stays green.
 
 123. **A shape gate on an edited outline is relative to the original over the same rows,
     checked at several scales, and reported as a pass fraction.** Absolute curvature bars
@@ -862,6 +872,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     reference, link or index entry that names it) and predict that many faults. A checker that
     reports a different count has a finding: it misses a dangling link, or reports one twice
     (see 70).
+    The same holds for any detector: before its PASS counts, show it firing on a planted case
+    that is known to hold the defect. A detector that never fires looks exactly like a clean result.
 
 125. **A pass line is conditional on exactly the checks it claims; a span with no checks
     says only "no error logged".** A pass line printed unconditionally stays green when its
@@ -986,3 +998,15 @@ came from a verifier finding or a falsify run that went red where the builder ex
     branches each raised an expected-count line from N to N+1; the merge saw the same edit on both
     sides and kept one, so the expected count fell one short of the checks that now ran. Recount
     every such number after each merge or rebase that brings in another branch (see 16).
+
+144. **A mutant that stays green means a second path recovers: find it before calling the check
+    weak.** A mutant removed one fix and the check stayed green, because another piece of code
+    reached the same result by a different route. Find that second path, mutate both together to
+    see the red, and state what the check proves: that at least one of the two paths works, not
+    that the mutated one does (see 51 and 109).
+
+145. **After a change that rebuilds the nodes, look them up again; a held reference reads a
+    detached copy.** A test kept a reference to a page element, then triggered a change that
+    rebuilt the list. The reference now pointed at the old, detached node, whose state never
+    changes, so the test passed whatever the live page showed. After any step that re-renders,
+    query the live node again, and prove the test red with a mutant that breaks the live one.
