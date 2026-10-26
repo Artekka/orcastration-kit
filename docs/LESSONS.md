@@ -49,6 +49,13 @@ kit's whole reason to exist.
 9. **No vacuous green.** A check that found nothing wrong and a check that ran on nothing
    are indistinguishable unless you assert the match/population count — "0 failed" out of
    0 run is not a pass.
+   A check fed by a file or a machine tool can run on less, or on nothing, without saying so. A
+   shell `while read` loop drops a last line with no newline (`|| [ -n "$line" ]` keeps it), an
+   unreadable file is skipped silently (test `-r` first), and a line that matches no expected form
+   is ignored unless the loop rejects it. A test that cannot run on this machine (a missing tool or
+   browser) fails in the gate's own result line; it never drops its pages or passes with zero
+   checks, and the number of pages built is part of the population the count asserts. The runner may
+   hide build output, so a missing input must show in the result itself (see 102 and 125).
 
 10. **Read the REAL pass line, unpiped.** Pipes mask exit codes; a background-task
     completion notification masks a failing exit; a process can print its pass summary and
@@ -71,6 +78,9 @@ kit's whole reason to exist.
     For a check that runs outside the main test, run it on an untouched copy of the base too and
     report only the failures the change adds; a failure the base also shows is not the change's.
     *Provenance:* origin-project memory `feedback_verify_subagent_failure_claims`.
+    Before blaming a failure outside the change on a merge, compare (`cmp`) the failing check's
+    built output on the merged tree and on both parents: if it is byte-identical on all three, the
+    merge did not cause it. Report what remains as k fails in N runs (see 139).
 
 ## Scope discipline
 
@@ -262,6 +272,9 @@ correcting the orchestrator, or a sibling correcting itself.*
     commit GREEN before mutating.
     After undoing a planted bug, wipe the compiled cache (Python's `__pycache__`), or a compiled
     copy of the bug can still run against the restored source.
+    The same cache has a second effect: a test run that writes compiled files into the tree leaves
+    it dirty, and the next gate's dirty-tree check fails (see 63). Run tests and gates with
+    compiled-file writes off (for Python, `PYTHONDONTWRITEBYTECODE=1`).
 
 48. **A mutant that reds for the wrong reason is not evidence.** A "mutant" that *inserted*
     a duplicate step rather than *relocating* one produced a red — but proved only
@@ -347,6 +360,10 @@ correcting the orchestrator, or a sibling correcting itself.*
     source actually uses. Count the forms first (bold, bulleted, quoted, italic notes), and derive
     the expected table a second, independent way before trusting the parser's output; one missed
     form silently files those entries under the wrong status.
+    A browser layout walk cries wolf the same way: content clipped by an ancestor with hidden
+    overflow, or inside a closed `<details>`, still has client rects. A right-edge overflow walk
+    clips each rect by its overflow ancestors and skips closed `<details>`, or it reports hidden
+    text as overflow (the opposite trap, a missed overflow, is 74).
 
 ## Guards, gate logs and worktree git (harvest 2026-10-15)
 
@@ -634,6 +651,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     that it counts leaks open to the edge, not only enclosed holes: a count over a cropped or
     single-layer window, or one that fills only closed gaps, read zero on the very output that
     was refused.
+    Run every new check against the code before the fix and label each one: a check that fails there
+    reproduces the complaint; a check that passes there is a regression guard, still worth keeping,
+    but no proof that the fix addressed the complaint.
 
 92. **When inheriting a row, list its scratch files by modification time against the branch tip.**
     A builder took over a row from a session that ended abruptly; its scratch folder held
@@ -771,6 +791,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     on a target nothing could satisfy. Before the long run, evaluate every target at the
     extremes and at the points beyond the measured range, and test that one candidate (or a
     cheap relaxation) can satisfy them all at once; if not, reconcile the targets first (see 99).
+    A target defined on a flat render of a three-dimensional scene (the share of one part hidden
+    behind another) is checked against the render's layer draw order before it becomes a pass line:
+    parts drawn on a layer below the covered part can hide none of it, so a target that counts on
+    them can never be met.
 
 108. **Run a long background chain as one script, memory-gated per step, with a status file per
     step.** A chain of heavy gate steps was started as separate background commands; the
@@ -845,6 +869,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     it, then build and run every planted mutant once after the change. A mutant whose anchor
     vanished, or that no longer goes red, is a dead check, and a helper that waits for a removed
     element passes or hangs for the wrong reason.
+    Re-aiming a check (a new selector, region or threshold) is such a step too: rerun every mutant
+    aimed at it, and also the mutants of checks that read the same shared state (browser storage, a
+    cache, a saved file). A setting written during one check's run turned an unrelated mutant green.
 
 119. **When the look is the requirement, a headless check of the model is not the check; read the
     drawn pixels and add a mutant only the pixel read can kill.** A test confirmed that a glow
@@ -867,6 +894,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     probes crashed after some had finished, and the finished ones were quoted as findings.
     If a run is cut off, none of its numbers count; rerun the whole set and quote only from a complete run
     (see 95).
+    A run on the code before a fix often crashes at the same place every time, so a plain rerun
+    repeats the crash. Cut out the crashing block (it counts as a fail for its own checks), rerun,
+    and repeat until every check has a verdict on the pre-fix code.
 
 121. **A metric that ranks things must be run on the reference pair it is meant to rank,
     and on wrong references.** A person's by-eye read contradicted a similarity meter that
@@ -887,6 +917,13 @@ came from a verifier finding or a falsify run that went red where the builder ex
     A "fits" check (one row, no overflow, no wrap) runs on the real worst case: the largest count of
     items and the longest label the data holds, not a small fixture. A layout that fits five short
     entries can wrap at twelve long ones while the fixture stays green.
+    Measure a layout guarantee (at least N items per row, fits one row) where the user sees it:
+    across the whole page, on the real item count and size spread, with the previous layout as a
+    mutant that must fail. A per-container count on a tidy fixture passed while most rows on the
+    real page held one item (see 74).
+    A never-fail baseline must come from clean input. An output made from an input that already held
+    the defect carries the defect, so checks that pass on it prove nothing; prove the checks can
+    pass on clean reference data first.
 
 123. **A shape gate on an edited outline is relative to the original over the same rows,
     checked at several scales, and reported as a pass fraction.** Absolute curvature bars
@@ -1029,6 +1066,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     nobody varied moved it well outside the band. List every seed site that feeds the number, vary
     them all, and set any band from the measured spread; prefer an exact check on a path with no
     random draws to a "within N percent" check (see 72 and 137).
+    The same holds for any noise source, not only seeds: a sweep of crops and thresholds on an
+    all-or-nothing mask read zero spread because none of the variants could move the number. Include
+    at least one variant that can move it, and report which variants did (see 69).
 
 143. **A count that two branches each raise by one merges to a single raise, with no conflict.** Two
     branches each raised an expected-count line from N to N+1; the merge saw the same edit on both
@@ -1060,6 +1100,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     object: a mark a few pixels wide averages away over a full figure. Slide a small window over
     the object, report the worst window's score against the bound, and prove it red on one planted
     small defect.
+    Feathering a paste moves the jump inward, so a seam check that reads only the edge ring goes
+    blind: measure the inner rings too, and plant the hard cut past the feather width (see 87).
 
 147. **Before a camera or vanishing-point check counts, prove it on shifted copies and on the
     reference itself.** A check meant to say "the picture keeps the reference camera" passed
@@ -1082,3 +1124,16 @@ came from a verifier finding or a falsify run that went red where the builder ex
     the item had been added after the build, so the seed's own `--check` was stale, not wrong when
     written. Before scoring a mismatch as the builder's fault, compare the dump's newest item time
     with the seed's build time, and report an item newer than the build as seed drift, not a defect.
+
+150. **Squash only onto the merge base; read the diff stat before any push.** After the main branch
+    moved, a `git reset --soft origin/main` followed by one commit squashed a branch onto the new
+    tip, and that commit silently reverted every newer commit on main, because the index still held
+    the branch's older copies of those files. Squash onto `git merge-base HEAD origin/main` instead,
+    and before any push read `git show --stat` of the commit for files the branch never touched; any
+    such file is a revert in disguise (see 126).
+
+151. **A tool that skips existing outputs turns a rerun into a no-op.** A job copied its old outputs
+    aside before a rerun; the tool skipped every item whose output file still existed, so the rerun
+    did nothing and the old outputs were read as new ones. Move old outputs away (never copy them)
+    before rerunning a tool with a skip-if-exists rule, and treat a run whose start and end state
+    match, with no resource peak, as a run that did nothing (see 69 and 83).
