@@ -333,6 +333,10 @@ correcting the orchestrator, or a sibling correcting itself.*
 60. **A guard that cries wolf gets deleted.** Measure a marker/heuristic set against the real
     corpus before shipping it: a first-choice marker matched three files, two of which were
     unrelated. Precision is what keeps a guard alive long enough to catch anything.
+    The other side is recall: a parser of hand-written status markers must accept every form the
+    source actually uses. Count the forms first (bold, bulleted, quoted, italic notes), and derive
+    the expected table a second, independent way before trusting the parser's output; one missed
+    form silently files those entries under the wrong status.
 
 ## Guards, gate logs and worktree git (harvest 2026-10-15)
 
@@ -527,6 +531,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
 82. **Never chain a commit after a gate with `;`.** `run-gate; git commit ...` commits even when
     the gate fails, and the log then shows a green-looking commit on red code. Join them with
     `&&`, or run the gate, read its pass line, and commit in a separate step (see 63).
+    The same holds for a script that edits a file and asserts its own result: run it in one `&&`
+    chain with the commit, never with `;` or on a new line, or have the commit step check that the
+    diff shows the change. A failed assert writes nothing, and the commit ships the old text under
+    a message that claims the edit.
 
 83. **A byte-identical before/after comparison counts only after a mutant shows it can differ.**
     "The report is identical" proves nothing if the comparison never reads the part that changed
@@ -821,6 +829,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     final output failed the same check. A guard's count is valid only for the stage it
     ran at: place the guard after the last step that moves its input, or run it again there
     and quote that count (see 61 and 87).
+    When a change removes a UI element, grep every test helper, wait and measure that references
+    it, then build and run every planted mutant once after the change. A mutant whose anchor
+    vanished, or that no longer goes red, is a dead check, and a helper that waits for a removed
+    element passes or hangs for the wrong reason.
 
 119. **When the look is the requirement, a headless check of the model is not the check; read the
     drawn pixels and add a mutant only the pixel read can kill.** A test confirmed that a glow
@@ -834,6 +846,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     callbacks may never run there. A fix that lives in such a callback is checked by reading its
     code (or in a real browser), and the report says which; a green headless run proves nothing
     about it.
+    The same applies to whoever presents a look for a human decision: when every automatic check
+    passes but the result is visual, the coordinator opens the result itself before asking for the
+    decision. Checks passed for three rounds while the look failed, and only opening the picture
+    showed it.
 
 120. **A probe run that dies part-way gives no results: rerun the whole set.** A long run of
     probes crashed after some had finished, and the finished ones were quoted as findings.
@@ -1024,6 +1040,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     its surroundings passed a check on mean colour and mean brightness while a hard seam ran
     along the patch's border. Also compare the jump across the patch edge with the jumps inside
     the region, and prove the check red on a planted patch with a hard edge (see 87 and 124).
+    More generally, score a local defect on the worst small window, never on a mean over the whole
+    object: a mark a few pixels wide averages away over a full figure. Slide a small window over
+    the object, report the worst window's score against the bound, and prove it red on one planted
+    small defect.
 
 147. **Before a camera or vanishing-point check counts, prove it on shifted copies and on the
     reference itself.** A check meant to say "the picture keeps the reference camera" passed
@@ -1032,3 +1052,11 @@ came from a verifier finding or a falsify run that went red where the builder ex
     time, and require a FAIL for each; run it on the reference picture and require a PASS. A
     check that passes the shifted copies or fails the reference does not measure the camera
     (see 91 and 124).
+
+148. **A stand-in for a platform API counts only after it is compared with the platform's own
+    contract.** A test stub of a database's update call deep-merged nested objects, and checks
+    built on it passed. Only reading the platform's type file confirmed that the real call merges
+    the same way, and the same reading showed that the full-write call replaces the whole
+    document, a hazard the stub never modelled. Before a check built on a stub or fake counts,
+    compare the stand-in's behaviour with the platform's documented contract (docs or types), cite
+    the line, and add one check for each behaviour the contract names that the stub does not.
