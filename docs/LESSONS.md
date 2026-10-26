@@ -463,6 +463,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     Containment is the same trap: "the child stays inside its box" measured against the box's own
     edge passes when the overflowing child widens that box. Measure against an edge the defect
     cannot move (the screen, a fixed parent, a width set in the test).
+    A gap measured to an outline must also catch a part that sits inside the shape. A spacing
+    check that took the distance to the nearest outline point read a part buried inside as
+    "touching" and passed it. Give a point inside the shape a negative gap, so a part that sinks
+    in fails, and plant one inside to prove it.
 
 75. **A falsify mutant removes or replaces the guarded line; a diff that only adds lines is a
     no-op.** A mutant meant to disable a check added a line beside it and left the check itself
@@ -1004,9 +1008,27 @@ came from a verifier finding or a falsify run that went red where the builder ex
     reached the same result by a different route. Find that second path, mutate both together to
     see the red, and state what the check proves: that at least one of the two paths works, not
     that the mutated one does (see 51 and 109).
+    A tool that places a part itself is such a second path for a planted case. A bad placement
+    planted before the tool ran was quietly moved back by the tool's own placement step, so the
+    check saw a good result and the plant proved nothing. Pin the placement (turn the tool's
+    placing off, or plant after it) and confirm the planted case is still wrong in the output
+    before its red counts.
 
 145. **After a change that rebuilds the nodes, look them up again; a held reference reads a
     detached copy.** A test kept a reference to a page element, then triggered a change that
     rebuilt the list. The reference now pointed at the old, detached node, whose state never
     changes, so the test passed whatever the live page showed. After any step that re-renders,
     query the live node again, and prove the test red with a mutant that breaks the live one.
+
+146. **A region-average check cannot see a patch edge.** A patched region whose average matched
+    its surroundings passed a check on mean colour and mean brightness while a hard seam ran
+    along the patch's border. Also compare the jump across the patch edge with the jumps inside
+    the region, and prove the check red on a planted patch with a hard edge (see 87 and 124).
+
+147. **Before a camera or vanishing-point check counts, prove it on shifted copies and on the
+    reference itself.** A check meant to say "the picture keeps the reference camera" passed
+    pictures made with a different camera, and another read junk on every input, the reference
+    included. Run it on copies of a good picture shifted up, down and sideways, one axis at a
+    time, and require a FAIL for each; run it on the reference picture and require a PASS. A
+    check that passes the shifted copies or fails the reference does not measure the camera
+    (see 91 and 124).
