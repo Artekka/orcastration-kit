@@ -240,6 +240,9 @@ correcting the orchestrator, or a sibling correcting itself.*
     used — because a different component is substituted there. All its tests rendered the
     component directly. Pin the **composition** that chooses the component, and assert the
     regime is actually active so the test cannot pass by falling through to the other path.
+    The same holds for entry paths: a feature built and tested only from its top-level entry
+    leaves every other way into it unchecked. Pin each other path with a check that measures the
+    change it should cause (the before and after numbers), not only that the page still loads.
 
 46. **A guard that compares NAMES cannot see TYPES.** An entire family of drift guards
     compared key sets; flipping a field's declared type in the *canonical schema* left the
@@ -264,6 +267,10 @@ correcting the orchestrator, or a sibling correcting itself.*
     a duplicate step rather than *relocating* one produced a red — but proved only
     sensitivity to placement, not that the guard catches the reorder it was written for.
     Diff-verify every mutant; a red you wanted is the easiest thing in the world to accept.
+    A red counts only when this run built the page it ran: a mutant whose build failed left the
+    last run's pages in the output folder, and the runner replayed them, so the "red" came from
+    an older mutant. Wipe the output folder before each mutant build, and stop on a failed build
+    instead of running whatever pages are there.
 
 49. **Report the non-findings.** An audit that finds a defect in everything it inspects is
     usually an audit performing thoroughness — the useful output is *which* items were wrong
@@ -324,6 +331,9 @@ correcting the orchestrator, or a sibling correcting itself.*
     actually shipped five weeks earlier, so an audit believed the comment over the data.
     Require the population count *before* the build, and say "zero" out loud so nobody
     re-files it.
+    A number in a code comment carries no commit: a balance or tuning figure quoted from a comment
+    may describe code that has changed since. Before offering such a number for a decision, re-run
+    the simulation or measurement on the current base and quote the commit SHA beside each number.
 
 59. **Fail-open vs fail-closed is the load-bearing property of any client-side guard.** A
     disable derived from data that may not have loaded must degrade to *enabled* — the
@@ -505,6 +515,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     reported about 175K in a status line while its real fill was 300K, past the report mark,
     and kept working. Every fill number in a READY, report or handover is the script's
     `current` line pasted from a run made in that same turn.
+    Time stamps follow the same rule: a stamp on a board, log or handover comes from `date -u`
+    run in that turn, never from memory or from the last stamp you saw.
 
 80. **Parity with the old version is proved on the whole report, not on the numbers you picked.**
     A change meant to leave the results as they were passed every per-number check, and a
@@ -996,6 +1008,10 @@ came from a verifier finding or a falsify run that went red where the builder ex
     after a different test it failed, and alone it passed again. Run a new or suspect test
     alone and after the tests around it, and report a flake as "k fails in N runs" with N
     stated, never as "flaky" (see 138).
+    In a scripted page or fixture, each check sets up its own preconditions (open the item it
+    needs, pick the group, reset the filter) instead of relying on where the check before it
+    left the page; otherwise a mutant that breaks one step turns a later, unrelated check red,
+    and the red names the wrong check.
 
 140. **Sort by the parsed value, never by the raw text.** A list stamped in two date formats
     was sorted as text, so newer items landed among older ones and the "latest" pick was
@@ -1060,3 +1076,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     document, a hazard the stub never modelled. Before a check built on a stub or fake counts,
     compare the stand-in's behaviour with the platform's documented contract (docs or types), cite
     the line, and add one check for each behaviour the contract names that the stub does not.
+
+149. **A reader rebuilding a list from a fresh data dump checks the seed's age first.** A verifier
+    rebuilt an enumeration from a live dump and found an item the builder's checked-in seed lacked;
+    the item had been added after the build, so the seed's own `--check` was stale, not wrong when
+    written. Before scoring a mismatch as the builder's fault, compare the dump's newest item time
+    with the seed's build time, and report an item newer than the build as seed drift, not a defect.
