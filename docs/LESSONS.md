@@ -99,6 +99,9 @@ kit's whole reason to exist.
     conflicts, both ids go live, and a grep returns two unrelated rows that look deliberate.
     Prefix = session tag (`O7-1`, `FQ-2`); collisions become impossible by construction.
     *Provenance:* six manual reconciliations in two days (origin project).
+    The same holds for shared document and decision-code counters: a branch that bumps one before it
+    merges mints a code that main mints again. Mint such codes on main only, by the seat, or first
+    list the next code on every open branch.
 
 17. **Milestone/log numbers are allocated through a claimed LOG slot** (same shape as the
     DEPLOY slot). Any shared monotonic counter needs a single allocator while concurrent
@@ -924,6 +927,9 @@ came from a verifier finding or a falsify run that went red where the builder ex
     calibration may be the floor itself.
     Run a new picture check on the picture already accepted first; if that one fails, the check is
     wrong, not the picture.
+    A new numeric check must also pass today's known-good output before it gates anything: red on the
+    known-bad cases alone is half the proof. Run it on the current accepted output, report the margin
+    to the bound, and tighten or drop the bound if that output fails.
     A never-fail baseline must come from clean input. An output made from an input that already held
     the defect carries the defect, so checks that pass on it prove nothing; prove the checks can
     pass on clean reference data first.
@@ -1135,6 +1141,30 @@ came from a verifier finding or a falsify run that went red where the builder ex
     did nothing and the old outputs were read as new ones. Move old outputs away (never copy them)
     before rerunning a tool with a skip-if-exists rule, and treat a run whose start and end state
     match, with no resource peak, as a run that did nothing (see 69 and 79).
+
+145. **A mask or region aimed at a flagged spot is checked to contain the spot before the run.** A
+    repair round was run with a mask that did not cover the spot the check had flagged, so the
+    round changed nothing that mattered and a whole round was spent. Before the run, assert that
+    each flagged spot's coordinates lie inside the new mask or region, and print the margin to its
+    edge; a spot outside it stops the run (see 109 and 113).
+
+146. **Seeds for a test that reads a time window are built relative to now, and the test is falsified
+    with the clock moved ahead.** A test with fixed dates was green on the day it was written and
+    went red later, when the dates left the window. Build the seeds from the current time (now
+    minus N days), then prove the test by running it with the clock shifted days ahead: it must
+    stay green; a test with a fixed date must be shown to go red the same way (see 104 and 134).
+
+147. **A check that prints only its worst offender is not a list of what is over the bound.** A fix
+    was planned from the single worst case a check printed, and the same check still failed on
+    other cases that were over the bound as well. Before planning a fix, list every offender over
+    the bound (count them and name them), plan for the whole list, and rerun the check to see the
+    count reach zero, not only the printed one go away (see 113 and 127).
+
+148. **Never prove a setting fired by a line in a filtered log.** A setting was judged to have
+    taken effect because a line appeared (or did not appear) in a log that a filter or a tool
+    already shortened; the output was in fact unchanged. Confirm the effect on the output itself
+    (the file, the number, the picture), or read the unfiltered log, and state which one was read
+    (see 98).
 
 ## Old numbers (before the 2026-10-26 renumber)
 
