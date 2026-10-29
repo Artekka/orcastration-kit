@@ -49,13 +49,14 @@ kit's whole reason to exist.
 9. **No vacuous green.** A check that found nothing wrong and a check that ran on nothing
    are indistinguishable unless you assert the match/population count — "0 failed" out of
    0 run is not a pass.
-   A check fed by a file or a machine tool can run on less, or on nothing, without saying so. A
-   shell `while read` loop drops a last line with no newline (`|| [ -n "$line" ]` keeps it), an
-   unreadable file is skipped silently (test `-r` first), and a line that matches no expected form
-   is ignored unless the loop rejects it. A test that cannot run on this machine (a missing tool or
-   browser) fails in the gate's own result line; it never drops its pages or passes with zero
-   checks, and the number of pages built is part of the population the count asserts. The runner may
-   hide build output, so a missing input must show in the result itself (see 102 and 125).
+   PRS (2026-10-26): A check fed by a file or a machine tool can run on less, or on nothing,
+   without saying so. A shell `while read` loop drops a last line with no newline (`|| [ -n
+   "$line" ]` keeps it), an unreadable file is skipped silently (test `-r` first), and a line
+   that matches no expected form is ignored unless the loop rejects it. A test that cannot run
+   on this machine (a missing tool or browser) fails in the gate's own result line; it never
+   drops its pages or passes with zero checks, and the number of pages built is part of the
+   population the count asserts. The runner may hide build output, so a missing input must show
+   in the result itself (see 102 and 125).
 
 10. **Read the REAL pass line, unpiped.** Pipes mask exit codes; a background-task
     completion notification masks a failing exit; a process can print its pass summary and
@@ -75,12 +76,13 @@ kit's whole reason to exist.
 13. **Re-verify subagent claims at reconcile.** "Pre-existing failure", "flake", and
     "done" are claims, not facts, until the reconciler re-runs the named suite in
     isolation and sees it with its own eyes.
-    For a check that runs outside the main test, run it on an untouched copy of the base too and
-    report only the failures the change adds; a failure the base also shows is not the change's.
     *Provenance:* origin-project memory `feedback_verify_subagent_failure_claims`.
-    Before blaming a failure outside the change on a merge, compare (`cmp`) the failing check's
-    built output on the merged tree and on both parents: if it is byte-identical on all three, the
-    merge did not cause it. Report what remains as k fails in N runs (see 139).
+    PRS (2026-10-26): For a check that runs outside the main test, run it on an untouched copy
+    of the base too and report only the failures the change adds; a failure the base also shows
+    is not the change's. Before blaming a failure outside the change on a merge, compare (`cmp`)
+    the failing check's built output on the merged tree and on both parents: if it is
+    byte-identical on all three, the merge did not cause it. Report what remains as k fails in N
+    runs (see 139).
 
 ## Scope discipline
 
@@ -227,9 +229,10 @@ correcting the orchestrator, or a sibling correcting itself.*
     re-enumeration found **eight** and **thirteen**. An illustration placed inside a
     requirement gets read AS the requirement. Name the enumeration as the artifact you
     want, and have the verifier rebuild it from scratch rather than check the builder's.
-    Before trusting a text scan to build the list, test its pattern on the real file: a tag pattern
-    that allowed only letters missed the tags that held digits, and the list came up short.
     *Provenance:* origin project — one row guarded 3 of 8 sites, another fixed 6 of 19 comments.
+    PRS (2026-10-26): Before trusting a text scan to build the list, test its pattern on the
+    real file: a tag pattern that allowed only letters missed the tags that held digits, and the
+    list came up short.
 
 43. **A term-sweep converges only when every hit gets a written verdict.** Iterative
     "search and fix" rounds do not converge: round 1 found 9, round 2 fixed 6, round 3
@@ -250,9 +253,10 @@ correcting the orchestrator, or a sibling correcting itself.*
     used — because a different component is substituted there. All its tests rendered the
     component directly. Pin the **composition** that chooses the component, and assert the
     regime is actually active so the test cannot pass by falling through to the other path.
-    The same holds for entry paths: a feature built and tested only from its top-level entry
-    leaves every other way into it unchecked. Pin each other path with a check that measures the
-    change it should cause (the before and after numbers), not only that the page still loads.
+    PRS (2026-10-26): The same holds for entry paths: a feature built and tested only from its
+    top-level entry leaves every other way into it unchecked. Pin each other path with a check
+    that measures the change it should cause (the before and after numbers), not only that the
+    page still loads.
 
 46. **A guard that compares NAMES cannot see TYPES.** An entire family of drift guards
     compared key sets; flipping a field's declared type in the *canonical schema* left the
@@ -260,19 +264,19 @@ correcting the orchestrator, or a sibling correcting itself.*
     *incidentally* — one file built typed literals while its neighbor used a cast. Decide
     explicitly whether a guard covers types, and write down which backstop you are relying
     on. Relying on one without knowing it is the failure.
-    The same holds for a checker that accepts a helper by its name: a reviewer passed a call
-    because the helper's name promised the right thing, while the helper returned something
-    else. Open what the helper returns (read its body or call it on a known case), not just
-    what it is called.
+    PRS (2026-10-26): The same holds for a checker that accepts a helper by its name: a reviewer
+    passed a call because the helper's name promised the right thing, while the helper returned
+    something else. Open what the helper returns (read its body or call it on a known case), not
+    just what it is called.
 
 47. **A restore check must assert TWO things: tree clean AND the fix still present.** A
     mutation-restore run against a baseline that never carried the fix is a **delete**, not
     a restore — and it prints `nothing to commit, working tree clean` plus a GREEN gate on
     the *pre-fix* SHA. Clean status alone cannot distinguish restored from deleted. Always
     commit GREEN before mutating.
-    After undoing a planted bug, wipe the compiled cache (Python's `__pycache__`), or a compiled
-    copy of the bug can still run against the restored source.
-    The same cache has a second effect: a test run that writes compiled files into the tree leaves
+    PRS (2026-10-26): After undoing a planted bug, wipe the compiled cache (Python's
+    `__pycache__`), or a compiled copy of the bug can still run against the restored source. The
+    same cache has a second effect: a test run that writes compiled files into the tree leaves
     it dirty, and the next gate's dirty-tree check fails (see 63). Run tests and gates with
     compiled-file writes off (for Python, `PYTHONDONTWRITEBYTECODE=1`).
 
@@ -280,10 +284,10 @@ correcting the orchestrator, or a sibling correcting itself.*
     a duplicate step rather than *relocating* one produced a red — but proved only
     sensitivity to placement, not that the guard catches the reorder it was written for.
     Diff-verify every mutant; a red you wanted is the easiest thing in the world to accept.
-    A red counts only when this run built the page it ran: a mutant whose build failed left the
-    last run's pages in the output folder, and the runner replayed them, so the "red" came from
-    an older mutant. Wipe the output folder before each mutant build, and stop on a failed build
-    instead of running whatever pages are there.
+    PRS (2026-10-26): A red counts only when this run built the page it ran: a mutant whose
+    build failed left the last run's pages in the output folder, and the runner replayed them,
+    so the "red" came from an older mutant. Wipe the output folder before each mutant build, and
+    stop on a failed build instead of running whatever pages are there.
 
 49. **Report the non-findings.** An audit that finds a defect in everything it inspects is
     usually an audit performing thoroughness — the useful output is *which* items were wrong
@@ -300,8 +304,8 @@ correcting the orchestrator, or a sibling correcting itself.*
     as a behavioral one. *Provenance:* a header fixed an over-claim about code scope and
     introduced a fresh one about test coverage **in the same edit** — the tidy sentence
     arrives first, and repairing a claim feels careful enough to skip checking the new one.
-    A pin that only prints a value the builder claims is the same over-claim: mutate the
-    claim away and predict GREEN; a mutant that survives is the finding.
+    PRS (2026-10-26): A pin that only prints a value the builder claims is the same over-claim:
+    mutate the claim away and predict GREEN; a mutant that survives is the finding.
 
 52. **The hedge is the untidy part, and a write-up wants a clean rule — whoever is writing.**
     An orchestrator turned a builder's "I ran no sweep" into "patience saved a sibling's
@@ -344,9 +348,10 @@ correcting the orchestrator, or a sibling correcting itself.*
     actually shipped five weeks earlier, so an audit believed the comment over the data.
     Require the population count *before* the build, and say "zero" out loud so nobody
     re-files it.
-    A number in a code comment carries no commit: a balance or tuning figure quoted from a comment
-    may describe code that has changed since. Before offering such a number for a decision, re-run
-    the simulation or measurement on the current base and quote the commit SHA beside each number.
+    PRS (2026-10-26): A number in a code comment carries no commit: a balance or tuning figure
+    quoted from a comment may describe code that has changed since. Before offering such a
+    number for a decision, re-run the simulation or measurement on the current base and quote
+    the commit SHA beside each number.
 
 59. **Fail-open vs fail-closed is the load-bearing property of any client-side guard.** A
     disable derived from data that may not have loaded must degrade to *enabled* — the
@@ -356,11 +361,11 @@ correcting the orchestrator, or a sibling correcting itself.*
 60. **A guard that cries wolf gets deleted.** Measure a marker/heuristic set against the real
     corpus before shipping it: a first-choice marker matched three files, two of which were
     unrelated. Precision is what keeps a guard alive long enough to catch anything.
-    The other side is recall: a parser of hand-written status markers must accept every form the
-    source actually uses. Count the forms first (bold, bulleted, quoted, italic notes), and derive
-    the expected table a second, independent way before trusting the parser's output; one missed
-    form silently files those entries under the wrong status.
-    A browser layout walk cries wolf the same way: content clipped by an ancestor with hidden
+    PRS (2026-10-26): The other side is recall: a parser of hand-written status markers must
+    accept every form the source actually uses. Count the forms first (bold, bulleted, quoted,
+    italic notes), and derive the expected table a second, independent way before trusting the
+    parser's output; one missed form silently files those entries under the wrong status. A
+    browser layout walk cries wolf the same way: content clipped by an ancestor with hidden
     overflow, or inside a closed `<details>`, still has client rects. A right-edge overflow walk
     clips each rect by its overflow ancestors and skips closed `<details>`, or it reports hidden
     text as overflow (the opposite trap, a missed overflow, is 74).
