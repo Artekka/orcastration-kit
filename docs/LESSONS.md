@@ -16,8 +16,9 @@ kit's whole reason to exist.
 2. **Worktree isolation for every implementation agent.** Concurrent sessions and their
    subagents never share main's working tree; non-isolated agents silently co-edit files.
    *Provenance:* origin-project memory `feedback_isolate_worktree_for_concurrent_sessions`.
-   *Added:* When builders must share one worktree, give each an exclusive file list and run
-   tests under one lock; parallel runs overwrite each other's files and results.
+   *Added:* When builders must share one worktree, give each an exclusive file list, commit
+   shared hooks first, run tests under one lock, and restore any singleton a test touches;
+   parallel runs overwrite each other.
 
 3. **NEVER `git stash` inside a worktree agent.** Stash refs are SHARED across all
    worktrees of a repo; two agents stashing concurrently popped each other's WIP. Prove a
@@ -53,8 +54,9 @@ kit's whole reason to exist.
 9. **No vacuous green.** A check that found nothing wrong and a check that ran on nothing
    are indistinguishable unless you assert the match/population count — "0 failed" out of
    0 run is not a pass.
-   *Added:* A check can silently run on less: an unreadable file skipped, a last line dropped, a
-   test that cannot run on this machine. Each must fail the gate.
+   *Added:* A check can silently run on less (an unreadable file skipped, a last line dropped, a
+   test that cannot run here): each must fail the gate, and a pass line depends on its own
+   checks' failure count.
 
 10. **Read the REAL pass line, unpiped.** Pipes mask exit codes; a background-task
     completion notification masks a failing exit; a process can print its pass summary and
@@ -62,8 +64,9 @@ kit's whole reason to exist.
     exit, from output you captured yourself.
     *Provenance:* origin-project memories `feedback_pipe_masks_exit_code`,
     `feedback_background_test_notification_masks_exit`.
-    *Added:* Count failures from the full log, never a cut or filtered one, which hides reds.
-    Join a gate and its push with `&&`, never `;`.
+    *Added:* Count failures from the full log, never a cut or filtered one, and never prove a
+    setting by a filtered log line; cuts hide reds. Join a gate and its push with `&&`, never
+    `;`.
 
 11. **Gate red ≠ code red.** Know the project's infra-flake modes (e.g. one test
     container per file saturating Docker) and encode the trusted gate + the never-run
@@ -78,7 +81,7 @@ kit's whole reason to exist.
     isolation and sees it with its own eyes.
     *Provenance:* origin-project memory `feedback_verify_subagent_failure_claims`.
     *Added:* Run the same check on the untouched base and report only the failures the change
-    adds; old failures are not the change's fault.
+    adds; before blaming a merge, compare the failing output on the merge and both parents.
 
 ## Scope discipline
 
@@ -97,8 +100,8 @@ kit's whole reason to exist.
     conflicts, both ids go live, and a grep returns two unrelated rows that look deliberate.
     Prefix = session tag (`O7-1`, `FQ-2`); collisions become impossible by construction.
     *Provenance:* six manual reconciliations in two days (origin project).
-    *Added:* Mint document and decision codes on main only, and recount after every merge: two
-    branches that each add one merge cleanly into a single increment.
+    *Added:* Mint document and decision codes on main only, by the seat, and recount after every
+    merge: two branches that each add one merge cleanly into a single increment.
 
 17. **Milestone/log numbers are allocated through a claimed LOG slot** (same shape as the
     DEPLOY slot). Any shared monotonic counter needs a single allocator while concurrent
@@ -120,16 +123,17 @@ kit's whole reason to exist.
     (origin project, 2026-08-21); caught by counting the landed commits against the branch's
     intended list — the byte-diff against the branch tip was the repair's verification,
     not the detection.
-    *Added:* After a crash or a row takeover, audit every worktree for dirty files, unpushed
-    commits and stale locks first; the last session may have left work half done.
+    *Added:* After a crash or a row takeover, audit every worktree before any work: dirty files,
+    unpushed commits, lost gate logs, stale locks and unlogged scratch files; the last session
+    may have left work half done.
 
 21. **Mutation/falsification commands: one explicit target tree, stderr visible.** Never
     leave earlier path guesses in a compound command; never `2>/dev/null` anything that
     edits files; after restore, diff-verify EVERY tree the command string could have
     reached, not just the one the test reads. And a mutant you haven't diff-verified as
     APPLIED proves nothing.
-    *Added:* A mutant counts only if its diff changes the guarded line and the measured value
-    moved; a diff of only added lines changes nothing.
+    *Added:* A mutant counts only if its diff changes the guarded line, its selection is not
+    empty, and the measured value moved; keep the falsify record in the commit message.
 
 22. **A change that ADDS test output needs one pass through the real gate stage** — gates
     that classify stage output by pattern make output part of the interface; a realistic
@@ -181,13 +185,15 @@ kit's whole reason to exist.
 
 31. **Push a `merge --no-ff` immediately.** A plain rebase before the push linearizes the merge;
     the builder's SHAs never reach origin and a branch stacked on them conflicts later.
-    *Added:* After the first push, cherry-pick instead of rebasing, and read `git show --stat`
-    before pushing: a file the branch never touched is a hidden revert.
+    *Added:* After the first push, cherry-pick instead of rebasing. Squash only onto the merge
+    base and read `git show --stat` before pushing: a file the branch never touched is a hidden
+    revert.
 
 32. **Run the gate from inside your own worktree.** A gate script that `cd`s to its own
     directory gates the tree it lives in and prints a legitimate green for a tree you are not in.
     *Added:* Write git commands as `git -C <worktree>`, because the shell can drift back to the
-    shared checkout; never edit a tree while its gate waits in the queue.
+    shared checkout. Commit before the gate, write the log's SHA line after the slot is
+    acquired, and never edit a tree while its gate waits.
 
 33. **Siblings verify siblings — not subagents.** A subagent the seat spawns inherits the seat's
     framing; a peer session has its own context. Nobody verifies their own row, no mutual
@@ -214,8 +220,9 @@ kit's whole reason to exist.
 
 38. **Measure the right object.** Identify a session from an authoritative id, never "most
     recently modified". Checking a property of the wrong object raises confidence, not accuracy.
-    *Added:* A check that reads the constant it guards or the code under test can never fail:
-    read the raw value and write the expected value into the test.
+    *Added:* Measure your own session by its own id. A check that reads the constant it guards
+    or the code under test, or a guard pasted onto another kind of object, can never fail: read
+    the raw value and write the expected value into the test.
 
 39. **Recycle launch-first, then SIGTERM.** Open the fresh session, wait until its process
     exists, then SIGTERM (not KILL) the old one — no seat is ever empty and the old transcript
@@ -224,8 +231,9 @@ kit's whole reason to exist.
 40. **All human approvals route through the seat.** Siblings stop and message the seat; the seat
     batches questions to the human in ONE terminal. Scattered prompts across terminals stall
     silently when nobody is watching that window.
-    *Added:* Relay only settled rulings to a builder, and while the base is unsettled send one
-    proposal, not a stream of questions; every change of course costs a rebuild.
+    *Added:* Relay only settled rulings to a builder; while the base is unsettled send one
+    proposal, not a stream of questions, and open a design with the owner's earlier rulings.
+    Every change of course costs a rebuild.
 
 41. **A suite nothing runs rots silently.** A fast DB-free gate is right per change, but some
     exhaustive sweep must run before trains or nightly — a change can be green on its own
@@ -282,15 +290,19 @@ correcting the orchestrator, or a sibling correcting itself.*
     a restore — and it prints `nothing to commit, working tree clean` plus a GREEN gate on
     the *pre-fix* SHA. Clean status alone cannot distinguish restored from deleted. Always
     commit GREEN before mutating.
-    *Added:* After undoing a planted bug, clear compiled caches such as `__pycache__`; a stale
-    cache keeps running the bug.
+    *Added:* After undoing a planted bug, clear compiled caches such as `__pycache__`, and run
+    gates with compiled-file writes off; a stale cache keeps running the bug, and the writes
+    dirty the tree.
 
 48. **A mutant that reds for the wrong reason is not evidence.** A "mutant" that *inserted*
     a duplicate step rather than *relocating* one produced a red — but proved only
     sensitivity to placement, not that the guard catches the reorder it was written for.
     Diff-verify every mutant; a red you wanted is the easiest thing in the world to accept.
-    *Added:* Predict the exact failing check before running a mutant; a red from a different
-    check proves nothing. Falsify in the gate's own mode, one mutant per bound and per path.
+    *Added:* Predict the exact failing check before running a mutant; a red from another check,
+    or from a run that did not build what it ran, proves nothing. Falsify in the gate's own mode
+    with one mutant per bound and per path, flip a policy constant once, and try path filters
+    with `..`, absolute and case variants. A planted bug proves a new test only if the old suite
+    misses it.
 
 49. **Report the non-findings.** An audit that finds a defect in everything it inspects is
     usually an audit performing thoroughness — the useful output is *which* items were wrong
@@ -319,7 +331,8 @@ correcting the orchestrator, or a sibling correcting itself.*
     is harder to catch, because there is no second party whose qualifier you notice yourself
     dropping.** When a builder qualifies a claim, the qualifier IS part of the finding.
     *Added:* Call an untraced gap "not explained", never "noise", and a value "display only"
-    only after listing every reader; a guess written as fact misleads the next session.
+    only after listing every reader. An automated reply on someone's behalf can invent facts:
+    correct it, never build on it.
 
 53. **Sweeps run from a SHA-pinned worktree, and you must replay your scoping patterns
     against the full file list before claiming coverage.** A shared checkout moves under a
@@ -370,8 +383,9 @@ correcting the orchestrator, or a sibling correcting itself.*
     unrelated. Precision is what keeps a guard alive long enough to catch anything.
 
     *Added:* Before a check counts, show it passes today's accepted output and fails each
-    known-bad case, including anything the human rejected; an uncalibrated check measures
-    nothing.
+    known-bad case, including anything the human rejected. A validator needs a planted fault it
+    must refuse, a parser accepts every form the source uses, and a layout walk skips clipped
+    and closed content.
 
 ## Measurement, pipelines and test design (added)
 
@@ -382,55 +396,65 @@ correcting the orchestrator, or a sibling correcting itself.*
 
 62. **A measuring guard shows its work and cannot be steered by what it measures.**
     Draw its sample points on the output it judges, take reference points only from parts the
-    input cannot move, and fail closed when they are missing; otherwise the input can pass by
-    moving the ruler.
+    input cannot move, fail closed when they are missing, and count a part sunk inside a shape
+    as a negative gap; otherwise the input can pass by moving the ruler.
 
 63. **A mutant that stays green means a second path recovers the result.**
-    Find that path before calling the check weak, and say the check proves only the one path.
-    After a change moves what a check aims at, rerun every mutant aimed at it.
+    Find that path before calling the check weak, switch the paths off in stacked steps, and say
+    the check proves only the one path. After a change moves what a check aims at, rerun every
+    mutant aimed at it and at checks that share its state.
 
 64. **Judge a change per row, never on a total.**
     A total within tolerance can hide one source far outside it. Run one unchanged probe on base
     and tip, print a line per source, apply the tolerance per row, and prove the diff can go
-    non-empty.
+    non-empty; "old data" fixtures are built by the old code.
 
 65. **Find a cause one path at a time.**
     Pin one path per run and try fixes as patches on a temp copy. A failure that depends on the
-    path taken cannot be bisected commit by commit; reproduce it in a minimal script instead.
+    path taken cannot be bisected commit by commit; reproduce it in a minimal script. Measure a
+    "missing" step's output at every later stage before rewriting it, and when one new random
+    draw shifts a seeded run, compare the old code with the old code plus that draw.
 
 66. **Control randomness; never count repeats.**
     "Passed 3 of 3" proves nothing about a chance failure: force the roll at the step instead.
     Before calling a seeded number steady, vary every seed that feeds it and set bands from the
-    measured spread.
+    measured spread. Compensate a generator's drift only after two rounds agree, and only once.
 
 67. **Test the worst real case and every input.**
     After moving a threshold, probe each input at empty, half and full, and check a layout on
-    the largest real count and longest label. Typical cases pass where the extremes break.
+    the largest real count and longest label; typical cases pass where the extremes break.
+    Before a long optimisation, check the targets can be met together; before a slow job, view
+    the guide from every angle beside the owner's reference.
 
 68. **Test a lock on the filesystem where it lives; its release removes only its own entry.**
     A race test on local disk says nothing about a network mount. Use a temp path shaped like
     the real one, and give each run a unique owner (tool, host, process id).
 
 69. **Heavy background work runs as one gated script.**
-    Size a fan-out by free memory, not cores. Record each process id at launch and stop by that
-    id, since stopping a shell leaves its children running. Rerun a cut-off batch whole.
+    Size a fan-out by free memory, not cores, and run a chain as one script with a status file
+    per step. Record each process id at launch and stop by that id, since stopping a shell
+    leaves its children running. Rerun a cut-off batch whole, and move old outputs away before
+    rerunning a tool that skips existing ones.
 
 70. **A record counts only if something reads it and stops on a mismatch.**
     A settings stamp nobody checks is decoration: give it a reader that fails on a difference,
     and compare a delivered file's checksum with its source in the same command.
 
 71. **Test-design traps.**
-    Each test sets up its own state and passes alone and among its neighbours. Give async
-    actions a late-resolving stub, look nodes up again after a re-render, sort by parsed value,
-    and build time-based seeds from now. Shared state and timing make passes that do not repeat.
+    Each test sets up its own state and passes alone and among its neighbours (report "k fails
+    in N runs"). Give async actions a late-resolving stub, look nodes up again after a
+    re-render, sort by parsed value, build time-based seeds from now and falsify them with the
+    clock moved ahead, compare a stub with the platform's documented contract, and check a data
+    dump's age before blaming a seed. Shared state and timing make passes that do not repeat.
 
 72. **When the look is the requirement, read the drawn pixels.**
     A model check can pass while the screen shows the wrong thing. Measure at full resolution in
-    the delivered view, still look at every changed picture, and open it yourself before asking
-    a human to judge it.
+    the delivered view, one metric per property, still look at every changed picture, and open
+    it yourself before asking a human to judge it; a headless browser draws no frames.
 
 73. **Visual-check traps.**
-    Averages hide local defects: score the worst small window, not a region average. Compare an
-    edited outline with the original at several scales, check a mask covers the flagged spot,
-    prove a batch fix changed only its mask, and keep colour keys distinct after every
-    transform.
+    Averages hide local defects: score the worst small window, not a region average. Measure
+    steadiness at one fixed scale per route and pin anchors to a steady value, not each frame's
+    extreme. Compare an edited outline with the original at several scales, check a mask covers
+    the flagged spot, prove a batch fix changed only its mask, keep colour keys distinct after
+    every transform, and build a pick sheet on fixed anchors, one scale and one baseline.
