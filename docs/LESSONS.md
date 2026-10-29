@@ -55,7 +55,7 @@ kit's whole reason to exist.
    is ignored unless the loop rejects it. A test that cannot run on this machine (a missing tool or
    browser) fails in the gate's own result line; it never drops its pages or passes with zero
    checks, and the number of pages built is part of the population the count asserts. The runner may
-   hide build output, so a missing input must show in the result itself (see 98 and 120).
+   hide build output, so a missing input must show in the result itself (see 102 and 125).
 
 10. **Read the REAL pass line, unpiped.** Pipes mask exit codes; a background-task
     completion notification masks a failing exit; a process can print its pass summary and
@@ -80,7 +80,7 @@ kit's whole reason to exist.
     *Provenance:* origin-project memory `feedback_verify_subagent_failure_claims`.
     Before blaming a failure outside the change on a merge, compare (`cmp`) the failing check's
     built output on the merged tree and on both parents: if it is byte-identical on all three, the
-    merge did not cause it. Report what remains as k fails in N runs (see 134).
+    merge did not cause it. Report what remains as k fails in N runs (see 139).
 
 ## Scope discipline
 
@@ -99,9 +99,6 @@ kit's whole reason to exist.
     conflicts, both ids go live, and a grep returns two unrelated rows that look deliberate.
     Prefix = session tag (`O7-1`, `FQ-2`); collisions become impossible by construction.
     *Provenance:* six manual reconciliations in two days (origin project).
-    The same holds for shared document and decision-code counters: a branch that bumps one before it
-    merges mints a code that main mints again. Mint such codes on main only, by the seat, or first
-    list the next code on every open branch.
 
 17. **Milestone/log numbers are allocated through a claimed LOG slot** (same shape as the
     DEPLOY slot). Any shared monotonic counter needs a single allocator while concurrent
@@ -366,22 +363,18 @@ correcting the orchestrator, or a sibling correcting itself.*
     A browser layout walk cries wolf the same way: content clipped by an ancestor with hidden
     overflow, or inside a closed `<details>`, still has client rects. A right-edge overflow walk
     clips each rect by its overflow ancestors and skips closed `<details>`, or it reports hidden
-    text as overflow (the opposite trap, a missed overflow, is 68).
+    text as overflow (the opposite trap, a missed overflow, is 74).
 
 ## Guards, gate logs and worktree git (harvest 2026-10-15)
 
 *One orchestrated day of tool-building rows, each read by a sibling verifier. Every lesson below
 came from a verifier finding or a falsify run that went red where the builder expected green.*
 
-61. **A guard's verdict holds only for the stage it ran at: run it after the last step that changes
-    what it looks at and before any step that erases it** — or that erasing step must record what it
-    erased, and the guard reads the record. A guard scanning a model's named parts for forbidden
-    names ran after an export step that deletes those parts, so it could never fire; it printed
-    green on every input. Only mutating the *writer* (feeding it a forbidden key) showed it. The
-    other order fails too: a check counted defects part-way through a pipeline and passed; a later
-    step reshaped the geometry and the final output failed the same check. Order the pipeline so the
-    scan sees the final input: place the guard after the last step that moves its input, or run it
-    again there and quote that count (see 84), and before any step that erases it. Prove each guard
+61. **A guard that scans state must run before any step that erases what it scans** — or that
+    step must record what it erased, and the guard reads the record. A guard scanning a model's
+    named parts for forbidden names ran after an export step that deletes those parts, so it could
+    never fire; it printed green on every input. Only mutating the *writer* (feeding it a
+    forbidden key) showed it. Order the pipeline so the scan sees the input, and prove each guard
     red by mutating what produces its input, not just the guard itself.
 
 62. **A measuring guard draws its measured landmarks on the output it judges.** A proportion
@@ -401,6 +394,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
     at queue time.
     Commit before the gate run, so the SHA line names the saved version and the log vouches for a
     tree with no uncommitted edits.
+
 
 64. **In multi-worktree sessions run every git write as `git -C <worktree>`.** The shell's
     working directory can reset to the shared checkout between commands, so a bare `git commit`,
@@ -439,46 +433,23 @@ came from a verifier finding or a falsify run that went red where the builder ex
     value failed it. Quote the script's own output, unrounded, and round only in prose that sets
     no limit.
 
-68. **A measuring guard takes its landmarks, reference length and containing edge only from things
-    the input cannot move, fails closed when they are missing, and is tried on known-bad input.**
-    The measured object must not choose its own landmarks. A guard that found its reference points
-    by a heuristic (the largest step in a profile, the widest slice) could be steered by the input
-    it judged: a small shape change moved the "largest step" to a different place, and the
-    measurement followed it. Pin landmarks to something the input cannot reshape (a skeleton's
-    joints, a certified reference basis), and fail closed when they are missing (see 62: draw them
-    on the output too).
-    A guard measured in fractions of a total takes the total only from parts that cannot be
-    stretched. A shape guard expressed its limits as fractions of the model's overall height, read
-    from the lowest to the highest point. An added base part lowered the lowest point by a few
+68. **A guard measured in fractions of a total takes the total only from parts that cannot be
+    stretched.** A shape guard expressed its limits as fractions of the model's overall height,
+    read from the lowest to the highest point. An added base part lowered the lowest point by a few
     centimetres, which grew the "height" and shrank every ratio under its limit, so a model the
     guard should refuse passed. Take the reference length from parts the input cannot extend (named
     anchors, a fixed skeleton), or refuse any input whose reference parts are not the expected ones.
-    A check that re-centres on the shape it measures follows that shape the same way: test it on
-    known-bad pictures before trusting it (one such check passed arms drawn far too thick).
-    Containment is the same trap: "the child stays inside its box" measured against the box's own
-    edge passes when the overflowing child widens that box. Measure against an edge the defect
-    cannot move (the screen, a fixed parent, a width set in the test).
 
-69. **A mutant or probe counts only after you show it took effect: its diff removes or changes the
-    guarded line, its selection picked at least one item, and the measured value moved.** A falsify
-    run fed a deliberately bad input to a guard and the guard passed it, which looked like a hole;
-    another run "passed" correctly, which looked like proof. In both, the mutation had not changed
-    the feature the guard measures. Log the measured value before and after the mutation next to the
-    verdict: a mutant that moved nothing is no evidence either way (see 21 and 48 for code mutants).
-    The same holds for a probe: before trusting a probe's number, or a mutant's verdict, show that
-    it moves the quantity the check reads. A probe that changes a neighbouring value reports nothing
-    about the one under test.
-    A code mutant removes or replaces the guarded line; a diff that only adds lines is a no-op. A
-    mutant meant to disable a check added a line beside it and left the check itself in place, so
-    the guard still ran and the "mutant" proved nothing. Before running a mutant, read its diff: it
-    must show the guarded line as removed (`-`) or changed. A diff with only `+` lines does not
-    disable anything (see 48 and 70).
-    A probe or mutant whose selection is empty passes vacuously: make it abort on an empty pick. A
-    mutant that was meant to alter "every item matching X" matched none, changed nothing, and the
-    check stayed green, which read as a guard that held. Count what the selection picked and abort
-    with a message when the count is zero; report the count next to the verdict.
-    Keep the falsify record (the mutant's diff, the prediction, the red line seen) in a commit
-    message on the branch, and keep the mutated files, so a reviewer can rerun it.
+69. **An input mutant proves it changed the measured feature before its PASS or FAIL counts.** A
+    falsify run fed a deliberately bad input to a guard and the guard passed it, which looked
+    like a hole; another run "passed" correctly, which looked like proof. In both, the mutation
+    had not changed the feature the guard measures. Log the measured value before and after the
+    mutation next to the verdict: a mutant that moved nothing is no evidence either way (see 21
+    and 48 for code mutants).
+    The same holds for a probe: before trusting a probe's number, or a mutant's verdict, show
+    that it moves the quantity the check reads. A probe that changes a neighbouring value
+    reports nothing about the one under test.
+
 
 70. **For a code mutant, predict the exact failure message it should cause, not just red or
     green.** A mutant that removes one check can turn the run red through a different check that
@@ -498,19 +469,11 @@ came from a verifier finding or a falsify run that went red where the builder ex
     break. Check out the commit before the change in a separate worktree, produce the fixtures
     there, record that commit in the fixture's header, and only then test the new code on them.
 
-72. **Never judge a change on a total: run one unchanged probe on base and tip, print one line per
-    source or action at each input level, apply any tolerance per row, and diff line by line.** A
-    claim of "within plus or minus N percent" is checked per row, not on the total. A re-tune
-    reported every total within -4 to +2 percent of the old numbers; one of the sources feeding a
-    total had moved +60 percent, cancelled out by others. Report the change for each source
-    separately and apply the tolerance to each row; a total within tolerance proves only that the
-    errors cancel.
-    For a parity review, run one probe script unchanged on the base and on the tip, and diff per
-    action and per input level, never per total. Two probes written for each side, or a probe that
-    sums its results, let opposite differences cancel and let each side measure something slightly
-    different. Keep the probe free of calls that exist on only one side (or pick the call at run
-    time), print one line per action at each input level (empty, half, full), and diff the two
-    outputs line by line.
+72. **A claim of "within plus or minus N percent" is checked per row, not on the total.** A
+    re-tune reported every total within -4 to +2 percent of the old numbers; one of the sources
+    feeding a total had moved +60 percent, cancelled out by others. Report the change for each
+    source separately and apply the tolerance to each row; a total within tolerance proves only
+    that the errors cancel.
 
 73. **Test a lock's atomicity on the filesystem where the real lock lives.** A race test for a
     create-if-absent lock ran in a local temp folder and passed; the real lock file sits on a
@@ -520,12 +483,31 @@ came from a verifier finding or a falsify run that went red where the builder ex
     says nothing about the mount, and a path without spaces hides quoting bugs in the test
     itself.
 
-74. **A gap measured to an outline must also catch a part that sits inside the shape.** A spacing
+74. **A measuring guard must not let the measured object choose its own landmarks.** A guard
+    that found its reference points by a heuristic (the largest step in a profile, the widest
+    slice) could be steered by the input it judged: a small shape change moved the "largest step"
+    to a different place, and the measurement followed it. Pin landmarks to something the input
+    cannot reshape (a skeleton's joints, a certified reference basis), and fail closed when they
+    are missing (see 62: draw them on the output too).
+    A check that re-centres on the shape it measures follows that shape the same way: test it on
+    known-bad pictures before trusting it (one such check passed arms drawn far too thick).
+    Containment is the same trap: "the child stays inside its box" measured against the box's own
+    edge passes when the overflowing child widens that box. Measure against an edge the defect
+    cannot move (the screen, a fixed parent, a width set in the test).
+    A gap measured to an outline must also catch a part that sits inside the shape. A spacing
     check that took the distance to the nearest outline point read a part buried inside as
-    "touching" and passed it. Give a point inside the shape a negative gap, so a part that sinks in
-    fails, and plant one inside to prove it.
+    "touching" and passed it. Give a point inside the shape a negative gap, so a part that sinks
+    in fails, and plant one inside to prove it.
 
-75. **After a scripted marker-to-marker cut, grep for the lines it removed.** A script that
+75. **A falsify mutant removes or replaces the guarded line; a diff that only adds lines is a
+    no-op.** A mutant meant to disable a check added a line beside it and left the check itself
+    in place, so the guard still ran and the "mutant" proved nothing. Before running a mutant,
+    read its diff: it must show the guarded line as removed (`-`) or changed. A diff with only
+    `+` lines does not disable anything (see 48 and 70).
+    Keep the falsify record (the mutant's diff, the prediction, the red line seen) in a commit
+    message on the branch, and keep the mutated files, so a reviewer can rerun it.
+
+76. **After a scripted marker-to-marker cut, grep for the lines it removed.** A script that
     deleted everything between two markers also swallowed three settings that sat inside the
     range; nothing failed until a probe run showed the settings missing. After any cut by
     pattern or marker, list the removed lines (`git diff | grep '^-'`) and check each one was
@@ -533,43 +515,38 @@ came from a verifier finding or a falsify run that went red where the builder ex
     The same goes for a find-and-replace that splices text into the middle of a line: edit whole
     lines, then read the diff to see each changed line in full.
 
-76. **A context-fill measure reads YOUR transcript, picked by your own session id, never the
+77. **A context-fill measure reads YOUR transcript, picked by your own session id, never the
     newest file.** The script measures whichever transcript it is given. A fresh session that
     took the newest transcript in the folder measured a sibling's 173K as its own. Take your
     identity from your own listing (the agent listing's first line, or your env block), find
     the transcript that belongs to it, and measure that one.
 
-77. **A lock helper's release removes only the exact line it wrote, and its default owner is
+78. **A lock helper's release removes only the exact line it wrote, and its default owner is
     unique per run.** A release that deleted the lock without comparing owners could free a
     lock another run had taken since; fixed default owner names let two unnamed runs each
     believe they held it. Write an owner unique to the run (tool, host and process id) unless
     the caller names one, and on release or trap compare the whole owner line before removing
-    anything. Never use a real session's name as the default (see 73; 76 on session identity).
+    anything. Never use a real session's name as the default (see 73).
 
-78. **Quote context fill from the measuring script's output, never from memory.** A verifier
+79. **Quote context fill from the measuring script's output, never from memory.** A verifier
     reported about 175K in a status line while its real fill was 300K, past the report mark,
     and kept working. Every fill number in a READY, report or handover is the script's
     `current` line pasted from a run made in that same turn.
     Time stamps follow the same rule: a stamp on a board, log or handover comes from `date -u`
     run in that turn, never from memory or from the last stamp you saw.
 
-79. **Parity with the old version is proved by diffing the old code's whole output against the new,
-    and a zero-line diff counts only after a mutant shows it can differ.** A change meant to leave
-    the results as they were passed every per-number check, and a reviewer still found rules that
-    behaved differently. When the goal is "same as before", write the old code's full output once (a
-    report, a probe of every rule) and `diff` the new one against it; zero lines of difference is
-    the proof, not the numbers you picked (see 72).
-    A byte-identical comparison ("the report is identical") proves nothing if the comparison never
-    reads the part that changed (the wrong file, a cached copy, a section the generator skips).
-    Before quoting a zero-line diff as proof, make it fail on purpose: change one input that must
-    move the output (a mutant), rerun, and see the diff go non-empty, so the comparison is known to
-    see a change.
-    Sample the odd moments as well as the usual one. A "nothing changed" check looked at the normal
-    case only, while the change showed only at night, or on single frames. Probe every regime the
-    rules read (time of day, per-frame versus per-snapshot, the rare branches), not only the moment
-    where the check is convenient (see 80).
+80. **Parity with the old version is proved on the whole report, not on the numbers you picked.**
+    A change meant to leave the results as they were passed every per-number check, and a
+    reviewer still found rules that behaved differently. When the goal is "same as before", write
+    the old code's full output once (a report, a probe of every rule) and `diff` the new one
+    against it; zero lines of difference is the proof. Then make the diff fail on purpose (a
+    mutant) so the comparison is known to see a change (see 40 and 72).
+    Sample the odd moments as well as the usual one. A "nothing changed" check looked at the
+    normal case only, while the change showed only at night, or on single frames. Probe every
+    regime the rules read (time of day, per-frame versus per-snapshot, the rare branches), not
+    only the moment where the check is convenient (see 81).
 
-80. **After moving a threshold or a scale, sweep every run-time input the rules read, not only
+81. **After moving a threshold or a scale, sweep every run-time input the rules read, not only
     the default.** A rescale matched the old results with the default inputs and diverged once a
     state value the user controls (a fill level, a count, a carried amount) was at half or
     full: some rules still read a value that included that input on the new scale. List each
@@ -579,20 +556,26 @@ came from a verifier finding or a falsify run that went red where the builder ex
     differ only where two inputs differ (one counts a value once, the other twice), vary the
     input that separates the readings, or both readings pass on the pinned case.
 
-81. **Never chain a push or a "done" claim after a gate with `;`.** Commit first (see 63), then
-    `run-gate && git push`: with `;` the push, or a "gate green" report, goes out even when the gate
-    fails, and red code reaches others under a green-looking commit. Join them with `&&`, or run the
-    gate, read its pass line, and push in a separate step; a red gate is fixed in a new commit.
+
+82. **Never chain a commit after a gate with `;`.** `run-gate; git commit ...` commits even when
+    the gate fails, and the log then shows a green-looking commit on red code. Join them with
+    `&&`, or run the gate, read its pass line, and commit in a separate step (see 63).
     The same holds for a script that edits a file and asserts its own result: run it in one `&&`
     chain with the commit, never with `;` or on a new line, or have the commit step check that the
     diff shows the change. A failed assert writes nothing, and the commit ships the old text under
     a message that claims the edit.
 
-82. **A test that takes its expected value from the constant it guards cannot fail on that
+83. **A byte-identical before/after comparison counts only after a mutant shows it can differ.**
+    "The report is identical" proves nothing if the comparison never reads the part that changed
+    (the wrong file, a cached copy, a section the generator skips). Before quoting a zero-line
+    diff as proof, change one input that must move the output, rerun, and see the diff go
+    non-empty (see 80).
+
+84. **A test that takes its expected value from the constant it guards cannot fail on that
     constant.** A check computed "what should happen" from the same setting the code used, so
     setting it to zero moved the code and the expectation together and the check stayed green.
     Write the ruled value into the test itself. To falsify, mutate the constant AND, separately,
-    delete the call it drives; both must turn the check red (see 70 and 69).
+    delete the call it drives; both must turn the check red (see 70 and 75).
     The same goes for an oracle that calls the function it checks: its expected value changes
     with any change to that function, so it passes every change. Take the expected value from
     the ruling or from a value written down before the change, never from the code under test.
@@ -600,7 +583,15 @@ came from a verifier finding or a falsify run that went red where the builder ex
     into both stays green. Where the formula cannot be avoided, also pin one case with its value
     written out by hand.
 
-83. **"Every item is covered" comes from a script over the list, never from memory.** A write-back
+
+85. **For a parity review, run one probe script unchanged on the base and on the tip, and diff
+    per action and per input level, never per total.** Two probes written for each side, or a
+    probe that sums its results, let opposite differences cancel and let each side measure
+    something slightly different. Keep the probe free of calls that exist on only one side (or
+    pick the call at run time), print one line per action at each input level (empty, half,
+    full), and diff the two outputs line by line.
+
+86. **"Every item is covered" comes from a script over the list, never from memory.** A write-back
     reported that every item on a list was ruled, tested and migrated; a script over the same list
     then found one item missed and one never ruled. Before claiming full coverage, loop over the
     list's real source (the file, the table, the grep) and print each item with where it is
@@ -609,7 +600,8 @@ came from a verifier finding or a falsify run that went red where the builder ex
     population from the file itself (the real column, the real text) instead of from a tag the
     entry carries, then compare the two counts.
 
-84. **When a repair pass runs before a check, report the check's count before the repair too.** A
+
+87. **When a repair pass runs before a check, report the check's count before the repair too.** A
     local cleanup (a relax, a smooth, an auto-fix) ran before a metric and turned its red into a
     visible artifact the metric no longer measured (folds became wrinkles) while the gate read
     green. Print the metric before and after the repair; a large drop is a finding to look at,
@@ -618,7 +610,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
     just cleaned passes by construction. Report a wider, independent read of the same output
     next to it, and keep the human-eye check as the evidence.
 
-85. **After a machine crash, audit before assigning any work.** A crash left a rebased branch
+88. **After a machine crash, audit before assigning any work.** A crash left a rebased branch
     unpushed in one worktree, shared memory files uncommitted, gate logs gone with the temp
     folder, and a lock naming a dead session. Before any sibling gets work: check every worktree
     for dirty files and unpushed commits (push a rebase under a new branch name, never a
@@ -626,12 +618,12 @@ came from a verifier finding or a falsify run that went red where the builder ex
     lost and re-run those gates, check each lock against a live owner, and hold the siblings
     until the audit is done.
 
-86. **Relay only a settled human ruling to a builder.** The seat forwarded each step of the
+89. **Relay only a settled human ruling to a builder.** The seat forwarded each step of the
     human's thinking as it came in, and one builder got five specs in fifteen minutes, each
     superseding the last. Collect the whole answer first, ask "is that final?", then send the
     builder one spec.
 
-87. **A visual check done on thumbnails is not a check; give each property its own measured
+90. **A visual check done on thumbnails is not a check; give each property its own measured
     check.** A review passed images that looked right at contact-sheet size, and a line-style
     metric passed a view that was turned 15–20° from the one asked for. Measure at full
     resolution with a number, and check each property separately (style is not geometry: the
@@ -645,12 +637,12 @@ came from a verifier finding or a falsify run that went red where the builder ex
     another with stray specks; numbers measure what they were built for, and only the look sees
     the rest.
 
-88. **Prove a new check red on the artifact the human actually rejected, not only on a made-up
+91. **Prove a new check red on the artifact the human actually rejected, not only on a made-up
     broken case.** A check passed a hand-built bad example and still passed the very output a
     reviewer had refused, because the invented case failed in a way the real one did not. Run
     the check on the rejected artifact itself (the picture, the file, the saved run) before
     calling it a guard for that complaint; if it stays green there, it does not guard it (see
-    69).
+    69 and 75).
     Before building a check for a reviewer's complaint, measure what actually differs between the
     rejected output and an accepted one: a "too wide" complaint was a taller header, not wider
     columns, and the planned column check would have passed the rejected output.
@@ -663,107 +655,103 @@ came from a verifier finding or a falsify run that went red where the builder ex
     reproduces the complaint; a check that passes there is a regression guard, still worth keeping,
     but no proof that the fix addressed the complaint.
 
-89. **When inheriting a row, list its scratch files by modification time against the branch tip.**
+92. **When inheriting a row, list its scratch files by modification time against the branch tip.**
     A builder took over a row from a session that ended abruptly; its scratch folder held
     attempts newer than the last commit, never logged, one of them the working version of a
     step the branch still lacked. Before starting, list the row's scratch and output files
     sorted by time next to the tip's commit time: any file newer than the tip is an unlogged
-    attempt, to be read, logged or discarded on purpose (see 85).
+    attempt, to be read, logged or discarded on purpose (see 88).
 
-90. **A factor in a shared function is checked at every call site, not only where it is defined; a
-    test drives the sites and a READ lists every caller.** A test checked a helper's result and the
-    helper was right, while one caller multiplied the result by the same factor again; the total was
-    off by that factor and every check stayed green. A review likewise confirmed a factor was
-    applied correctly in the function that owns it, without listing who calls the function, and one
-    caller applied the same factor again or skipped it. Grep every caller, quote the list, and state
-    for each whether it applies the factor itself.
-    A check that never runs the call site cannot see a site that applies a factor twice. Either
-    drive the call site itself, or check the exact call text (grep the line, count the factor's
-    occurrences per site), and falsify by doubling the factor at one site. Next to a per-site check,
-    also assert the exact total number of call sites, so a site added elsewhere cannot go unchecked,
-    and falsify by adding one extra call in another function.
-    The same applies to a claim that code never runs or is dead: cite a full caller grep on the
-    object's real class (subclass overrides included) or a probe; "runs but is never seen" is a
-    separate verdict. The same goes for "X unchanged" lines in records (a changelog, a decision
-    log): cite the search behind each one.
+93. **A check that never runs the call site cannot see a site that applies a factor twice.**
+    A test checked a helper's result and the helper was right, while one caller multiplied the
+    result by the same factor again; the total was off by that factor and every check stayed
+    green. Either drive the call site itself, or check the exact call text (grep the line,
+    count the factor's occurrences per site), and falsify by doubling the factor at one site.
+    Next to a per-site check, also assert the exact total number of call sites, so a site added
+    elsewhere cannot go unchecked, and falsify by adding one extra call in another function.
 
-91. **Before proposing how to satisfy a refusing check, trace where the check takes its input.**
+94. **Before proposing how to satisfy a refusing check, trace where the check takes its input.**
     A guard refused an object and the first fix proposed edited the stored data it was assumed to
     read; the guard actually read a live, derived value (an evaluated result, not the stored
     field), so the edit changed nothing. Read the check's own code to the point where its input
     enters, name that input, and only then propose a change to it (see 67).
 
-92. **A gap you have not isolated is "not explained", never "noise"; a quantity is "display
+95. **A probe or mutant whose selection is empty passes vacuously: make it abort on an empty
+    pick.** A mutant that was meant to alter "every item matching X" matched none, changed
+    nothing, and the check stayed green, which read as a guard that held. Count what the
+    selection picked and abort with a message when the count is zero; report the count next to
+    the verdict (see 69).
+
+96. **A gap you have not isolated is "not explained", never "noise"; a quantity is "display
     only" only after every consumer is traced.** A small unexplained difference between two runs
     was written off as noise, and a value labelled display-only fed a rule two calls away.
     Write "not explained" until the gap has been reproduced and attributed to a named cause; call
     a value display-only only after listing every reader of it (grep each consumer, quote the
-    list) (see 72 and 80).
+    list) (see 72 and 81).
 
-93. **A failure that depends on the path cannot be bisected by one run per commit.** A crash
+97. **A failure that depends on the path cannot be bisected by one run per commit.** A crash
     appeared only on some routes through a long scenario, so a good run on a commit proved
     nothing and a bisect pointed at three different commits. Read the crash frame, reproduce the
     engine fact it names in a minimal script, and prove the fix with a check that can fail (a
     mutant that restores the bug turns it red), not with a green run of the long scenario (see 70
-    and 69).
+    and 75).
 
-94. **A liveness guard compares to the thing it guards; pasted for another kind of object it
+98. **A liveness guard compares to the thing it guards; pasted for another kind of object it
     silently aborts.** A guard written for one kind of node (a level) was copied to guard a
     different kind (a child overlay that is never the level), so the guard failed every time
     and the scripted run quietly stopped; the lint and the smoke test stayed green and only
     the full playthrough saw it. For each guard site, say what object it guards and which
     object the guard compares against, and plant a case per kind (no guard, wrong guard, right
     guard) in the lint; falsify by pasting the guard onto the other kind and checking it goes
-    red (see 70 and 93). A guard counts only where it controls the use: plant cases where the
+    red (see 70 and 97). A guard counts only where it controls the use: plant cases where the
     guard is nested away from the use, is a no-op (`if G: pass`) or is joined by `and not G`,
     and require the lint to flag each.
 
-95. **A refit that wins back broken bars can quietly move the bars it does not score.** A
+99. **A refit that wins back broken bars can quietly move the bars it does not score.** A
     geometry refit repaired the failing measurements while a neighbouring measurement it never
     scored drifted past its limit (a notch went from −1.4 to −1.8 mm). Put every bar that
     must hold into the refit's cost, not only the ones that failed, and report all bars
-    before and after the refit (see 62 and 91).
+    before and after the refit (see 62 and 94).
 
-96. **Before wiring an effect to an event, prove the event can fire where the effect lives.**
+100. **Before wiring an effect to an event, prove the event can fire where the effect lives.**
     An effect was hooked to a clock tick that does not run on the screen the effect belongs
     to, so the hook was dead code that only a probe could reach. Name the event, name the
     screen or state the effect lives in, and show a run in which the event fires there (a
-    log line from the real path, not from the probe) before building on it (see 90).
+    log line from the real path, not from the probe) before building on it (see 93).
 
-97. **Prove a cause by pinning one path at a time, and measure options as patch scripts on the
+101. **Prove a cause by pinning one path at a time, and measure options as patch scripts on the
     probe's temp copy.** Several candidate causes were changed together, so a better result
     could not be attributed; and trying options by editing the product left changes to be
     reverted. Pin or remove one path per run and record which pin moved the number; apply each
     option as a patch script to a temporary copy of the tree, so a proposal milestone commits
-    no product change (see 92).
+    no product change (see 96).
     When a defect survives a fix to one stage of a pipeline, swap components before the next
     fix: hold one stage, vary the other (A/B renders or runs), and see which stage carries the
     defect. A scalar meter can confirm a wrong cause: a meter computed in the wrong space or
     over zones of mixed scale moved with each fix while the defect stayed, and several refits
-    were spent on a stage that was not at fault (see 87).
+    were spent on a stage that was not at fault (see 90).
     Before an A/B, read the settings the existing evidence was produced with (an earlier
     sheet was already rendered with shadows off), so the comparison varies only what you
     mean to vary.
     The same flaw in the same spot on every seed comes from the input, not the random draw: check
     the input picture before fixing the outputs.
 
-98. **A gate that truncates error output can hide the reds a mutant should cause.** A falsify
+102. **A gate that truncates error output can hide the reds a mutant should cause.** A falsify
     run was scored from a gate's shortened output (the first lines of the failure), and a
     mutant that did turn a guard red looked as if it survived because its message fell past the
     cut. Score every falsify result from the untruncated log (the full output file, not the
-    gate's summary), and quote the count of red lines found there (see 69).
+    gate's summary), and quote the count of red lines found there (see 95).
     Wrappers that delete the run log on failure hide the very lines a mutant should leave:
     run each mutant through the wrapper (for the exit status) and through a runner that
     keeps the log (for the lines), including the timed-out case. A timeout on a shared gate
-    slot means load, not a failure: rerun with a longer limit before scoring it; until that
-    rerun, a timeout is a claim, like a flake (see 13).
+    slot means load, not a failure: rerun with a longer limit before scoring it.
     Count failures from the full log, never from a cut-down list: a list cut at 40 lines hid 16 of
     56 failures.
 
-99. **Size a parallel fan-out by free memory, not by cores.** A fan-out was sized by the
+103. **Size a parallel fan-out by free memory, not by cores.** A fan-out was sized by the
     processor count, started many heavy processes at once and ran the machine out of memory
     close to a crash. Start at most two heavy processes, and start each only when the free
-    memory reported by the system is at least 3 GB; wait otherwise (see 85).
+    memory reported by the system is at least 3 GB; wait otherwise (see 88).
     On a shared GPU or similar scarce device, gate each job on the CURRENT baseline before
     it starts, not only on a peak limit: a sampler that reads once a second cannot stop a
     load spike, and a neighbour that just finished may still hold its memory. Memory-mapped
@@ -771,7 +759,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
     both, so budget each process as frames x size x item size for everything open at once,
     and stream one frame at a time.
 
-100. **Stopping a background shell task leaves its child processes running.** A task was
+104. **Stopping a background shell task leaves its child processes running.** A task was
     stopped and the engine process it had started kept running, holding memory and a lock.
     Record each heavy run's process id at launch (a file next to its log) and stop it by that
     exact id; never by a name match, which can also kill your own shell or another session's
@@ -781,116 +769,118 @@ came from a verifier finding or a falsify run that went red where the builder ex
     time and stop the wrappers too. When a row moves to another agent mid-run, kill your
     queued gate chain by id and check the throttle queue for leftover tickets.
 
-101. **After every delivery, assert the delivered file's md5 against its source.** A file was
+105. **A READ of a factor in a shared function lists every caller.** A review confirmed a
+    factor was applied correctly in the function that owns it, without listing who calls the
+    function, and one caller applied the same factor again or skipped it. Grep every caller,
+    quote the list, and state for each whether it applies the factor itself (see 93).
+    The same applies to a claim that code never runs or is dead: cite a full caller grep on
+    the object's real class (subclass overrides included) or a probe; "runs but is never
+    seen" is a separate verdict.
+    The same goes for "X unchanged" lines in records (a changelog, a decision log): cite the search
+    behind each one.
+
+106. **After every delivery, assert the delivered file's md5 against its source.** A file was
     copied to its destination and used on the belief that the copy was the source; an older or
     partial copy had been left there. Compare the md5 of the delivered file with the source's
     in the same command that delivers it, and fail the step when they differ.
 
-102. **Before a long optimization against extrapolated targets, check the targets can be met
+107. **Before a long optimization against extrapolated targets, check the targets can be met
     together.** An optimizer was set to hit several targets (a fill, an aspect ratio, a
     ratio against the source range), each extrapolated on its own beyond the measured range.
     The separate curves drifted apart, no solution met them all, and the run stalled for hours
     on a target nothing could satisfy. Before the long run, evaluate every target at the
     extremes and at the points beyond the measured range, and test that one candidate (or a
-    cheap relaxation) can satisfy them all at once; if not, reconcile the targets first (see 95).
+    cheap relaxation) can satisfy them all at once; if not, reconcile the targets first (see 99).
     A target defined on a flat render of a three-dimensional scene (the share of one part hidden
     behind another) is checked against the render's layer draw order before it becomes a pass line:
     parts drawn on a layer below the covered part can hide none of it, so a target that counts on
     them can never be met.
 
-103. **Run a long background chain as one script, memory-gated per step, with a status file per
+108. **Run a long background chain as one script, memory-gated per step, with a status file per
     step.** A chain of heavy gate steps was started as separate background commands; the
     system's low-memory reaper killed it partway, and nothing showed which step had finished,
     which was running and which never started. Put the chain in one script that waits for free
     memory before each step and writes each step's own status file (started, exit code, end
     time) next to its log, so a reaped chain shows exactly where it stopped and can resume
-    at the first step with no finished status file (see 99 and 100). This holds for
-    independent gate steps; a probe set cut off part-way is rerun whole (see 115).
+    from there (see 103 and 104).
 
-104. **A planted bug proves a new test only if the old tests miss it.** To show a new test works, a
+109. **A planted bug proves a new test only if the old tests miss it.** To show a new test works, a
     bug was planted and the test went red, but the existing tests went red on that same bug, so
     the new test added nothing that was not already guarded. Run each planted bug against the
     old suite too and record both results: the new test earns its place only on a bug the old
-    suite leaves green (see 70 and 69).
+    suite leaves green (see 70 and 75).
 
-105. **Falsify a check in the mode the real gate runs it.** A check had a quick mode and a
+110. **Falsify a check in the mode the real gate runs it.** A check had a quick mode and a
     strict mode and ran in the quick one by default, where it could not fail. Prove a check red
     with the same flags, environment and mode the gate itself uses, and make the gate name that
     mode explicitly instead of relying on a default.
 
-106. **A stamp that records how something was made counts only if something reads it and stops on a
+111. **A stamp that records how something was made counts only if something reads it and stops on a
     mismatch.** A tool wrote the settings it used next to its output, and nothing ever compared
     that note with the settings in force, so a mismatch could never be caught. Wherever a stamp
     exists, add the reader that compares it with the live values and fails on any difference,
-    and prove that reader red by changing one setting (see 79).
+    and prove that reader red by changing one setting (see 83).
 
-107. **Before pinning an anchor per frame to a measured extreme, measure the motion the pin adds.**
+112. **Before pinning an anchor per frame to a measured extreme, measure the motion the pin adds.**
     An animation's ground point was pinned frame by frame to the lowest pixel of each frame. The
     source drifted about 2 px; the pins made the result bounce 6 to 7 px, because each frame's
     lowest pixel moves with the content. Measure the anchor's motion in the source, then in the
     pinned result, and pin to a value that is steady across frames (a median over the
-    animation, per direction) when the pinned result moves more than the source (see 87).
+    animation, per direction) when the pinned result moves more than the source (see 90).
 
-108. **Measure a "missing" step's output at every later stage before rewriting it.** A step
+113. **Measure a "missing" step's output at every later stage before rewriting it.** A step
     thought to do nothing was about to be rewritten; it was firing and only under-correcting
     (it lifted a far leg to 0.93 of the target), a later gamma grade doubled the remaining gap,
     and the last stage reported ok for a frame it had got wrong. Read the step's own output
     and each later stage's input and output for a few items before changing it; fix the stage
     where the gap appears, not the one that looks idle.
 
-109. **After a batch fix, a mask-only composite plus an md5 count proves the fix touched only what
+114. **After a batch fix, a mask-only composite plus an md5 count proves the fix touched only what
     it should.** A fix meant to change 30 of 288 frames was first applied by re-running the
     whole pipeline, which changed 6 to 47 px per frame outside the fixed area on frames it
     should not have touched. Composite the fixed result into the old frame through the fix's
     mask only, then count by md5 how many outputs differ from before: the count must equal
     the number meant to change (here 30 changed, 258 identical), and the differing pixels must
-    lie inside the mask (see 79).
+    lie inside the mask (see 83).
 
-110. **A mutant that stays green means a second path recovers the result: find it, switch the paths
-    off in stacked steps, and say the check proves only that at least one path works.** A mutant
-    removed one fix and the check stayed green, because another piece of code reached the same
-    result by a different route. In another run two fixes covered for each other, so switching off
-    one left the run green and the test looked weak: a fix whose trigger appears only after another
-    fix is removed cannot go red alone. Find the second path before calling the check weak, mutate
-    both together to see the red, and stack the mutants: switch the paths off in steps from one
-    saved state (A off; A and B off; all off), say in the prediction which step should turn which
-    check red, and score each step from its own result (see 97 and 104). State what the check
-    proves: that at least one of the paths works, not that the mutated one does (see 51).
-    A tool that places a part itself is such a second path for a planted case. A bad placement
-    planted before the tool ran was quietly moved back by the tool's own placement step, so the
-    check saw a good result and the plant proved nothing. Pin the placement (turn the tool's placing
-    off, or plant after it) and confirm the planted case is still wrong in the output before its red
-    counts.
+115. **A fix whose trigger appears only after another fix is removed cannot go red alone: stack
+    the mutants.** Two fixes covered for each other, so switching off one left the run green
+    and the test looked weak. Switch them off in steps from one saved state (A off; A and B
+    off; all off), say in the prediction which step should turn which check red, and score
+    each step from its own result (see 101 and 109).
 
-111. **Judge a guide on every view before spending a long job on it.** A reference guide looked right
+116. **Judge a guide on every view before spending a long job on it.** A reference guide looked right
     from the front and was wrong from the side; the fault was found only after the slow
     job had run. Before any slow or scarce job (a GPU run, a render, a bake), look at the guide
-    from each view the output will be judged in, and reject it there first (see 102).
+    from each view the output will be judged in, and reject it there first (see 107).
 
-112. **A pick-by-eye sheet shows the candidate between fixed anchors, at one scale, on one
+117. **A pick-by-eye sheet shows the candidate between fixed anchors, at one scale, on one
     baseline.** Candidates drawn at different sizes and baselines, with numbers printed on the
     picture, could not be told apart by eye. Put the candidate between its fixed neighbours,
     at one scale and a shared baseline; put zoom-ins and measurements in the written
     note, not on the sheet.
 
-113. **After a change moves what a check aims at, grep every helper that references it and rerun
-    every mutant aimed at it and at checks that share its state.** When a change removes a UI
-    element, grep every test helper, wait and measure that references it, then build and run every
-    planted mutant once after the change. A mutant whose anchor vanished, or that no longer goes
-    red, is a dead check, and a helper that waits for a removed element passes or hangs for the
-    wrong reason.
-    Re-aiming a check (a new selector, region or threshold) is such a change too: rerun every mutant
+118. **Re-run every guard after the last step that changes what it looks at.** A check counted
+    defects part-way through a pipeline and passed; a later step reshaped the geometry and the
+    final output failed the same check. A guard's count is valid only for the stage it
+    ran at: place the guard after the last step that moves its input, or run it again there
+    and quote that count (see 61 and 87).
+    When a change removes a UI element, grep every test helper, wait and measure that references
+    it, then build and run every planted mutant once after the change. A mutant whose anchor
+    vanished, or that no longer goes red, is a dead check, and a helper that waits for a removed
+    element passes or hangs for the wrong reason.
+    Re-aiming a check (a new selector, region or threshold) is such a step too: rerun every mutant
     aimed at it, and also the mutants of checks that read the same shared state (browser storage, a
     cache, a saved file). A setting written during one check's run turned an unrelated mutant green.
 
-114. **When the look is the requirement, a headless check of the model is not the check; read the
+119. **When the look is the requirement, a headless check of the model is not the check; read the
     drawn pixels and add a mutant only the pixel read can kill.** A test confirmed that a glow
     was scheduled with the right numbers and passed while the drawn glow came out white at
     night, because one draw mode skips the scene's tint; a divided-out multiplier was never
     checked on the drawn result either. A pin that stores a value beside the draw call, or
     calls the update itself, cannot see the effect. Read the rendered pixels inside the
     subject's own mask, and prove the check red by mutating the effect itself (its colour,
-    its draw order), not the number the pin reads (see 82 and 96).
+    its draw order), not the number the pin reads (see 84 and 100).
     A headless browser on virtual time draws no frames, so animation-frame and resize-observer
     callbacks may never run there. A fix that lives in such a callback is checked by reading its
     code (or in a real browser), and the report says which; a green headless run proves nothing
@@ -900,64 +890,53 @@ came from a verifier finding or a falsify run that went red where the builder ex
     decision. Checks passed for three rounds while the look failed, and only opening the picture
     showed it.
 
-115. **A probe run that dies part-way gives no results: rerun the whole set.** A long run of
+120. **A probe run that dies part-way gives no results: rerun the whole set.** A long run of
     probes crashed after some had finished, and the finished ones were quoted as findings.
     If a run is cut off, none of its numbers count; rerun the whole set and quote only from a complete run
-    (see 69).
+    (see 95).
     A run on the code before a fix often crashes at the same place every time, so a plain rerun
     repeats the crash. Cut out the crashing block (it counts as a fail for its own checks), rerun,
     and repeat until every check has a verdict on the pre-fix code.
 
-116. **Before a check or metric counts, calibrate it on cases with a known answer: it must pass the
-    known-good case and fail each known-bad case, and the margin is reported.** A metric that ranks
-    things must be run on the reference pair it is meant to rank, and on wrong references. A
-    person's by-eye read contradicted a similarity meter that ranked a candidate level with the
-    larger reference while reading 64 percent. Before trusting a metric, score it on a pair whose
-    order is known: every right pair must beat every wrong pair (a shifted frame, the other view),
-    and the margin is reported. A meter that cannot separate known pairs is broken; fix or drop it
-    before it ranks candidates (see 69).
-    A camera or vanishing-point check is proved on shifted copies and on the reference itself. A
-    check meant to say "the picture keeps the reference camera" passed pictures made with a
-    different camera, and another read junk on every input, the reference included. Run it on copies
-    of a good picture shifted up, down and sideways, one axis at a time, and require a FAIL for
-    each; run it on the reference picture and require a PASS. A check that passes the shifted copies
-    or fails the reference does not measure the camera (see 88 and 119).
-    An edit check with a quantisation floor (the smallest change it can see) is trusted only after
-    it passes a null edit (no change) and fails a mutant (a known-bad change); a fail without that
-    calibration may be the floor itself.
+121. **A metric that ranks things must be run on the reference pair it is meant to rank,
+    and on wrong references.** A person's by-eye read contradicted a similarity meter that
+    ranked a candidate level with the larger reference while reading 64 percent. Before
+    trusting a metric, score it on a pair whose order is known: every right pair must beat
+    every wrong pair (a shifted frame, the other view), and the margin is reported. A meter
+    that cannot separate known pairs is broken; fix or drop it before it ranks candidates
+    (see 69).
+
+122. **Before a ladder of edits, test the largest step on the hardest case; calibrate an
+    edit check with a null edit and a mutant.** A method's size ceiling only shows on its
+    largest step, so trying small steps first hides it. And a check with a quantisation
+    floor (the smallest change it can see) is trusted only after it passes a null edit (no
+    change) and fails a mutant (a known-bad change); a fail without that calibration may be
+    the floor itself.
     Run a new picture check on the picture already accepted first; if that one fails, the check is
     wrong, not the picture.
-    A new numeric check must also pass today's known-good output before it gates anything: red on the
-    known-bad cases alone is half the proof. Run it on the current accepted output, report the margin
-    to the bound, and tighten or drop the bound if that output fails.
-    A never-fail baseline must come from clean input. An output made from an input that already held
-    the defect carries the defect, so checks that pass on it prove nothing; prove the checks can
-    pass on clean reference data first.
-
-117. **Test on the worst real case first: the largest edit step on the hardest case before a ladder
-    of edits, and a fit or layout check on the real worst case across the whole page.** A method's
-    size ceiling only shows on its largest step, so trying small steps first hides it (calibrating
-    the edit check itself: see 116).
     A "fits" check (one row, no overflow, no wrap) runs on the real worst case: the largest count of
     items and the longest label the data holds, not a small fixture. A layout that fits five short
     entries can wrap at twelve long ones while the fixture stays green.
     Measure a layout guarantee (at least N items per row, fits one row) where the user sees it:
     across the whole page, on the real item count and size spread, with the previous layout as a
     mutant that must fail. A per-container count on a tidy fixture passed while most rows on the
-    real page held one item (see 68).
+    real page held one item (see 74).
+    A never-fail baseline must come from clean input. An output made from an input that already held
+    the defect carries the defect, so checks that pass on it prove nothing; prove the checks can
+    pass on clean reference data first.
 
-118. **A shape gate on an edited outline is relative to the original over the same rows,
+123. **A shape gate on an edited outline is relative to the original over the same rows,
     checked at several scales, and reported as a pass fraction.** Absolute curvature bars
     flag the figure's own bends where the defect sits, so compare against the original over
     the same rows. One scale misses flat-bottomed defects: check several scales and prove
     the gate red with a planted flat-bottom mutant. When a bar sits at the measure's noise
     floor it passes only in pockets of the parameter grid (4 of 54 here): report the pass
-    fraction, never just "pass" (see 105).
+    fraction, never just "pass" (see 110).
 
-119. **A validator needs a pin that feeds it a planted fault.** A validator run only on
+124. **A validator needs a pin that feeds it a planted fault.** A validator run only on
     clean real data has branches nobody has proved: its checks survived mutants and a bad
     copy was never tried. Plant a bad copy for each branch (a missing slot, a wrong
-    reference) and require the validator to refuse it (see 94 and 104).
+    reference) and require the validator to refuse it (see 98 and 109).
     When the planted fault drops a record, first count the places that point at it (every
     reference, link or index entry that names it) and predict that many faults. A checker that
     reports a different count has a finding: it misses a dangling link, or reports one twice
@@ -965,32 +944,30 @@ came from a verifier finding or a falsify run that went red where the builder ex
     The same holds for any detector: before its PASS counts, show it firing on a planted case
     that is known to hold the defect. A detector that never fires looks exactly like a clean result.
 
-120. **A pass line is conditional on exactly the checks it claims; a span with no checks
+125. **A pass line is conditional on exactly the checks it claims; a span with no checks
     says only "no error logged".** A pass line printed unconditionally stays green when its
     checks fail. Make each pass line depend on the failure count of its own checks, and when
     adding a pin, count the unconditional ok prints (20 of 20 were found). A span that holds
     no check of its own prints "ok" only for "no error was logged": say so, and back it with
-    a logger that counts errors only (see 98).
+    a logger that counts errors only (see 102).
 
-121. **Rebase only before the first push; after it, cherry-pick onto the pushed tip and
+126. **Rebase only before the first push; after it, cherry-pick onto the pushed tip and
     re-gate.** A rebase after a push forces a force-push or leaves two histories. Before the
-    push, rebase freely, unless the branch holds an unpushed `merge --no-ff`: a rebase
-    linearizes it, so push that merge first (see 31); once pushed, move later work by
-    cherry-pick onto the pushed tip and run the gate again at the new tip, so no force-push is
-    needed (see 85).
+    push, rebase freely; once pushed, move later work by cherry-pick onto the pushed tip and
+    run the gate again at the new tip, so no force-push is needed (see 88).
 
-122. **Compensating a non-deterministic generator's drift needs two rounds that agree
+127. **Compensating a non-deterministic generator's drift needs two rounds that agree
     first.** A generator that pulls its output back toward its own bias drifts differently
     each run. A one-shot compensation over-corrected (a width +1.9 became -2.1). Measure the
     drift in two independent rounds, compensate only when they agree, and compensate once at
     most.
 
-123. **A design row's seam table includes the owner's earlier rulings on the topic,
+128. **A design row's seam table includes the owner's earlier rulings on the topic,
     built or not.** Before a design is proposed, grep the decisions file for rulings on the
     topic, including ones never built. An unbuilt ruling reframes the row: a proposal that
     ignores it reopens a settled question. Open the document with what already exists.
 
-124. **Parallel builders in one worktree: exclusive file lists, shared hooks committed
+129. **Parallel builders in one worktree: exclusive file lists, shared hooks committed
     first, one locked test runner; silent side effects and singletons get their own
     checks.** Give each builder an exclusive file list, let the lead commit the shared hooks
     first, and run tests through a single runner under a file lock. A claim kept true by a
@@ -998,23 +975,23 @@ came from a verifier finding or a falsify run that went red where the builder ex
     and a mutant that removes the effect. Tests that share one process restore any singleton
     state they touch.
 
-125. **Flip a policy constant once before calling a change green.** A constant that sets
+130. **Flip a policy constant once before calling a change green.** A constant that sets
     a policy (a floor, a cap) is moved once to another value and the suite rerun: the pins
     that go red are the scenario-bound ones, tied to the value rather than to the rule. Five
     pins went red when a floor moved from 12 to 8; each is either rewritten relative to the
     constant or named as bound.
 
-126. **A steadiness check measures at one fixed scale per route.** A pipeline that
+131. **A steadiness check measures at one fixed scale per route.** A pipeline that
     normalises each frame (to the same height, say) hides exactly the drift a size or
     steadiness check is looking for. Measure at one fixed scale per route, and before
-    reading a result confirm no stage resized the frames individually (see 107).
+    reading a result confirm no stage resized the frames individually (see 112).
     A batch step that derives a setting from the whole set (a median size, a shared box) must
     keep the old set's setting when new items join, or adding items quietly changes the old
     outputs and the new ones. Pass the setting in from the original set, prove a run with the
     new items alone equals a run with all of them, and check that the setting really reaches
     the step (an environment value can be dropped on the way into another program).
 
-127. **A two-sided bound needs a mutant per side.** A check with a lower and an upper
+132. **A two-sided bound needs a mutant per side.** A check with a lower and an upper
     limit can survive a mutant on one side while the other side holds it red. Falsify each
     side separately: one mutant that breaks the lower limit, one that breaks the upper, and
     report both results (see 70).
@@ -1023,99 +1000,118 @@ came from a verifier finding or a falsify run that went red where the builder ex
     through one path left the other one unguarded. List the paths the rule names and give
     each its own mutant.
 
-128. **An automated quick reply to a person can invent facts or promise work nobody
+133. **An automated quick reply to a person can invent facts or promise work nobody
     started; correct it in the full answer and never build on it.** A channel that answers
     instantly on the coordinator's behalf stated facts that were false and said work was
     under way when none had been started. The coordinator reads every such reply, corrects
     it in the full answer, and builds only on what the person actually said, not on what the
     quick reply claimed.
 
-129. **While the base model is not agreed, send one proposal, not a fan-out of
+134. **While the base model is not agreed, send one proposal, not a fan-out of
     questions.** When the foundation of a design is undecided, a set of detailed questions
     asks the person to rule on parts of something that may change. Send a single proposal
     for the base first; open the detailed questions after it is agreed, one per real fork.
 
-130. **Every async UI action gets one check with a deliberately late stub.** A test stub that
+135. **Every async UI action gets one check with a deliberately late stub.** A test stub that
     resolves at once hides in-flight races: a redraw while a save or a remote call was still
     pending re-armed a button, and the instant stub never left a window for it. For each
     async action, add one check whose stub resolves late, fire a redraw (or the rebuild the
     real screen does) before it resolves, and assert the in-flight state holds: the control
     stays disabled, nothing is sent twice, the result lands once.
 
-131. **Before a long round of redoing work toward a person's target, put today's result beside
+136. **Before a long round of redoing work toward a person's target, put today's result beside
     that person's own reference.** A round of re-posing was aimed at a coordinator's summary of
     what the owner wanted; set beside the owner's own reference picture, the summary had the
     wrong detail and the round chased it. Make one layout sheet with the current result next
     to the owner's reference before the long round starts; a summary of a wish is not the
-    target (see 102 and 111).
+    target (see 107 and 116).
 
-132. **When a new random draw shifts a seeded run, compare the old code against the old code
+137. **When a new random draw shifts a seeded run, compare the old code against the old code
     plus only that one draw.** Adding one draw to a seeded sequence moves every draw after it,
     so a long run took a different path and stopped somewhere new, which read as a new bug.
     Build the old code plus only the new draw and run both on the same seeds: if they match,
     the change is drift from the shifted sequence, not a fault; compare the kinds of outcome,
-    not the seeds (see 97).
+    not the seeds (see 101).
 
-133. **Fix a chance flake by forcing the roll at the step, not by counting repeats.** A test
+138. **Fix a chance flake by forcing the roll at the step, not by counting repeats.** A test
     failed now and then because a random roll under a chance changed the outcome, and "passed
     3 of 3 runs alone" proved nothing because the roll barely varied there. Force the roll at
     the step (set the seed or the value right before it) and show the test fails exactly when
     the roll is under the chance and passes otherwise; then make the test hold the roll it
-    needs (see 93).
+    needs (see 97).
 
-134. **A test that passes only because an earlier test reset the state hides an order bug.**
+139. **A test that passes only because an earlier test reset the state hides an order bug.**
     A check passed in the full suite because a test before it emptied the shared state; run
     after a different test it failed, and alone it passed again. Run a new or suspect test
     alone and after the tests around it, and report a flake as "k fails in N runs" with N
-    stated, never as "flaky" (see 133).
+    stated, never as "flaky" (see 138).
     In a scripted page or fixture, each check sets up its own preconditions (open the item it
     needs, pick the group, reset the filter) instead of relying on where the check before it
     left the page; otherwise a mutant that breaks one step turns a later, unrelated check red,
     and the red names the wrong check.
 
-135. **Sort by the parsed value, never by the raw text.** A list stamped in two date formats
+140. **Sort by the parsed value, never by the raw text.** A list stamped in two date formats
     was sorted as text, so newer items landed among older ones and the "latest" pick was
     wrong. Parse each key to its value (a time, a number) before sorting, and test the sort
     with mixed formats.
 
-136. **A new colour key must stay distinct from every existing key after every transform the tool
+141. **A new colour key must stay distinct from every existing key after every transform the tool
     applies.** A key chosen distinct in its raw value collided with an old key once the tool's fade
     to black was applied, so two regions read as one. Check each new key against all existing keys
     at every stage that transforms colours (fades, tints, quantising), not only at the value
     written.
 
-137. **Before calling a seeded number steady, vary every seed that feeds it and measure the
+142. **Before calling a seeded number steady, vary every seed that feeds it and measure the
     spread.** A tolerance band was set on a number after varying one seed; a second group of seeds
     nobody varied moved it well outside the band. List every seed site that feeds the number, vary
     them all, and set any band from the measured spread; prefer an exact check on a path with no
-    random draws to a "within N percent" check (see 72 and 132).
+    random draws to a "within N percent" check (see 72 and 137).
     The same holds for any noise source, not only seeds: a sweep of crops and thresholds on an
     all-or-nothing mask read zero spread because none of the variants could move the number. Include
     at least one variant that can move it, and report which variants did (see 69).
 
-138. **A count that two branches each raise by one merges to a single raise, with no conflict.** Two
+143. **A count that two branches each raise by one merges to a single raise, with no conflict.** Two
     branches each raised an expected-count line from N to N+1; the merge saw the same edit on both
     sides and kept one, so the expected count fell one short of the checks that now ran. Recount
     every such number after each merge or rebase that brings in another branch (see 16).
 
-139. **After a change that rebuilds the nodes, look them up again; a held reference reads a
+144. **A mutant that stays green means a second path recovers: find it before calling the check
+    weak.** A mutant removed one fix and the check stayed green, because another piece of code
+    reached the same result by a different route. Find that second path, mutate both together to
+    see the red, and state what the check proves: that at least one of the two paths works, not
+    that the mutated one does (see 51 and 109).
+    A tool that places a part itself is such a second path for a planted case. A bad placement
+    planted before the tool ran was quietly moved back by the tool's own placement step, so the
+    check saw a good result and the plant proved nothing. Pin the placement (turn the tool's
+    placing off, or plant after it) and confirm the planted case is still wrong in the output
+    before its red counts.
+
+145. **After a change that rebuilds the nodes, look them up again; a held reference reads a
     detached copy.** A test kept a reference to a page element, then triggered a change that
     rebuilt the list. The reference now pointed at the old, detached node, whose state never
     changes, so the test passed whatever the live page showed. After any step that re-renders,
     query the live node again, and prove the test red with a mutant that breaks the live one.
 
-140. **A region-average check cannot see a patch edge.** A patched region whose average matched
+146. **A region-average check cannot see a patch edge.** A patched region whose average matched
     its surroundings passed a check on mean colour and mean brightness while a hard seam ran
     along the patch's border. Also compare the jump across the patch edge with the jumps inside
-    the region, and prove the check red on a planted patch with a hard edge (see 84 and 119).
+    the region, and prove the check red on a planted patch with a hard edge (see 87 and 124).
     More generally, score a local defect on the worst small window, never on a mean over the whole
     object: a mark a few pixels wide averages away over a full figure. Slide a small window over
     the object, report the worst window's score against the bound, and prove it red on one planted
     small defect.
     Feathering a paste moves the jump inward, so a seam check that reads only the edge ring goes
-    blind: measure the inner rings too, and plant the hard cut past the feather width (see 84).
+    blind: measure the inner rings too, and plant the hard cut past the feather width (see 87).
 
-141. **A stand-in for a platform API counts only after it is compared with the platform's own
+147. **Before a camera or vanishing-point check counts, prove it on shifted copies and on the
+    reference itself.** A check meant to say "the picture keeps the reference camera" passed
+    pictures made with a different camera, and another read junk on every input, the reference
+    included. Run it on copies of a good picture shifted up, down and sideways, one axis at a
+    time, and require a FAIL for each; run it on the reference picture and require a PASS. A
+    check that passes the shifted copies or fails the reference does not measure the camera
+    (see 91 and 124).
+
+148. **A stand-in for a platform API counts only after it is compared with the platform's own
     contract.** A test stub of a database's update call deep-merged nested objects, and checks
     built on it passed. Only reading the platform's type file confirmed that the real call merges
     the same way, and the same reading showed that the full-write call replaces the whole
@@ -1123,84 +1119,21 @@ came from a verifier finding or a falsify run that went red where the builder ex
     compare the stand-in's behaviour with the platform's documented contract (docs or types), cite
     the line, and add one check for each behaviour the contract names that the stub does not.
 
-142. **A reader rebuilding a list from a fresh data dump checks the seed's age first.** A verifier
+149. **A reader rebuilding a list from a fresh data dump checks the seed's age first.** A verifier
     rebuilt an enumeration from a live dump and found an item the builder's checked-in seed lacked;
     the item had been added after the build, so the seed's own `--check` was stale, not wrong when
     written. Before scoring a mismatch as the builder's fault, compare the dump's newest item time
     with the seed's build time, and report an item newer than the build as seed drift, not a defect.
 
-143. **Squash only onto the merge base; read the diff stat before any push.** After the main branch
+150. **Squash only onto the merge base; read the diff stat before any push.** After the main branch
     moved, a `git reset --soft origin/main` followed by one commit squashed a branch onto the new
     tip, and that commit silently reverted every newer commit on main, because the index still held
     the branch's older copies of those files. Squash onto `git merge-base HEAD origin/main` instead,
     and before any push read `git show --stat` of the commit for files the branch never touched; any
-    such file is a revert in disguise (see 121).
+    such file is a revert in disguise (see 126).
 
-144. **A tool that skips existing outputs turns a rerun into a no-op.** A job copied its old outputs
+151. **A tool that skips existing outputs turns a rerun into a no-op.** A job copied its old outputs
     aside before a rerun; the tool skipped every item whose output file still existed, so the rerun
     did nothing and the old outputs were read as new ones. Move old outputs away (never copy them)
     before rerunning a tool with a skip-if-exists rule, and treat a run whose start and end state
-    match, with no resource peak, as a run that did nothing (see 69 and 79).
-
-145. **A mask or region aimed at a flagged spot is checked to contain the spot before the run.** A
-    repair round was run with a mask that did not cover the spot the check had flagged, so the
-    round changed nothing that mattered and a whole round was spent. Before the run, assert that
-    each flagged spot's coordinates lie inside the new mask or region, and print the margin to its
-    edge; a spot outside it stops the run (see 109 and 113).
-
-146. **Seeds for a test that reads a time window are built relative to now, and the test is falsified
-    with the clock moved ahead.** A test with fixed dates was green on the day it was written and
-    went red later, when the dates left the window. Build the seeds from the current time (now
-    minus N days), then prove the test by running it with the clock shifted days ahead: it must
-    stay green; a test with a fixed date must be shown to go red the same way (see 104 and 134).
-
-147. **A check that prints only its worst offender is not a list of what is over the bound.** A fix
-    was planned from the single worst case a check printed, and the same check still failed on
-    other cases that were over the bound as well. Before planning a fix, list every offender over
-    the bound (count them and name them), plan for the whole list, and rerun the check to see the
-    count reach zero, not only the printed one go away (see 113 and 127).
-
-148. **Never prove a setting fired by a line in a filtered log.** A setting was judged to have
-    taken effect because a line appeared (or did not appear) in a log that a filter or a tool
-    already shortened; the output was in fact unchanged. Confirm the effect on the output itself
-    (the file, the number, the picture), or read the unfiltered log, and state which one was read
-    (see 98).
-
-## Old numbers (before the 2026-10-26 renumber)
-
-Lessons 61–151 were condensed to 61–144; older commits, boards and briefs cite the old numbers,
-so read them through this table (a split lesson lists both parts).
-
-| Old | New | Old | New | Old | New |
-|---|---|---|---|---|---|
-| 61 | 61 | 92 | 89 | 123 | 118 |
-| 62 | 62 | 93 | 90 | 124 | 119 |
-| 63 | 63 | 94 | 91 | 125 | 120 |
-| 64 | 64 | 95 | 69 | 126 | 121 |
-| 65 | 65 | 96 | 92 | 127 | 122 |
-| 66 | 66 | 97 | 93 | 128 | 123 |
-| 67 | 67 | 98 | 94 | 129 | 124 |
-| 68 | 68 | 99 | 95 | 130 | 125 |
-| 69 | 69 | 100 | 96 | 131 | 126 |
-| 70 | 70 | 101 | 97 | 132 | 127 |
-| 71 | 71 | 102 | 98 | 133 | 128 |
-| 72 | 72 | 103 | 99 | 134 | 129 |
-| 73 | 73 | 104 | 100 | 135 | 130 |
-| 74 | 68 + 74 | 105 | 90 | 136 | 131 |
-| 75 | 69 | 106 | 101 | 137 | 132 |
-| 76 | 75 | 107 | 102 | 138 | 133 |
-| 77 | 76 | 108 | 103 | 139 | 134 |
-| 78 | 77 | 109 | 104 | 140 | 135 |
-| 79 | 78 | 110 | 105 | 141 | 136 |
-| 80 | 79 | 111 | 106 | 142 | 137 |
-| 81 | 80 | 112 | 107 | 143 | 138 |
-| 82 | 81 | 113 | 108 | 144 | 110 |
-| 83 | 79 | 114 | 109 | 145 | 139 |
-| 84 | 82 | 115 | 110 | 146 | 140 |
-| 85 | 72 | 116 | 111 | 147 | 116 |
-| 86 | 83 | 117 | 112 | 148 | 141 |
-| 87 | 84 | 118 | 61 + 113 | 149 | 142 |
-| 88 | 85 | 119 | 114 | 150 | 143 |
-| 89 | 86 | 120 | 115 | 151 | 144 |
-| 90 | 87 | 121 | 116 |  |  |
-| 91 | 88 | 122 | 116 + 117 |  |  |
+    match, with no resource peak, as a run that did nothing (see 69 and 83).

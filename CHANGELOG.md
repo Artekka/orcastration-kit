@@ -4,6 +4,7 @@ Newest first.
 
 ## Unreleased
 
+- **New, lessons 61–151 (`docs/LESSONS.md`, "Guards, gate logs and worktree git").** (PRS 2026-10-26)
 - **New, lessons 61–148 (`docs/LESSONS.md`, "Guards, gate logs and worktree git").** (PRS 2026-10-26)
 - **Lessons from real checks and guards (`docs/LESSONS.md`).** (PRS 2026-10-28)
 - **Lessons from real checks and guards (`docs/LESSONS.md`).** Eighty-eight lessons condensed into thirteen new ones (61–73: guard placement, measuring guards, second paths, per-row comparison, finding a cause, randomness, worst-case testing, locks, background work, records that are read, test-design and visual-check traps) and short *Added:* lines on twenty-four original lessons, each naming the numbers it replaces; a list at the end maps both earlier numberings.
