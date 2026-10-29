@@ -751,10 +751,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
     status file (started, exit code, end time) next to its log, so a reaped chain shows exactly
     where it stopped and can resume from there (see 103 and 104).
 
-109. **A planted bug proves a new test only if the old tests miss it.** If the old tests also go
-    red on it, the new test adds nothing that is not already guarded. Run each planted bug
-    against the old suite too and record both results: the new test earns its place only on a
-    bug the old suite leaves green (see 48).
+109. Retired, see the falsify skill (its "Discriminating mutant" step).
 
 110. **Falsify a check in the mode the real gate runs it.** A check with a quick and a strict
     mode may be unable to fail in its default one. Prove a check red with the same flags,
@@ -855,7 +852,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
 
 124. **A validator needs a pin that feeds it a planted fault.** A validator run only on clean
     real data has branches nobody has proved. Plant a bad copy for each branch (a missing slot,
-    a wrong reference) and require the validator to refuse it (see 98 and 109).
+    a wrong reference) and require the validator to refuse it (see 98).
     When the planted fault drops a record, first count the places that point at it (every
     reference, link or index entry that names it) and predict that many faults. A checker that
     reports a different count has a finding: it misses a dangling link, or reports one twice
@@ -975,7 +972,7 @@ came from a verifier finding or a falsify run that went red where the builder ex
 144. **A mutant that stays green means a second path recovers: find it before calling the check
     weak.** Another piece of code can reach the same result by a different route. Find that
     second path, mutate both together to see the red, and state what the check proves: that at
-    least one of the two paths works, not that the mutated one does (see 51 and 109).
+    least one of the two paths works, not that the mutated one does (see 51).
     A tool that places a part itself is such a second path for a planted case: its own placement
     step can quietly move a bad placement planted before it ran, so the plant proves nothing.
     Pin the placement (turn the tool's placing off, or plant after it) and confirm the planted
