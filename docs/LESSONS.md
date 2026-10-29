@@ -290,7 +290,7 @@ correcting the orchestrator, or a sibling correcting itself.*
     a restore — and it prints `nothing to commit, working tree clean` plus a GREEN gate on
     the *pre-fix* SHA. Clean status alone cannot distinguish restored from deleted. Always
     commit GREEN before mutating.
-    *Added:* After undoing a planted bug, clear compiled caches such as `__pycache__`, and run
+    *Added:* After undoing a planted bug, wipe compiled caches such as `__pycache__`, and run
     gates with compiled-file writes off; a stale cache keeps running the bug, and the writes
     dirty the tree.
 
