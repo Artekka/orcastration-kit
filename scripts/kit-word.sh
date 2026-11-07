@@ -44,7 +44,7 @@ current_word() { [ -f "$rc" ] && awk -v b="$BEGIN" -v e="$END" '$0==b{inb=1;next
 set_conf() {  # <key> <value>: replace or add one line of launcher.conf
   local f="$STATE/launcher.conf"
   mkdir -p "$STATE"; touch "$f"
-  { grep -v "^[[:space:]]*$1[[:space:]]*=" "$f"; printf '%s=%s\n' "$1" "$2"; } > "$f.tmp" && mv "$f.tmp" "$f"
+  { grep -v "^[[:space:]]*$1[[:space:]]*=" "$f"; printf '%s=%s\n' "$1" "$2"; } > "$f.tmp" && cat "$f.tmp" > "$f" && rm -f "$f.tmp"   # in place: a linked launcher.conf stays a link
 }
 
 write_shim() {
