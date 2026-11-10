@@ -12,6 +12,10 @@ export type Heartbeat = {
   state: Busy
   activity: string
   at: number
+  /** The kit project the session works in (its main checkout's folder name); absent outside a repo. */
+  project?: string
+  /** The session's dot color in project mode (#rrggbb): its tab's recorded color, else its project's; '' = none. */
+  color?: string
 }
 
 /** The shared host reading, written to <statusDir>/host.json by whichever session finds it stale. */

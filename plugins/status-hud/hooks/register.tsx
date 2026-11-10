@@ -4,6 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Heartbeat, Snapshot } from '../types'
 import { parseConfig, type Config } from '../lib/config'
 import { accountFromConfigDir, nameFromArgs, oneLine } from '../lib/heartbeat'
+import { projectColor, repoFromCommonDir } from '../lib/project'
 import type { Io } from '../lib/io'
 import { ensureStatusDirs } from '../lib/ensureDir'
 import { newTickState, tick } from '../lib/tick'
@@ -34,6 +35,10 @@ const S: {
   last: Snapshot | null
   /** The session directory (session.start's cwd): the chip's toggle script is looked up there. */
   cwd: string
+  /** The session's project (main checkout; '' outside a repo), its tab's color (CLAUDE_TAB_COLOR), and when its dot color was last read. */
+  repo: string
+  tabColor: string
+  colorAt: number
   /** Set by `/hud band|pane` (true) or `/hud off` (false) in this process only: it overrides showForNames here and nowhere else. */
   forceShow: boolean | null
 } = {
@@ -45,6 +50,9 @@ const S: {
   anyBusy: false,
   last: null,
   cwd: '',
+  repo: '',
+  tabColor: '',
+  colorAt: 0,
   forceShow: null,
 }
 
@@ -92,6 +100,7 @@ async function doTick($: Dollar): Promise<void> {
       } catch {
         /* no response yet: keep the last reading */
       }
+      await refreshColor(c, io, now)
       const snap = await tick(io, c, S.me, S.ts, exists, S.cwd)
       S.hasFlash = Object.keys(S.ts.flash).length > 0
       S.anyBusy = snap.sessions.some(x => x.state === 'busy')
@@ -107,6 +116,16 @@ async function doTick($: Dollar): Promise<void> {
   } finally {
     S.running = false
   }
+}
+
+/** The dot color: re-read every minute, since the launcher records a project's color when it opens its first tab. */
+async function refreshColor(c: Config, io: Io, now: number): Promise<void> {
+  if (S.colorAt !== 0 && now - S.colorAt < 60_000) return
+  S.colorAt = now
+  // Either file may be absent (no launcher record, no overlay): read as '' and the next source applies.
+  const colors = S.repo ? ((await io.read(`${c.kitRuntimeDir}/tab-colors`)) ?? '') : ''
+  const overlay = S.repo ? ((await io.read(`${S.repo}/docs/orchestration/ORCHESTRATION.md`)) ?? '') : ''
+  S.me.color = projectColor(S.repo, colors, overlay, S.tabColor)
 }
 
 async function flipQuiet($: Dollar): Promise<string> {
@@ -194,6 +213,12 @@ export const register: Register = (on, options) => {
     const ps = await S.io.run(['sh', '-c', 'ps -o args= -p $PPID; echo ::; tr "\\0" "\\n" < /proc/$PPID/environ 2>/dev/null | grep "^CLAUDE_CONFIG_DIR="'])
     const [args = '', env = ''] = ps.stdout.split('::')
     me.name = c.sessionName || (await $.env.get('CLAUDE_HUD_NAME')) || nameFromArgs(args) || `s-${me.id.slice(0, 6)}`
+    // The project: the main checkout of the session's directory, so a sibling in its own worktree counts too.
+    const common = S.cwd ? await S.io.run(['git', '-C', S.cwd, 'rev-parse', '--path-format=absolute', '--git-common-dir']) : { exitCode: 1, stdout: '' }
+    S.repo = common.exitCode === 0 ? repoFromCommonDir(common.stdout) : ''
+    if (S.repo) me.project = S.repo.split('/').pop() ?? ''
+    S.tabColor = (await $.env.get('CLAUDE_TAB_COLOR')) ?? ''
+    S.colorAt = 0
     me.account = accountFromConfigDir(env.trim().replace(/^CLAUDE_CONFIG_DIR=/, '') || (await $.env.get('CLAUDE_CONFIG_DIR')))
     await $.command.register({ name: 'hud', description: 'Status HUD: /hud band | pane | off | quiet | help' })
     $.clock.every(500, () => void doTick($))

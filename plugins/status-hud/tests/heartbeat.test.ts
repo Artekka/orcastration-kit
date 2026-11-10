@@ -15,6 +15,10 @@ test('heartbeat round-trips and a torn or foreign file is skipped, not thrown', 
   expect(parseHeartbeat('[]')).toBe(null)
   expect(parseHeartbeat('{"id":"a"}')).toBe(null)
   expect(parseHeartbeat('{"id":"a","name":"n","at":5,"state":"weird","account":9}')?.state).toBe('idle')
+  // Another session's project and dot color survive the read (its row is drawn from them); a bad color is dropped.
+  const full = hb({ project: 'my-app', color: '#16a085' })
+  expect(parseHeartbeat(serializeHeartbeat(full))).toEqual(full)
+  expect(parseHeartbeat(serializeHeartbeat(hb({ color: 'red;evil' })))?.color).toBe(undefined)
 })
 
 test('staleness: older than the limit is gone', async () => {

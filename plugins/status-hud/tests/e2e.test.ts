@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { paletteColor } from '../lib/project'
 import { world } from './world'
 
 const START = { cwd: '/x', surface: 'terminal', isInteractive: true } as never
@@ -241,6 +242,35 @@ test('Quiet Mode chip: a failed press then a good one returns the chip to plain,
   const tree = JSON.stringify(await (await mount()).drawn())
   expect(tree).not.toContain('failed')
   expect(tree).toContain('WORK mode')
+})
+
+test('project dots: the heartbeat carries the project and its dot color (tab color, else recorded, else the project\'s own)', { options: { dotMode: 'project' } }, async ($, on) => {
+  const HB = '/home/u/.claude-status-hud/sessions/sess-1234567.json'
+  // The launcher told the session its tab's color: that wins.
+  const w = world(on, { repo: '/home/u/work/book-shop', env: { CLAUDE_TAB_COLOR: '#8e44ad' } })
+  w.files.set('/home/u/.orchestration-kit/runtime/tab-colors', '/home/u/work/book-shop\t#d35400\n')
+  await $.session.start(START)
+  await w.clock.advance(500)
+  const hb = JSON.parse(w.files.get(HB) ?? '{}')
+  expect(hb.project).toBe('book-shop')
+  expect(hb.color).toBe('#8e44ad')
+  const band = await $.ui.mount({ plugin: 'status-hud', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  const tree = JSON.stringify(await band.drawn())
+  expect(tree).toContain('book-shop')
+  expect(tree).toContain('#8e44ad')
+})
+
+test('project dots: no tab color and no tab-colors file: the project\'s own color, never an error', { options: { dotMode: 'project' } }, async ($, on) => {
+  const w = world(on, { repo: '/home/u/work/book-shop' })
+  await $.session.start(START)
+  await w.clock.advance(500)
+  const hb = JSON.parse(w.files.get('/home/u/.claude-status-hud/sessions/sess-1234567.json') ?? '{}')
+  expect(hb.project).toBe('book-shop')
+  expect(hb.color).toBe(paletteColor('book-shop'))
+  // the launcher records the project's color later: the next minute's read picks it up
+  w.files.set('/home/u/.orchestration-kit/runtime/tab-colors', '/home/u/work/other\t#2980b9\n/home/u/work/book-shop\t#d35400\n')
+  await w.clock.advance(61_000)
+  expect(JSON.parse(w.files.get('/home/u/.claude-status-hud/sessions/sess-1234567.json') ?? '{}').color).toBe('#d35400')
 })
 
 test('a busy session\'s mark turns between full refreshes (redrawn every half second while busy)', async ($, on) => {

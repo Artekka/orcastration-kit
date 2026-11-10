@@ -72,6 +72,28 @@
       "description": "Comma-separated session names that draw the HUD, e.g. Orca,Vali (kit-init sets it to your seat). Exact and case-sensitive. Empty shows it in every session. Every session still writes its heartbeat either way.",
       "default": "Orca"
     },
+    "dotMode": {
+      "type": "string",
+      "title": "Session dot",
+      "description": "What each session row's dot shows: account (blue = Claude account 1, purple = account 2) or project (the color of the session's terminal tab when its launcher recorded one, else its project's color), so several projects' teams are told apart.",
+      "default": "account",
+      "options": [
+        "account",
+        "project"
+      ]
+    },
+    "hideItems": {
+      "type": "string",
+      "title": "Hidden items",
+      "description": "Comma-separated ids of items to switch off, e.g. history,context-key (README: Items). The setup page (scripts/hud-guide.sh open in the kit) picks them on a picture.",
+      "default": ""
+    },
+    "kitRuntimeDir": {
+      "type": "string",
+      "title": "Kit runtime dir",
+      "description": "Where the kit's launcher records each project's tab color (the tab-colors file), read for project dots. A missing file is fine.",
+      "default": "~/.orchestration-kit/runtime"
+    },
     "statusDir": {
       "type": "string",
       "title": "Status directory",

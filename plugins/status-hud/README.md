@@ -17,12 +17,13 @@ Switch while running with `/hud band`, `/hud pane` or `/hud off`. The choice is 
 
 ## What it shows
 
-- **Every session**: name, account dot (blue = account 1, purple = account 2), context bar and size, busy/shell/idle glyph, and the last tool or prompt as the activity line.
+- **Every session**: name, a dot (by account, blue = account 1, purple = account 2; or by project, see Dots), context bar and size, busy/shell/idle glyph, and the last tool or prompt as the activity line.
   Colors: green below the amber mark, amber from it, red from the report mark. Every color has a second cue: `~` after the size at amber, `!` at red.
   A session that crosses the report mark **flashes red** for `flashSeconds`.
 - **Host**: CPU load against the thread count (with sparkline), RAM, disks, GPU utilization and temperature, VRAM.
 - **Windows commit limit** (WSL): amber at `commitWarnPct`, red at `commitCritPct`. This is a real failure mode: Windows hits its commit limit and stops the WSL VM while the Linux side looks fine, with nothing logged inside Linux.
-- **Chips**: WORK/QUIET (shown only where the kit's quiet-mode script exists; clickable when both commands are configured; red `failed` for a minute after a failed press), commit warning, sessions over the report mark, load high, session count.
+- **Chips**: WORK/QUIET (shown only where the kit's quiet-mode script exists; clickable when both commands are configured; red `failed` for a minute after a failed press) and the session count from the left; alerts against the right edge (on a row of their own in the pane), most urgent first: Windows commit, sessions over the report mark, load high.
+- **Dots**: by Claude account (default), or by project (`dotMode: project`), so one HUD tells several projects' teams apart. A session's project is the main checkout of its directory (a sibling in its own worktree counts). Its dot color is, first that applies: the color of its own terminal tab when the launcher that opened it set `CLAUDE_TAB_COLOR`; the color the kit's launcher recorded for the project in `<kitRuntimeDir>/tab-colors` (lines `<repo path><TAB>#rrggbb`); `tab_color: #rrggbb` in the team block of the project's `docs/orchestration/ORCHESTRATION.md`; else a fixed color picked from the project's name. Missing files are skipped. In project mode the key row names each project in its color and the sessions title counts projects. Hex colors are drawn as 24-bit color where the terminal says it supports it (`COLORTERM=truecolor`).
 
 ## How it works
 
@@ -104,6 +105,9 @@ The quiet-mode values above are the defaults: the flag file the kit's `scripts/q
 | `commitSeconds` | 30 | Minimum seconds between commit readings. |
 | `mounts` | `/` | Comma-separated mount points for the disk meters. |
 | `showForNames` | `Orca` | Comma-separated session names that draw the HUD (exact, case-sensitive). Empty shows it in every session. kit-init sets your seat. |
+| `dotMode` | `account` | `account` or `project` (see Dots above). |
+| `hideItems` | (none) | Comma-separated item ids to switch off; see Items below. |
+| `kitRuntimeDir` | `~/.orchestration-kit/runtime` | Where the kit's launcher records project tab colors (`tab-colors`), read for project dots. |
 | `statusDir` | `~/.claude-status-hud` | Shared directory. All sessions must use the same one. |
 | `sessionName` | (detected) | Override the detected session name. |
 | `refreshSeconds` | 3 | Heartbeat and redraw interval. |
@@ -118,6 +122,18 @@ The Quiet Mode chip is hidden unless a flag file or status command is configured
 
 **What the WORK/QUIET chip does and when you'll see it:** The chip is a switch for the kit's quiet mode. QUIET holds every NEW test/gate run started through `scripts/gate-throttle.sh` while you use the machine yourself; runs already going finish, and WORK lets new ones start normally. It only helps if your team runs its gate through that throttle, so the chip appears only when `scripts/quiet-mode.sh` exists in the session's directory (or quiet mode is already on). No throttle, no chip. If a press fails, the chip turns red and says `failed` for a minute, and the toast says why. `/hud help` repeats this, and `quietModeRequiresFile` changes the file it looks for (empty always shows the chip).
 
+## Items
+
+Every drawn item has an id for `hideItems`. Unknown ids are ignored. The setup page (`docs/status-hud-guide.html` in the kit, opened set to your current settings by `bash scripts/hud-guide.sh open`) shows each one numbered on a picture drawn by this plugin's own layout code: keep or remove each, pick the dot mode, and copy one line that `bash scripts/hud-guide.sh apply '<line>'` saves (only `dotMode` and known `hideItems` ids). After a layout change, rebuild the page with `bash scripts/hud-guide.sh build` (node 22.18 or later; `tests/hud-guide.test.sh` fails while it is out of date).
+
+| Area | Ids |
+|---|---|
+| Host | `host-title`, `cpu`, `history`, `ram`, `win`, `gpu`, `vram`, `disk`, `disk2` |
+| Sessions | `sessions-title`, `context-key`, `state-key`, `dot-key`, `dot`, `model`, `bar`, `tokens`, `state`, `activity`, `column2`, `frame-title` |
+| Chips | `work-mode`, `count`, `warnings` |
+
+`dot-key` is the project key (project mode only); `disk2` is any disk after the first; `column2` is the band's second column of session rows (off: one column and `+N more`); `warnings` is every alert chip.
+
 ## Develop
 
 ```bash
@@ -125,6 +141,7 @@ tsc -p .                              # type-check (the engine lays .claude-plug
 claude plugin validate .
 claude plugin test .
 npx tsx scripts/preview.ts band 180   # print the band for sample data; also: pane 60, band 100 10, band 180 10 1
+bash ../../scripts/hud-guide.sh build # rebuild the setup page (docs/status-hud-guide.html) after a layout change
 ```
 
 Layout and logic are plain modules in `lib/`; `hooks/register.tsx` only wires them to the engine. Tests use fakes for files and processes, plus an engine-level mock world in `tests/world.ts`.

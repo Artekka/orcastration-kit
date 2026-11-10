@@ -23,6 +23,12 @@ export type Config = {
   quietOffCmd: string
   /** The file (relative to the session directory, or absolute) the on/off commands need; the chip is hidden without it. Empty skips the check. */
   quietRequiresFile: string
+  /** What a session row's dot shows: its Claude account (blue/purple) or its project's color. */
+  dotMode: 'account' | 'project'
+  /** Items switched off, by id (README: Items). */
+  hide: Set<string>
+  /** The kit's runtime dir: the launcher records each project's tab color there (tab-colors). */
+  kitRuntimeDir: string
 }
 
 const num = (v: unknown, d: number, min = 0): number =>
@@ -54,5 +60,8 @@ export function parseConfig(o: PluginOptions, home: string): Config {
     quietOnCmd: str(o.quietModeOnCmd).trim(),
     quietOffCmd: str(o.quietModeOffCmd).trim(),
     quietRequiresFile: str(o.quietModeRequiresFile, 'scripts/quiet-mode.sh').trim(),
+    dotMode: str(o.dotMode, 'account') === 'project' ? 'project' : 'account',
+    hide: new Set(str(o.hideItems).split(',').map(s => s.trim().toLowerCase()).filter(Boolean)),
+    kitRuntimeDir: (str(o.kitRuntimeDir).trim() || '~/.orchestration-kit/runtime').replace(/^~(?=\/|$)/, home),
   }
 }
