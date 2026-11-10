@@ -125,24 +125,21 @@ git push origin main                                # never HEAD:main
 
 **Board size:** status, not narrative. Past ~60 KB → `cp` it verbatim to `docs/orchestration/archive/BOARD_ARCHIVE_<YYYY-MM-DD>.md`, add a row to the board's archive table, rewrite the live board to status only. Archives are grepped, never read whole.
 
-## 7 · Wave-train deploys
+## 7 · Deploys and the log (§8 moved here)
 
-- **Couple rows into one train when the INTERMEDIATE state is worse than either endpoint** (LESSON 55), not merely because they are related.
-- Deploy after each reconcile wave (1–3 rows finishing together); a hotfix or human-awaited fix ships immediately. Main never sits ahead of live past a working day.
-- Claim DEPLOY slot (written + pushed BEFORE running) → announce the window → run **ORCHESTRATION.md → Deploy `vehicle`** → verify with its `post-deploy` check (a marker from this train in the live artifact + the version string) → release the slot with the verified version.
-- Siblings never deploy while the banner stands; they hand SHAs to the seat.
-- **Deploy policy** = ORCHESTRATION.md → Deploy `deploy_policy:`. `ask` (default): ask the human before running the vehicle. `auto-when-green`: a train whose rows all passed READ and whose gate is green deploys without asking; tell the human after, with the verified version. Never ask under `auto-when-green`, never skip the ask under `ask`.
+**Before claiming the DEPLOY or LOG slot, read `deploy-and-log.md` in this skill's folder** (wave trains, the deploy steps and post-deploy check, the append-only log recipe). The two rules that shape every plan:
 
-## 8 · Log
-
-Claim LOG slot (number allocated inside the claim text) → append the entry to the log (ORCHESTRATION.md → Docs; default `docs/timeline/build-log.md`) **with Edit — old_string = its last lines, new_string = those + the entry; NEVER Write** — and refresh the status doc (version, test count, deferred) in the SAME pass. A dispatched doc agent gets that Edit rule verbatim → **verify the diff: append-only (`git diff <log> | grep -c '^-[^-]'` = 0) and every fact checked** (LESSON 23) → commit yourself → release the slot.
+- **Deploy policy** = ORCHESTRATION.md → Deploy `deploy_policy:`. `ask` (default): ask the human before running the vehicle. `auto-when-green`: a train whose rows all passed READ and whose gate is green deploys without asking. Siblings never deploy while the banner stands.
+- Log and milestone numbers are allocated only inside a LOG-slot claim (§1).
 
 ## 9 · Sibling lifecycle
+
+**Before recycling anyone, read `recycle-and-handover.md` in this skill's folder** (the dry-run live-work check, in-place vs new-tab, exit codes, the relaunch fallback `claude --name <Name> --model <lane model> "/orchestration-kit:orient"`).
 
 | Signal | Action |
 |---|---|
 | Sibling self-reports fill at the prompt mark; incoherent status; stale claim | SendMessage **"run /orchestration-kit:retro now"** + board note. A row already in flight finishes first |
-| Sibling replies **"retro complete … background: none"** | ONLY NOW recycle (a reply without `background: none` → ask what is still running; subagents are invisible to any process check). **Look at live work in its OWN tool call first**: `bash scripts/recycle-sibling.sh <Name> --dry-run` prints `live work` (the old session's live shells). The real run refuses with exit 3 while any are live; wait, or have the owner stop them; `--force` only when you know they are disposable. Then: `bash scripts/recycle-sibling.sh <Name> ["/orchestration-kit:orient-brief <ROW>"] --model <lane model, §3a> [--effort <e>]` (no `--model` = the default, never the old session's). **In place** when the old `claude` runs under `scripts/sibling-shell.sh` (every tab `start-team.sh`/`recycle-sibling.sh` opens does): the script writes the wrapper a hand-off file in `~/.orchestration-kit/sessions/<Name>.next`, SIGTERMs only the old `claude`, and the wrapper starts the fresh one in the SAME tab (summary says `mode: in-place`). A Name with no old process, an old one started by hand, `--new-tab`, or a 60 s timeout opens a NEW tab that runs the wrapper (launch fresh → wait → SIGTERM old), so every session moves over at its next recycle. Seat self-recycle (`recycle-sibling.sh <seat>` from the seat's own shell): the script prints `log: <path>`, detaches a copy that restarts the seat IN PLACE and SIGTERMs this session ~2 s later, so write the banner and let subagents finish first; a failed copy is diagnosed from that log, and no `setsid` (macOS) = `mode: new-tab`. `--dry-run` prints the `mode:` (and `detach:`) it would use. Script exits 2 (no usable terminal: `manual`) → tell the human "terminal <Name> is safe to close — relaunch it with `claude --name <Name> --model <lane model> "/orchestration-kit:orient"` (a bare `/clear` keeps that terminal's OLD model; if you must `/clear`, run `/model <lane model>` first, then `/orchestration-kit:orient`)" |
+| Sibling replies **"retro complete … background: none"** | ONLY NOW recycle, by the steps in `recycle-and-handover.md` (no `--model` = the default, never the old session's) |
 | Fresh sibling sends READY | Assign the next DAG node (check `seen:` before giving it a READ) |
 
 Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro complete" → recycle, one terminal at a time. Never pre-announce a clear.
@@ -155,7 +152,7 @@ Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro com
 | ~200K (every small-tier model) | ~120K (60%) | ~150K (75%) |
 
 - Measure: `python3 scripts/ctx-fill.py <uuid> --window <1m|200k>` (window from your env block) — sums input + cache_read + cache_creation off the last assistant turn. **Never `bytes ÷ 4`** (biased high 30–60%, unstably). **Never infer a window from a transcript's model string** — the one safe exception only lowers it: a small-tier (`haiku`) string means 200K, and ctx-fill applies it. (A seat on a ~200K window died at 175,725 tokens with no handover: that is why the small window's marks sit at 120K/150K, not 140K/160K.)
-- At handover: finish only what is already in verify → wait for every subagent and background shell YOU started (their completion notices; the recycle would kill or orphan them, and its live-work check cannot see subagents) → write the **handover block** under the banner (slots, in-flight rows + SHAs, READs owed, human's queue) → run your own `/orchestration-kit:retro` → `bash scripts/recycle-sibling.sh <SeatName> /orchestration-kit:orchestrate --model 'opus[1m]'` (the fresh seat opens first, then this one is SIGTERMed), or tell the human: "seat retro complete — close this terminal and relaunch it with `claude --name Orca --model 'opus[1m]' /orchestration-kit:orchestrate` (a bare `/clear` keeps the OLD model; if you must `/clear`, run `/model opus[1m]` first)".
+- At handover: **read `recycle-and-handover.md` §10 first** (finish what is in verify, wait for your own subagents and shells, write the handover block, run your retro, then recycle the seat; fallback relaunch `claude --name Orca --model 'opus[1m]' /orchestration-kit:orchestrate`).
 - Include your measured fill + model in every handover and every roster report.
 
 ## 11 · The human's loop — all approvals through the seat
