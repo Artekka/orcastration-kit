@@ -349,6 +349,10 @@ and it will make the change for you. For example:
 | "enforce worktrees" / "make worktrees advised" | `worktrees:` in the `team:` block; takes effect on the next edit |
 | "turn on the git guard" / "turn off the git guard" | `git_guard:` in the `team:` block; takes effect on the next command |
 | "rename the siblings to Worker1…" | `prefix:` in the `team:` block (then recycle the old windows) |
+| "give the siblings names from my list" | `names: Mars,Venus,Vulcan` in the `team:` block (a comma list, no spaces): each launch draws from it at random |
+| "number the siblings: w1-Mars, w2-Venus" | add `numbered: w` to the `team:` block, next to `names:` |
+| "use my own team names on every project" | `~/.orchestration-kit/team-defaults` (kit-init asks once per machine); `team-defaults.sh --repo .` applies it to a project set up before |
+| "make the team's tabs green" / "no tab colors" | `tab_color: #27ae60` / `tab_color: none` in the `team:` block (WSL + Windows Terminal) |
 | "deploy on your own when the train is green" / "ask me before deploying" | `deploy_policy: auto-when-green` / `ask` in the Deploy section of `ORCHESTRATION.md` |
 | "ask me questions without blocking" / "go back to blocking questions" | `questions: non-blocking` / `blocking` in `ORCHESTRATION.md` |
 | "cap the team at 6 sessions" | `max_sessions: 6` in the `team:` block |
