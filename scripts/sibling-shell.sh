@@ -3,7 +3,7 @@
 # (orchestration-kit v0.7.0).
 #
 #   scripts/sibling-shell.sh <Name> [--mode M] --model M [--effort E] [prompt]
-#       (prompt defaults to /orchestration-kit:orient; --mode is normal|accept-edits|auto)
+#       (prompt defaults to /orchestration-kit:orient; --mode is normal|accept-edits|auto|bypass-available)
 #
 # It runs `claude --name <Name> [mode flags] --model M [--effort E] <prompt>` as a CHILD, not via exec.
 # When the child exits it looks for a hand-off file; if scripts/recycle-sibling.sh left one, it starts
@@ -54,7 +54,7 @@ main() {
     case "$1" in
       --model) [ $# -ge 2 ] || { echo "sibling-shell: --model needs a model id" >&2; return 64; }; model="$2"; shift 2 ;;
       --effort) [ $# -ge 2 ] || { echo "sibling-shell: --effort needs low|medium|high|xhigh|max" >&2; return 64; }; effort="$2"; shift 2 ;;
-      --mode) [ $# -ge 2 ] || { echo "sibling-shell: --mode needs normal|accept-edits|auto" >&2; return 64; }; mode="$2"; shift 2 ;;
+      --mode) [ $# -ge 2 ] || { echo "sibling-shell: --mode needs normal|accept-edits|auto|bypass-available" >&2; return 64; }; mode="$2"; shift 2 ;;
       -*) echo "sibling-shell: unknown flag '$1' (flags: --model M, --effort E, --mode M)" >&2; return 64 ;;
       *)
         if [ -z "$name" ]; then name="$1"
@@ -67,7 +67,7 @@ main() {
   [ -n "$name" ] || { echo "usage: sibling-shell.sh <Name> [--mode M] --model M [--effort E] [prompt]" >&2; return 64; }
   [[ "$model" =~ $model_re ]] || { echo "sibling-shell: --model must look like opus[1m], sonnet[1m], haiku or a full model id; got '$model'" >&2; return 64; }
   case "$effort" in ''|low|medium|high|xhigh|max) ;; *) echo "sibling-shell: --effort must be one of low|medium|high|xhigh|max; got '$effort'" >&2; return 64 ;; esac
-  case "$mode" in normal|accept-edits|auto) ;; *) echo "sibling-shell: --mode must be one of normal|accept-edits|auto; got '$mode'" >&2; return 64 ;; esac
+  case "$mode" in normal|accept-edits|auto|bypass-available) ;; *) echo "sibling-shell: --mode must be one of normal|accept-edits|auto|bypass-available; got '$mode'" >&2; return 64 ;; esac
 
   local next="$state_dir/$name.next"
   local fast=0 rc start end elapsed claimed
@@ -113,7 +113,7 @@ main() {
     rm -f -- "$claimed"
     [[ "$m" =~ $model_re ]] || bad="${bad:-model must be explicit and well-formed; got '$m'}"
     case "$e" in ''|low|medium|high|xhigh|max) ;; *) bad="${bad:-bad effort '$e'}" ;; esac
-    case "$md" in ''|normal|accept-edits|auto) ;; *) bad="${bad:-bad mode '$md'}" ;; esac
+    case "$md" in ''|normal|accept-edits|auto|bypass-available) ;; *) bad="${bad:-bad mode '$md'}" ;; esac
     if [ -n "$bad" ]; then
       echo "sibling-shell: refusing the hand-off for ${name} (${bad}); not launching it." >&2
       return 1
@@ -147,6 +147,7 @@ run_claude() {  # <name> <mode> <model> <effort> <prompt>
   case "$2" in
     accept-edits) mflag=(--permission-mode acceptEdits) ;;
     auto) mflag=(--permission-mode auto) ;;
+    bypass-available) mflag=(--allow-dangerously-skip-permissions) ;;
   esac
   if [ -n "$4" ]; then
     claude --name "$1" ${mflag[@]+"${mflag[@]}"} --model "$3" --effort "$4" "$5"

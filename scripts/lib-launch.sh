@@ -48,12 +48,15 @@ LAUNCH_EMULATORS="gnome-terminal konsole xfce4-terminal kitty alacritty wezterm 
 # Permission modes (claude --help, v2.1.x). Every mode keeps Claude Code's permission checks:
 # normal = no flag (asks before risky actions), accept-edits = --permission-mode acceptEdits
 # (file edits auto-approved, commands still ask), auto = --permission-mode auto.
+# bypass-available = --allow-dangerously-skip-permissions: starts like normal, and Shift+Tab can then
+# switch the session into bypass mode (no permission checks at all) when the human picks it.
 LAUNCH_MODE="${LAUNCH_MODE:-normal}"
-launch_valid_mode() { case "$1" in normal|accept-edits|auto) return 0 ;; *) return 1 ;; esac; }
+launch_valid_mode() { case "$1" in normal|accept-edits|auto|bypass-available) return 0 ;; *) return 1 ;; esac; }
 launch_mode_flags() {
   case "$1" in
     accept-edits) printf -- '--permission-mode acceptEdits ' ;;
     auto) printf -- '--permission-mode auto ' ;;
+    bypass-available) printf -- '--allow-dangerously-skip-permissions ' ;;
     *) printf '' ;;
   esac
 }
@@ -139,7 +142,7 @@ _launch_env() {  # <quote-fn> — the CLAUDE_CONFIG_DIR prefix, or nothing for t
 }
 
 launch_set_mode() {
-  launch_valid_mode "$1" || { echo "--mode must be normal|accept-edits|auto: '$1'" >&2; exit 64; }
+  launch_valid_mode "$1" || { echo "--mode must be normal|accept-edits|auto|bypass-available: '$1'" >&2; exit 64; }
   LAUNCH_MODE="$1"
 }
 

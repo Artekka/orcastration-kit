@@ -139,7 +139,7 @@ Nothing in the kit is sacred. This is the order to tune things, what to drop whe
 |---|---|---|
 | The gate command | `command:` in the Gate block | Your real test command; add a fast path for RED proofs and a slow path for pre-deploy |
 | Throttle slots | `gate_slots` | 2; lower it if gates flake under load, raise it on a big machine |
-| Permission mode | `permission_mode` | `normal` (asks before risky actions); move to `accept-edits` or `auto` only once the guards are on |
+| Permission mode | `permission_mode` | `normal` (asks before risky actions); move to `accept-edits` or `auto` only once the guards are on; `bypass-available` adds bypass to Shift+Tab without starting in it |
 | Model per lane | `model` / `effort` | Strong model for risky rows and every READ, a cheaper one for mechanical rows |
 | Deploy policy | the `Deploy` block + `deploy_policy` | Ask first, until you trust the gate |
 | Question mode | `questions:` in `templates/ORCHESTRATION.md` | Non-blocking: keeps the team moving while you are away |

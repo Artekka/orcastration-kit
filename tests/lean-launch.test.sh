@@ -74,6 +74,10 @@ out="$(rs --model=claude-sonnet-5-5 --effort=max ZzNone)"
 has "--flag=value form" '--model claude-sonnet-5-5 --effort max' "$out"
 out="$(rs --mode auto --model 'sonnet[1m]' ZzNone)"
 has "mode flag and model flag coexist" '--permission-mode auto --model sonnet\[1m\]' "$out"
+out="$(rs --mode bypass-available --model 'sonnet[1m]' ZzNone)"
+has "bypass-available: Shift+Tab may switch to bypass, the session starts normal" '--allow-dangerously-skip-permissions --model sonnet\[1m\]' "$out"
+hasnt "bypass-available never starts in bypass" "--dangerously-skip-permissions " "$(printf '%s' "$out" | sed 's/--allow-dangerously-skip-permissions//g')"
+out="$(rs --mode bypass ZzNone)"; has "a bare 'bypass' is not a mode" "--mode must be" "$out"
 
 # A lean-start prompt (`orient --brief <ROW>`) passes launch validation on a POSIX and a WSL backend
 # and reaches the command intact.
