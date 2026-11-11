@@ -5,7 +5,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; G="$ROOT/hooks/ctx-guard.py"
 command -v python3 >/dev/null 2>&1 || { echo "ctx-guard: skipped (no python3)"; exit 0; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-export KIT_STATE_DIR="$TMP/state"
+export KIT_STATE_DIR="$TMP/state" KIT_HUD_DIR="$TMP/hud"   # the status bar's records: none unless a test writes one
 pass=0; fail=0
 ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $*"; }
@@ -61,6 +61,30 @@ conf "  ctx_guard: on
   context_window: 200k"
 has "context_window: 200k makes opus at 125K report" "crossed the 120K self-report mark" "$(run "$T" h5)"
 conf "  ctx_guard: on"
+
+# --- the window Claude Code itself reports (the status bar's record of the session) beats the team block and the
+#     model name, both ways; a record with no token reading yet is the status bar's default, not a measurement
+hud() {  # <session id> <window> <tokens>
+  mkdir -p "$KIT_HUD_DIR/sessions"
+  printf '{"id":"%s","name":"Mars","model":"opus","tokens":%s,"window":%s,"at":1}' "$1" "$3" "$2" > "$KIT_HUD_DIR/sessions/$1.json"
+}
+conf "  ctx_guard: on
+  context_window: 200k"
+tx "$T" 125000; hud w1 1000000 125000
+empty "measured 1M window inside a 200k team block: 125K is silent" "$(run "$T" w1)"
+tx "$T" 310000; out="$(run "$T" w1)"
+has "measured 1M window inside a 200k team block: warns at the 1M marks" "approaching the 350K self-report mark" "$out"
+has "the line names where the window came from" "Claude Code's own figure" "$out"
+conf "  ctx_guard: on"
+tx "$T" 125000; hud w2 200000 125000
+has "measured 200K window inside a 1m team block: reports at 120K" "crossed the 120K self-report mark" "$(run "$T" w2)"
+tx "$T" 125000 claude-haiku-x; hud w3 1000000 125000
+empty "measured 1M window beats the Haiku rule" "$(run "$T" w3)"
+tx "$T" 125000 claude-haiku-x; hud w4 1000000 0
+has "a record with no token reading is not a measurement: the Haiku rule stands" "crossed the 120K self-report mark" "$(run "$T" w4)"
+tx "$T" 310000; printf 'not json' > "$KIT_HUD_DIR/sessions/w5.json"
+has "a broken record falls back to the team block" "the team block's context_window" "$(run "$T" w5)"
+rm -rf "$KIT_HUD_DIR"
 
 # --- rate limit: once per STEP (15K on 1M) of growth, a newly crossed mark always speaks, prompts always speak
 tx "$T" 310000; has "rate: first call speaks" "CONTEXT GUARD" "$(run "$T" r1)"

@@ -17,7 +17,7 @@ For a builder the seat assigned a row that has a brief file (`docs/orchestration
 |---|---|
 | 1 | `git fetch origin \|\| { sleep 2; git fetch origin; }`, then `git show origin/main:docs/orchestration/briefs/<ROW>.md` — the row's whole contract, as the seat pushed it (substitute your default branch for `main`; a plain `cat` of your own checkout misses a brief it has not rebased onto yet). Not on origin/main → `cat docs/orchestration/briefs/<ROW>.md`; in neither → tell the seat, then fall back to the full mode |
 | 2 | `git show origin/main:docs/orchestration/AGENT_BOARD.md \| awk '/^## /{ if (on) exit; if (/ORCHESTRATOR ACTIVE/ && !/[Ss][Uu][Pp][Ee][Rr][Ss][Ee][Dd][Ee][Dd]/) on=1 } on' \| head -60` — the CURRENT banner's own section, from its `ORCHESTRATOR ACTIVE` heading to the next `## ` (who the seat is, the era's rows, the standing rules it names; a header that says `superseded` is never taken for the live banner, so a board holding only superseded banners prints nothing). Anchored on the banner, not on line counts: the archive table and `---` rulers above it are skipped. No output = no banner = no seat: ask the human |
-| 3 | `python3 scripts/ctx-fill.py <uuid> --window <1m\|200k>` as its own command — the window your OWN env block names |
+| 3 | `python3 scripts/ctx-fill.py <uuid>` as its own command — its `window` line is your window (Claude Code's own figure, else the team block's); never read one from the model id |
 | 4 | `ToolSearch` with `select:ListAgents,SendMessage` first (they are deferred tools: calling one unloaded fails), then `ListAgents` (first line = your name + ref), then the READY signal of Step 7 |
 
 Skip: the status doc, the log, `git log`, the overlay (unless the brief names no gate command — then read `ORCHESTRATION.md` → Gate only), the test-health check and the five-bullet summary. `CLAUDE.md` loads with the session, so the Step 0 rules (worktree, refresh before claiming, row prefix) still apply: follow them and restate them in one line in READY.
@@ -64,9 +64,9 @@ Skip: the status doc, the log, `git log`, the overlay (unless the brief names no
 READY <PREFIX> [<ref>] · model <id> · fill <current from ctx-fill, verbatim> · marks <prompt>/<handover> · saw <seat Name [ref]> era-<N> · <what you can take> · seen: <rows whose builder narrative you've already read, or "none">
 ```
 - `<ref>` = your own identity line from `ListAgents` (e.g. "This session is Sib1 [57f3ab]") — not your session uuid.
-- `model <id>` = the exact model id in YOUR env block (e.g. `claude-opus-5-5[1m]`). The seat chose your model by lane at launch; stating it lets the seat check the lane got the model it asked for.
-- Fill = `python3 scripts/ctx-fill.py <uuid> --window <1m|200k>` run as its own command, output pasted verbatim; `--window` = what your env block says. `marks` = the `marks` line it printed for that window (1M → 350K/400K, 200K → 120K/150K).
-- If ctx-fill says the window is UNKNOWN, read your env block and re-run with `--window` — a transcript cannot carry the `[1m]` suffix.
+- `model <id>` = the exact model id in YOUR env block. The seat chose your model by lane at launch; stating it lets the seat check the lane got the model it asked for. The id names no window: a 1M launch can show it without `[1m]`.
+- Fill = `python3 scripts/ctx-fill.py <uuid>` run as its own command, output pasted verbatim. `marks` = the `marks` line it printed for the window it found (1M → 350K/400K, 200K → 120K/150K).
+- If ctx-fill says the window is UNKNOWN, say so in READY and use the 1M marks until the seat answers; never lower your window from the model id, and never ask for a recycle on that reading. The seat settles it from the launch (`--model`) and the team block's `context_window`.
 - `saw <seat Name [ref]> era-<N>` = the seat and era named by the banner you read (lean step 2). A builder that cannot name them did not see the banner: re-run step 2, or say "no banner seen".
 - `seen:` is your independence disclosure — it decides which rows you may later verify.
 - If the banner's era/seat looks stale against the board body, say so in READY.

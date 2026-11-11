@@ -12,8 +12,17 @@ short additionalContext line, again every STEP tokens of growth (and on every pr
 forgotten without adding a line to every tool call.
 
 Opt-in: silent unless the repo's main checkout carries docs/orchestration/.kit-hooks AND
-docs/orchestration/ORCHESTRATION.md says `ctx_guard: on`. Window: `context_window: 1m|200k` there
-(default 1m); a transcript naming a Haiku model is always 200K (while the fill fits in 200K).
+docs/orchestration/ORCHESTRATION.md says `ctx_guard: on`.
+
+Window, per session, first found:
+  1. Claude Code's own figure for THIS session, as the status bar (plugins/status-hud) records it in
+     <status dir>/sessions/<session id>.json. It beats the team block both ways: a session on a small
+     window gets the small marks inside a 1m team, and a 1M session keeps the large marks inside a team
+     block someone set to 200k.
+  2. `context_window: 1m|200k` in the team block (default 1m); a transcript naming a Haiku model is 200K
+     (while the fill fits in 200K).
+Never the model id: it names no window (a 1M launch can show the bare id), and sessions that read one
+from it handed over at a third of their room.
 Never fails: any error = no output, exit 0.
 """
 import json
@@ -24,6 +33,8 @@ import sys
 
 TAIL_BYTES = 512 * 1024
 STATE_DIR = os.path.join(os.environ.get("KIT_STATE_DIR") or os.path.expanduser("~/.orchestration-kit"), "ctx-guard")
+HUD_DIR = os.environ.get("KIT_HUD_DIR") or os.path.expanduser("~/.claude-status-hud")  # the status bar's statusDir
+LARGE_FROM = 500_000   # a window at or above this uses the large marks (same line as scripts/ctx-fill.py)
 MARKS = {
     "large": {"warn": 300_000, "report": 350_000, "handover": 400_000, "wall": 1_000_000, "step": 15_000},
     "small": {"warn": 100_000, "report": 120_000, "handover": 150_000, "wall": 200_000, "step": 8_000},
@@ -56,6 +67,23 @@ def config(cwd):
     return bool(ON.search(text)), bool(w and w.group(1).lower() in ("200k", "200000"))
 
 
+def hud_window(sid):
+    """The window Claude Code itself reports for this session, as the status bar recorded it, or None.
+
+    Trusted only once the record carries a token reading: until its first reading the status bar writes
+    its own default window, which is not a measurement."""
+    try:
+        with open(os.path.join(HUD_DIR, "sessions", f"{sid}.json"), encoding="utf8") as fh:
+            o = json.load(fh)
+        window, tokens = o.get("window"), o.get("tokens")
+        if (isinstance(window, (int, float)) and not isinstance(window, bool) and window >= 50_000
+                and isinstance(tokens, (int, float)) and not isinstance(tokens, bool) and tokens > 0):
+            return int(window)
+    except (OSError, ValueError, AttributeError):
+        pass
+    return None
+
+
 def last_usage(path):
     """(fill, model) from the last assistant turn that carries usage, reading only the tail."""
     size = os.path.getsize(path)
@@ -83,7 +111,11 @@ def k(n):
     return f"{n // 1000}K"
 
 
-def message(fill, m):
+def message(fill, m, source=""):
+    return _order(fill, m) + (f" Window {k(m['wall'])}: {source}." if source else "")
+
+
+def _order(fill, m):
     if fill >= m["handover"]:
         return (f"CONTEXT GUARD: fill {k(fill)} is PAST the {k(m['handover'])} handover mark (wall {k(m['wall'])}). "
                 f"Stop taking new work now. Sibling: finish or park the row, report your fill to the seat, run "
@@ -110,7 +142,15 @@ def main():
         if not enabled:
             return
         fill, model = last_usage(path)
-        small = small_window or ("haiku" in model.lower() and fill <= MARKS["small"]["wall"])
+        measured = hud_window(sid)
+        if measured:
+            small, source = measured < LARGE_FROM, "Claude Code's own figure for this session"
+        elif small_window:
+            small, source = True, "the team block's context_window"
+        elif "haiku" in model.lower() and fill <= MARKS["small"]["wall"]:
+            small, source = True, "a Haiku model"
+        else:
+            small, source = False, "the team block's context_window (default 1m)"
         m = MARKS["small" if small else "large"]
         if fill < m["warn"]:
             return
@@ -128,7 +168,7 @@ def main():
             return
         with open(state_file, "w") as fh:
             fh.write(str(fill))
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": message(fill, m)}}))
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": event, "additionalContext": message(fill, m, source)}}))
     except Exception:
         return  # a guard must never break the session it guards
 

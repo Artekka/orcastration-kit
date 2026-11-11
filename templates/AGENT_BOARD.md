@@ -53,7 +53,7 @@ deletes this section (the shape stays in the plugin's `templates/AGENT_BOARD.md`
 section is here, no orchestrator is active.
 
 ````markdown
-## 🎛 ORCHESTRATOR ACTIVE — era-<N> · <SeatName> `[<ref>]` · seated <HH:MM TZ YYYY-MM-DD> · prefix `<P>-` · <model>, <window> window (own env block) · fill <NNN,NNN> measured
+## 🎛 ORCHESTRATOR ACTIVE — era-<N> · <SeatName> `[<ref>]` · seated <HH:MM TZ YYYY-MM-DD> · prefix `<P>-` · <model>, <window> window (from ctx-fill) · fill <NNN,NNN> measured
 **Siblings: report to `<SeatName> [<ref>]`.** ⛔ All human approvals/questions route through the SEAT · Validator = `<Name>` (never builds) · siblings don't spawn agents unless the human asks.
 **Slots:** DEPLOY FREE · LOG FREE (next <N>) · resource windows: none open
 

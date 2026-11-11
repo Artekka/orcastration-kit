@@ -71,7 +71,7 @@ tag scheme:     <Name> [<ref>]  — Name = the terminal's `claude --name`, ref =
 context marks:  1M window: self-report ~350K, hand over by ~400K · 200K window: ~120K / ~150K
 evidence dir:   ~/.orchestration-kit/scratch/<YYYY>/<Month>/<row>/   (probe scripts, gate/run logs, READ evidence, mutant outputs)
 questions:      blocking   (blocking | non-blocking — see the orchestrate skill §11)
-                measure: python3 scripts/ctx-fill.py <uuid> --window 1m|200k   (never bytes ÷ 4)
+                measure: python3 scripts/ctx-fill.py <uuid>   (prints the window too; never bytes ÷ 4, never a window read from a model id)
 start team:     bash scripts/start-team.sh [--dry-run] [--siblings N]   (skips names already running)
 recycle:        bash scripts/recycle-sibling.sh <Name> [prompt] [--model M] [--effort E]   (prints commands + exits 2 where no terminal can be opened)
 ```
@@ -96,7 +96,9 @@ from the warn mark up, injects one line: approaching (300K), report now (350K), 
 (400K); on a 200K window 100K/120K/150K. It repeats every ~15K of growth (8K on 200K) and on
 every prompt, so nobody has to remember to measure. Same default as `git_guard`: kit-init sets
 `on` for a team, `off` in practice (Solo) mode. `context_window` (`1m` or `200k`, default `1m`) picks the marks for
-the guard; a session whose transcript names a Haiku model always gets the 200K marks.
+the guard; a session whose transcript names a Haiku model always gets the 200K marks. Where the status bar runs,
+Claude Code's own window figure for each session beats both, so one team can hold sessions of both sizes. Change
+`context_window` only on that figure (ctx-fill's `window` line), never on a model id: it names no window.
 `max_sessions` (unset = no check): the most Claude sessions this machine should run, the seat and every
 verifier included. `start-team.sh` and `recycle-sibling.sh` warn (never refuse) before passing it. Each
 session holds several GB of RAM; on WSL, Windows kills the whole VM when it runs out of commit, with

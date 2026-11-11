@@ -17,7 +17,7 @@ git fetch origin || { sleep 2; git fetch origin; } && git rebase origin/main
 
 0. Fresh seat → do the `/orchestration-kit:orient` reads first (Steps 0–6; skip its READY step — you are the one receiving READYs).
 1. Read the board top to bottom (archives: grep only, never whole). Another `ORCHESTRATOR ACTIVE` banner with a live seat → do NOT take it; ask the human.
-2. Post the banner at the TOP of the board (shape: the board's "Seat banner — SHAPE ONLY" section, or `${CLAUDE_PLUGIN_ROOT}/templates/AGENT_BOARD.md`): seat name + `[ref]`, era/date, your row prefix, model + window **from your own env block**, measured fill, standing rules. **Commit + push immediately** (board-write recipe, §6) — an unpushed banner is invisible.
+2. Post the banner at the TOP of the board (shape: the board's "Seat banner — SHAPE ONLY" section, or `${CLAUDE_PLUGIN_ROOT}/templates/AGENT_BOARD.md`): seat name + `[ref]`, era/date, your row prefix, model (the id in your env block) + window (**the `window` line of ctx-fill**, never the model id), measured fill, standing rules. **Commit + push immediately** (board-write recipe, §6) — an unpushed banner is invisible.
 3. Measure yourself: `python3 scripts/ctx-fill.py` → paste `current` into the banner.
 4. Load the cross-session tools: `ToolSearch` with `select:ListAgents,SendMessage` first (they are deferred tools: calling one unloaded fails). `ListAgents` shows who is **reachable**, never who is **ready** — terminal uptime survives `/clear`. Build the roster from READY signals only (§3). Re-run `ListAgents` right before publishing any roster/dispatch plan.
 5. **Siblings not running?** Offer the human `bash scripts/start-team.sh` (opens any missing seat/sibling window; skips names already running; `--dry-run` to preview) and run it on a yes.
@@ -149,12 +149,12 @@ Retro-before-clear is a **handshake** (LESSON 24): order → explicit "retro com
 
 ## 10 · Seat context self-check
 
-| Window (read your OWN env block) | Self-report | Hand over by |
+| Window (the `window` line of ctx-fill) | Self-report | Hand over by |
 |---|---|---|
 | ~1M | ~350K | ~400K |
 | ~200K (every small-tier model) | ~120K (60%) | ~150K (75%) |
 
-- Measure: `python3 scripts/ctx-fill.py <uuid> --window <1m|200k>` (window from your env block) — sums input + cache_read + cache_creation off the last assistant turn. **Never `bytes ÷ 4`** (biased high 30–60%, unstably). **Never infer a window from a transcript's model string** — the one safe exception only lowers it: a small-tier (`haiku`) string means 200K, and ctx-fill applies it. (A seat on a ~200K window died at 175,725 tokens with no handover: that is why the small window's marks sit at 120K/150K, not 140K/160K.)
+- Measure: `python3 scripts/ctx-fill.py <uuid>` — sums input + cache_read + cache_creation off the last assistant turn, and prints the window it found: Claude Code's own figure for that session when the status bar runs, else the team block's `context_window`. `--all` lists every session of the project, each with its own window and marks, and the context guard gives each session the marks for its own window. **Never read a window from a model id, yours or a sibling's** (a 1M launch can show the bare id), and never change `context_window` or recycle a session on that reading: sessions that read "no `[1m]`" as 200K handed over at a third of their room. **Never `bytes ÷ 4`** (biased high 30–60%, unstably). **Never infer a window from a transcript's model string** — the one safe exception only lowers it: a small-tier (`haiku`) string means 200K, and ctx-fill applies it. (A seat on a ~200K window died at 175,725 tokens with no handover: that is why the small window's marks sit at 120K/150K, not 140K/160K.)
 - At handover: finish only what is already in verify → wait for every subagent and background shell YOU started (their completion notices; the recycle would kill or orphan them, and its live-work check cannot see subagents) → write the **handover block** under the banner (slots, in-flight rows + SHAs, READs owed, human's queue) → run your own `/orchestration-kit:retro` → `bash scripts/recycle-sibling.sh <SeatName> /orchestration-kit:orchestrate --model 'opus[1m]'` (the fresh seat opens first, then this one is SIGTERMed), or tell the human: "seat retro complete — close this terminal and relaunch it with `claude --name Orca --model 'opus[1m]' /orchestration-kit:orchestrate` (a bare `/clear` keeps the OLD model; if you must `/clear`, run `/model opus[1m]` first)".
 - Include your measured fill + model in every handover and every roster report.
 

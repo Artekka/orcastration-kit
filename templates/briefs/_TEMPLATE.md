@@ -41,6 +41,6 @@ The class and command from `ORCHESTRATION.md` → Gate, run from INSIDE the work
 
 - To the seat (SendMessage), never to a verifier or to the builder of another row.
 - At RED (the failing guard, with numbers) and at GREEN-FINAL (sha · per-stage counts · falsify
-  record · fill from `python3 scripts/ctx-fill.py <uuid> --window <1m|200k>`, window from YOUR env block).
+  record · fill and window from `python3 scripts/ctx-fill.py <uuid>`).
 - Questions and permission prompts → stop and message the seat. No deploy, no merge to main.
 - Scratch and evidence (probes, logs, mutant outputs) → the evidence dir (ORCHESTRATION.md), never `/tmp`.

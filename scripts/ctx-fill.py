@@ -7,17 +7,19 @@ That is the prompt size the model actually saw. Everything else is a guess -- an
 popular guess, `bytes / 4` of the session jsonl, over-reports by roughly 30-60% with a bias
 that is not stable, so no threshold expressed against it is safe.
 
-What this CANNOT tell you: the session's context WINDOW. The transcript's `model` field does
-not carry it (a 1M-window variant and a 200K-window variant can record the same model string).
-The only authoritative source is the session's OWN system-prompt environment block. What the
-transcript CAN prove is a lower bound: a session that reached N tokens has a window >= N.
+What a transcript CANNOT tell you: the session's context WINDOW. Its `model` field does not carry
+it, and neither does the model id in a session's own environment block: a session launched on a
+1M model can show the bare id, and sessions that read "no [1m]" as 200K handed over at a third of
+their room. The authoritative source is Claude Code's own figure for the session, which the status
+bar (plugins/status-hud) records; without it, the team block's `context_window`. What the transcript
+CAN prove is a lower bound: a session that reached N tokens has a window >= N.
 
 Usage:
     python3 scripts/ctx-fill.py                    # this session (from $CLAUDE_CODE_SESSION_ID)
     python3 scripts/ctx-fill.py <session-uuid>     # a specific session
     python3 scripts/ctx-fill.py <path/to/x.jsonl>  # a specific transcript file
     python3 scripts/ctx-fill.py --all              # every session of this project, newest first
-    ... --window 1m|200k|<tokens>                  # state the window (from YOUR env block)
+    ... --window 1m|200k|<tokens>                  # state the window (only when nothing below knows it)
 
 Marks: self-report at the PROMPT mark, hand the terminal over by the HANDOVER mark.
     1M window (>= 500K)       -> 350,000 / 400,000 (absolute)
@@ -26,10 +28,16 @@ Marks: self-report at the PROMPT mark, hand the terminal over by the HANDOVER ma
 Why the small window is not 70% / 80%: a seat on a ~200K window died at 175,725 tokens with no
 handover, so a 160K handover leaves too little margin for the retro itself.
 
-Which window? Never the transcript's model string for Opus or Sonnet: both come in 200K and 1M and
-record the same string. The one safe model rule only ever LOWERS the window: Haiku has no 1M
-variant, so a `haiku` model string means 200K. --window (what your env block says) beats everything;
-with none of those the window is UNKNOWN and BOTH sets of marks are printed.
+Which window? First found:
+  1. Claude Code's own figure for that session (<status dir>/sessions/<uuid>.json, written by the
+     status bar while the session runs). It beats --window: a stated window that disagrees is ignored
+     and the line says so.
+  2. --window (or CTX_WINDOW).
+  3. A peak above 200K proves a large window.
+  4. A `haiku` model string means 200K (the one model rule, and it only ever LOWERS the window).
+  5. `context_window:` in the team block of docs/orchestration/ORCHESTRATION.md (the main checkout's).
+With none of those the window is UNKNOWN and BOTH sets of marks are printed. Never the model string
+for Opus or Sonnet, in a transcript or in an env block: it names no window.
 Transcripts live at ~/.claude/projects/<slug>/<uuid>.jsonl, where <slug> is the session's
 working directory with every non-alphanumeric character replaced by '-'.
 """
@@ -37,6 +45,7 @@ import glob
 import json
 import os
 import re
+import subprocess
 import sys
 
 CLAUDE_HOME = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
@@ -50,6 +59,8 @@ LARGE_FROM = 500_000   # a window at or above this uses the absolute marks
 PROMPT_PCT, HANDOVER_PCT = 0.60, 0.75   # of a smaller window: 200K -> 120K / 150K
 WINDOW_ALIASES = {"1m": LARGE_WINDOW, "200k": SMALL_WINDOW}
 TOO_LONG = "Prompt is too long"
+HUD_DIR = os.environ.get("KIT_HUD_DIR") or os.path.expanduser("~/.claude-status-hud")  # the status bar's statusDir
+TEAM_WINDOW = re.compile(r"^[ \t]*context_window:[ \t]*(\S+)", re.M)
 
 
 def slug(path):
@@ -76,14 +87,56 @@ def parse_window(text):
     return int(t) if t.isdigit() and int(t) > 0 else None
 
 
-def resolve_window(model, peak, stated):
+def hud_window(uuid):
+    """Claude Code's own window figure for a session, as the status bar recorded it, or None.
+
+    Trusted only once the record carries a token reading: until its first reading the status bar writes
+    its own default window, which is not a measurement."""
+    name = re.sub(r"[^A-Za-z0-9_-]", "_", uuid)
+    try:
+        with open(os.path.join(HUD_DIR, "sessions", name + ".json"), encoding="utf8") as fh:
+            o = json.load(fh)
+        window, tokens = o.get("window"), o.get("tokens")
+        if (isinstance(window, (int, float)) and not isinstance(window, bool) and window >= 50_000
+                and isinstance(tokens, (int, float)) and not isinstance(tokens, bool) and tokens > 0):
+            return int(window)
+    except (OSError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def team_window():
+    """`context_window:` from the team block of the main checkout holding the cwd, or None (no default:
+    a project that never stated it is not evidence)."""
+    try:
+        out = subprocess.run(["git", "worktree", "list", "--porcelain"],
+                             capture_output=True, text=True, timeout=5).stdout
+        first = out.splitlines()[0] if out else ""
+        if not first.startswith("worktree "):
+            return None
+        conf = os.path.join(first[len("worktree "):], "docs/orchestration/ORCHESTRATION.md")
+        with open(conf, encoding="utf8") as fh:
+            m = TEAM_WINDOW.search(fh.read())
+        return parse_window(m.group(1)) if m else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def resolve_window(model, peak, stated, uuid=""):
     """(window or None, how it was known). Evidence, not a lookup table: see the module docstring."""
+    measured = hud_window(uuid) if uuid else None
+    if measured:
+        ignored = f"; --window {stated:,} ignored" if stated and stated != measured else ""
+        return measured, f"Claude Code's own figure for this session, from the status bar{ignored}"
     if stated:
-        return stated, "STATED by you with --window (from your env block, not the transcript)"
+        return stated, "STATED with --window"
     if peak > SMALL_WINDOW:
         return LARGE_WINDOW, f"PROVEN: this session already reached {peak:,}"
     if model and "haiku" in model.lower():
         return SMALL_WINDOW, "model is Haiku, which has only a 200K window"
+    team = team_window()
+    if team:
+        return team, "the team block's context_window"
     return None, "UNKNOWN"
 
 
@@ -134,7 +187,7 @@ def report(path, stated):
     if not turns:
         print(f"{uuid}  (no assistant turns with usage yet)")
         return
-    window, how = resolve_window(model, peak, stated)
+    window, how = resolve_window(model, peak, stated, uuid)
     small_prompt, small_handover = marks(SMALL_WINDOW)
     if window is not None:
         prompt_mark, handover_mark = marks(window)
@@ -142,8 +195,8 @@ def report(path, stated):
         marks_lines = [f"marks     prompt {prompt_mark:,} | handover {handover_mark:,}  ({window:,} window)"]
     else:
         prompt_mark = handover_mark = None
-        window_note = (f"UNKNOWN -- not knowable from a transcript: {model} comes in both sizes. Read your OWN env "
-                       f"block and re-run with --window 1m or --window 200k.")
+        window_note = (f"UNKNOWN -- a transcript cannot say, and the model id ({model}) names no window: never read one "
+                       f"from it. State `context_window: 1m|200k` in the team block, or re-run with --window.")
         marks_lines = [f"marks     IF 1M:   prompt {ABS_PROMPT:,} | handover {ABS_HANDOVER:,}",
                        f"marks     IF 200K: prompt {small_prompt:,} | handover {small_handover:,}"]
 
@@ -154,9 +207,9 @@ def report(path, stated):
     elif too_long:
         verdict = f"~  RECOVERED from a wall at {wall_at:,}; judge it on `current`"
     elif window is None and final >= small_handover:
-        verdict = f"?  PAST the 200K handover mark ({small_handover:,}) IF this is a 200K window -- read your env block NOW"
+        verdict = f"?  PAST the 200K handover mark ({small_handover:,}) IF this is a 200K window -- ask the seat; do not guess from the model id"
     elif window is None and final >= small_prompt:
-        verdict = f"?  AT the 200K prompt mark ({small_prompt:,}) IF this is a 200K window -- read your env block NOW"
+        verdict = f"?  AT the 200K prompt mark ({small_prompt:,}) IF this is a 200K window -- ask the seat; do not guess from the model id"
     elif window is None:
         verdict = f"OK on either window -- {small_prompt - final:,} to the 200K prompt mark"
     elif final >= handover_mark:

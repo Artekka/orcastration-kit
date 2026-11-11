@@ -48,7 +48,7 @@ Open or refill the team with `bash scripts/start-team.sh` (skips sessions alread
 
 Never `/compact`. With `ctx_guard: on` a hook measures for you: a `CONTEXT GUARD:` line is an
 order (report at the report mark; stop and hand over at the handover mark). Otherwise measure fill with `python3 scripts/ctx-fill.py` (never `bytes ÷ 4`; the
-window comes from your own env block, not the transcript: `ctx-fill.py <uuid> --window 1m|200k`).
+window is the `window` line it prints, never a reading of your model id).
 1M window: self-report at ~350K, hand over by ~400K; 200K window: ~120K / ~150K. Report your
 fill AND your model with every hand-off. Then the handshake: seat orders `/orchestration-kit:retro` →
 you reply "retro complete" → the seat recycles your terminal in place, in the same tab (`scripts/recycle-sibling.sh`)
@@ -58,7 +58,7 @@ or the human relaunches it with an explicit `--model` (a bare `/clear` keeps the
 
 The seat picks each session's model by lane when it launches it (`scripts/recycle-sibling.sh <Name>
 --model <m>`; table in the orchestrate skill, "Model per lane"). A recycled session never inherits
-one. Read your own model and window from your env block, and state both in READY. Builders start
+one. State your model (the id in your env block) and your window (ctx-fill's `window` line) in READY. Builders start
 with `/orchestration-kit:orient-brief <ROW>` when the seat gave them a brief file.
 
 > Keep this file slim: it is re-read on every turn of every session. Rules here, narrative in a

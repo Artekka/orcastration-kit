@@ -5,6 +5,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; CF="$ROOT/scripts/ctx-fill.py"
 command -v python3 >/dev/null 2>&1 || { echo "ctx-fill: skipped (no python3)"; exit 0; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+export KIT_HUD_DIR="$TMP/hud"   # the status bar's records: none unless a test writes one
 pass=0; fail=0
 has() {  # <label> <want substring> <got>
   case "$3" in *"$2"*) pass=$((pass+1)) ;; *) fail=$((fail+1)); echo "FAIL $1: want '$2' in: $3" ;; esac
@@ -15,7 +16,7 @@ hasnt() {  # <label> <unwanted substring> <got>
 transcript() {  # <file> <model> <context tokens> — one assistant turn whose prompt was exactly N tokens
   printf '{"type":"assistant","message":{"model":"%s","content":[{"type":"text","text":"x"}],"usage":{"input_tokens":%s,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":5}}}\n' "$2" "$3" > "$1"
 }
-cf() { python3 "$CF" "$@" 2>&1; }
+cf() { (cd "${CF_DIR:-$TMP}" && python3 "$CF" "$@" 2>&1); }   # from a folder that is no repo: the team block is read only where a test says so
 T="$TMP/t.jsonl"
 
 # 1. 1M window: 350K / 400K, whatever the model string says.
@@ -78,6 +79,44 @@ has "bad --window rc != 0" "rc=1" "$out"
 { transcript "$T" claude-opus-5 90000; printf '{"type":"assistant","message":{"model":"claude-opus-5","content":[{"type":"text","text":"Prompt is too long"}]}}\n' >> "$T"; }
 out="$(cf "$T" --window 200k)"
 has "wall hit" "WALL ALREADY HIT" "$out"
+
+# 9. Claude Code's own figure for the session (the status bar's record, by transcript name) beats everything: a
+#    stated window that disagrees is ignored and named, and the Haiku rule does not lower it.
+hud() {  # <uuid> <window> <tokens>
+  mkdir -p "$KIT_HUD_DIR/sessions"
+  printf '{"id":"%s","name":"Mars","tokens":%s,"window":%s,"at":1}' "$1" "$3" "$2" > "$KIT_HUD_DIR/sessions/$1.json"
+}
+transcript "$T" claude-opus-5 140000; hud t 1000000 140000
+out="$(cf "$T")"
+has "measured window is used with no --window" "window    1,000,000  (Claude Code's own figure" "$out"
+has "measured 1M: 140K is OK" "OK -- 210,000 to the prompt mark" "$out"
+out="$(cf "$T" --window 200k)"
+has "measured window beats a stated one" "prompt 350,000 | handover 400,000  (1,000,000 window)" "$out"
+has "the ignored --window is named" "--window 200,000 ignored" "$out"
+hud t 200000 140000
+has "measured 200K: 140K is at the prompt mark" "AT PROMPT MARK" "$(cf "$T")"
+transcript "$T" claude-haiku-4-5-20251001 130000; hud t 1000000 130000
+has "measured 1M beats the Haiku rule" "(1,000,000 window)" "$(cf "$T")"
+hud t 1000000 0
+has "a record with no token reading is not a measurement" "200,000  (model is Haiku" "$(cf "$T")"
+rm -rf "$KIT_HUD_DIR"
+
+# 10. With nothing better, the team block's context_window (the main checkout's) settles it; no team block, no
+#     guess. The model id in an env block is never offered as a source.
+REPO="$TMP/repo"; git init -q -b main "$REPO"; mkdir -p "$REPO/docs/orchestration"
+transcript "$T" claude-opus-5 140000
+printf 'team:\n  seat: Atlas\n  context_window:   1m\n' > "$REPO/docs/orchestration/ORCHESTRATION.md"
+out="$(CF_DIR="$REPO" cf "$T")"
+has "team block 1m" "1,000,000  (the team block's context_window)" "$out"
+has "team block 1m: OK" "verdict   OK -- " "$out"
+printf 'team:\n  seat: Atlas\n  context_window:   200k\n' > "$REPO/docs/orchestration/ORCHESTRATION.md"
+has "team block 200k" "AT PROMPT MARK" "$(CF_DIR="$REPO" cf "$T")"
+has "--window beats the team block" "(1,000,000 window)" "$(CF_DIR="$REPO" cf "$T" --window 1m)"
+printf 'team:\n  seat: Atlas\n' > "$REPO/docs/orchestration/ORCHESTRATION.md"
+out="$(CF_DIR="$REPO" cf "$T")"
+has "no context_window key: still unknown" "UNKNOWN" "$out"
+hasnt "unknown never sends a session to its env block" "env block" "$out"
+has "unknown says the model id names no window" "names no window" "$out"
 
 echo "ctx-fill: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
