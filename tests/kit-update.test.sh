@@ -23,6 +23,7 @@ for v in 1.0 1.1; do mkdir -p "$TMP/cache/$v/scripts"; for f in lib-launch.sh st
 cat > "$TMP/bin/claude" <<EOF
 #!/usr/bin/env bash
 echo "\$*" >> "$TMP/claude.log"
+if [ "\$1 \$2 \$3" = "plugin list --json" ]; then cat "$TMP/list.json" 2>/dev/null; exit 0; fi
 if [ "\$1 \$2 \$3" = "plugin update orchestration-kit@mk" ]; then
   v="\$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' "$MP/.claude-plugin/marketplace.json")"
   sed -i "s|\"installPath\": \"[^\"]*\", \"version\": \"[^\"]*\"|\"installPath\": \"$TMP/cache/\$v\", \"version\": \"\$v\"|" "$P/installed_plugins.json"
@@ -61,6 +62,15 @@ has "refresh: old kept" "start-team.sh 1.0" "$(cat "$PR/old/scripts/start-team.s
 [ ! -e "$PR/old/scripts/quiet-mode.sh" ]; rc_is "refresh: adds nothing new" 0 $?
 out="$("$U" projects --projects "$PR")"; has "projects: all match after refresh" "every kit project's script copies match" "$out"
 out="$("$U" refresh "$PR/nokit" 2>&1)"; rc_is "refresh: refuses a project without the kit" 1 $?
+# a folder install is read in place (readFromFolder): projects and refresh compare with that folder, not the installed copy
+mkdir -p "$TMP/live/scripts"; for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh; do echo "$f live" > "$TMP/live/scripts/$f"; done
+printf '[{"id": "other@mk", "readFromFolder": "/nowhere"}, {"id": "orchestration-kit@mk", "installPath": "%s", "readFromFolder": "%s"}]\n' "$TMP/cache/1.1" "$TMP/live" > "$TMP/list.json"
+out="$("$U" projects --projects "$PR")"; has "projects: a folder install compares with the folder" "new: lib-launch.sh" "$out"
+out="$("$U" refresh "$PR/new")"; cmp -s "$PR/new/scripts/start-team.sh" "$TMP/live/scripts/start-team.sh"; rc_is "refresh: a folder install copies from the folder" 0 $?
+printf '[{"id": "orchestration-kit@mk", "readFromFolder": "%s"}]\n' "$TMP/gone" > "$TMP/list.json"
+out="$("$U" projects --projects "$PR")"; has "projects: a folder that is not there falls back to the installed copy" "new: lib-launch.sh" "$out"
+rm -f "$TMP/list.json" "$PR/new/scripts/"*.bak-*; cp "$TMP/cache/1.1/scripts/"* "$PR/new/scripts/"
+out="$("$U" projects --projects "$PR")"; has "projects: no readFromFolder, the installed copy" "every kit project's script copies match" "$out"
 
 # --- run
 installed 1.0 "$TMP/cache/1.0" hud; offer 1.1; cp "$TMP/cache/1.0/scripts/start-team.sh" "$PR/new/scripts/start-team.sh"

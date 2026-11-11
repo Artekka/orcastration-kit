@@ -22,7 +22,9 @@
 #   kit-update.sh projects [--projects DIR]
 #                                     projects with the kit set up whose copies of the kit's session
 #                                     scripts differ from the installed kit (kit-init copies them once
-#                                     and never overwrites them)
+#                                     and never overwrites them). "The installed kit" is the folder sessions
+#                                     load it from: the kit's own folder for a folder install, which Claude
+#                                     Code reads in place, else the installed copy
 #   kit-update.sh refresh <project>   copy the installed kit's session scripts over that project's
 #                                     copies; each replaced file is kept as <file>.bak-<date>
 # DIR defaults to projects_dir= in ~/.orchestration-kit/launcher.conf, else ~/projects.
@@ -65,6 +67,16 @@ available() {  # the version the marketplace's local copy offers
 source_commit() {  # the marketplace folder's git commit, when it is a local git folder
   local loc; loc="$(json "j['$(marketplace)'].get('installLocation')" "$CFG/plugins/known_marketplaces.json")"
   [ -n "$loc" ] && git -C "$loc" rev-parse HEAD 2>/dev/null
+}
+kit_root() {  # the folder sessions load the kit from. Claude Code reads a folder install in place and names that
+  # folder as readFromFolder in `claude plugin list --json`; any other install runs from the installed copy.
+  local k r=""; k="$(installed_key)"
+  r="$(claude plugin list --json 2>/dev/null | python3 -c 'import json,sys
+try:
+    print(next((p.get("readFromFolder") or "" for p in json.load(sys.stdin) if p.get("id") == sys.argv[1]), ""))
+except Exception:
+    print("")' "$k" 2>/dev/null)"
+  if [ -n "$r" ] && [ -d "$r/scripts" ]; then printf '%s' "$r"; else installed installPath; fi
 }
 newer() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$2" ]; }  # <a> <b>: b is newer
 
@@ -109,8 +121,8 @@ open_sessions() {  # KIT_UPDATE_SESSIONS fixes the count (tests)
 
 cmd_projects() {
   local dir="$1" root p f n=0 diffs
-  root="$(installed installPath)"
-  [ -d "$root/scripts" ] || die "cannot find the installed kit's scripts (installPath: ${root:-none})"
+  root="$(kit_root)"
+  [ -d "$root/scripts" ] || die "cannot find the installed kit's scripts (looked in: ${root:-nowhere})"
   [ -d "$dir" ] || { echo "Projects: no folder $dir"; return 0; }
   for p in "$dir"/*/; do
     p="${p%/}"; [ -f "$p/docs/orchestration/ORCHESTRATION.md" ] || continue
@@ -129,7 +141,7 @@ cmd_refresh() {
   local p="${1:-}" root f n=0 stamp
   [ -n "$p" ] || usage
   [ -f "$p/docs/orchestration/ORCHESTRATION.md" ] || die "$p does not have the kit set up"
-  root="$(installed installPath)"; stamp="$(date +%Y%m%d)"
+  root="$(kit_root)"; stamp="$(date +%Y%m%d)"
   for f in $SESSION_SCRIPTS; do
     [ -f "$p/scripts/$f" ] && [ -f "$root/scripts/$f" ] && ! cmp -s "$p/scripts/$f" "$root/scripts/$f" || continue
     cp -p "$p/scripts/$f" "$p/scripts/$f.bak-$stamp" && cp "$root/scripts/$f" "$p/scripts/$f" && echo "REFRESH $p/scripts/$f" && n=$((n+1))
