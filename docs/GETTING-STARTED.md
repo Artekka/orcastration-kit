@@ -306,8 +306,8 @@ prints the model and effort. Bounded one-off jobs (a search, a mechanical sweep)
 builds and every verification are sessions. Details: the orchestrate skill, "Model per lane".
 
 **Your own seat model.** The seat is the session you talk to, so its model is yours to choose:
-`bash scripts/seat-model.sh` shows a short menu (`fable`, `opus[1m]`, `sonnet[1m]`, `haiku` or a model id,
-then the effort) and saves the choice once for this machine. Every seat start and seat recycle then uses it, in
+`bash scripts/seat-model.sh` shows a short menu (fable, opus, sonnet or haiku, each with its context window
+beside it, or a model id, then the effort) and saves the choice once for this machine. Every seat start and seat recycle then uses it, in
 every project, ahead of a project's `seat_model:` / `model:`; a `--model` flag still wins, and the other
 sessions keep the models the seat picks for them.
 

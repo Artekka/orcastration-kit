@@ -7,7 +7,8 @@
 # uses it (start-team.sh, recycle-sibling.sh <Seat>), ahead of a project's `seat_model:` / `model:`. A
 # --model or --effort flag still wins. The other sessions are untouched: the seat picks their models by lane.
 #
-# Usage: scripts/seat-model.sh                      a short menu: the model, then the effort
+# Usage: scripts/seat-model.sh                      a short menu: the model (its context window in a column
+#                                                   of its own), then the effort
 #        scripts/seat-model.sh --show               the saved choice on one line
 #        scripts/seat-model.sh --label              the same, short ("fable · high"), for a menu line
 #        scripts/seat-model.sh --set MODEL [EFFORT] save without the menu
@@ -50,7 +51,7 @@ norm_effort() {  # <typed> -> the value to save ('' = the model's default); exit
 }
 
 case "${1:-}" in
-  -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   --show) show; exit 0 ;;
   --label) label; exit 0 ;;
   --set)
@@ -65,12 +66,13 @@ esac
 m="$(get model)"; e="$(get effort)"
 echo ""
 echo "  Seat model, for every project you start on this machine   (now: ${m:-$NO_MODEL})"
-echo "    [1] fable        the tier above opus"
-echo "    [2] opus[1m]     top tier"
-echo "    [3] sonnet[1m]   mid tier"
-echo "    [4] haiku        small tier"
-echo "    [o] other        type a model id"
-echo "    [p] project      no choice here: each project's own setting decides"
+echo "        model     context"
+echo "    [1] fable     1M        the tier above opus"
+echo "    [2] opus      1M        top tier"
+echo "    [3] sonnet    1M        mid tier"
+echo "    [4] haiku     200K      small tier"
+echo "    [o] other               type a model id"
+echo "    [p] project             no choice here: each project's own setting decides"
 echo "    [Enter] keep"
 a=""; read -r -p "  Model: " a || exit 0
 case "$(printf '%s' "$a" | tr -d '[:space:]')" in
