@@ -16,8 +16,8 @@
 #   --account N|DIR   launch the whole team on that Claude Code account (docs/MULTI-ACCOUNT.md)
 #   --model M         the model for EVERY window (opus[1m] | sonnet[1m] | haiku | fable | a full id). Always
 #                     passed explicitly; default = the team block's `model:`, else opus[1m]; without the
-#                     flag the seat's window takes the block's `seat_model:` when it has one. Give each
-#                     lane its own with `recycle-sibling.sh <Name> --model`.
+#                     flag the seat's window takes your own seat choice (scripts/seat-model.sh), else the
+#                     block's `seat_model:`. Give each lane its own with `recycle-sibling.sh <Name> --model`.
 #   --effort E        low|medium|high|xhigh|max; passed only when given. Bad values exit 64.
 #
 # Precedence: flags > the optional `team:` block in docs/orchestration/ORCHESTRATION.md > defaults.
@@ -74,13 +74,16 @@ if ! [[ "$n" =~ ^[0-9]$ ]]; then echo "--siblings must be 0..9: '$n'" >&2; exit 
 launch_set_mode "${f_mode:-${TEAM_MODE:-normal}}"
 launch_set_account "$f_account"
 launch_resolve_model "$f_model" "$f_model_set" "$f_effort" "$f_effort_set"
-# The seat's own default (`seat_model:`), unless --model named one model for every window.
-team_model="$LAUNCH_MODEL"; team_model_src="$LAUNCH_MODEL_SRC"; seat_model="$team_model"; seat_model_src="$team_model_src"
-if [ "$f_model_set" != 1 ] && [ -n "${TEAM_SEAT_MODEL:-}" ]; then seat_model="$TEAM_SEAT_MODEL"; seat_model_src="team block seat_model"; fi
+# The seat's own model and effort (your seat choice from seat-model.sh, else `seat_model:`), unless a flag named
+# one for every window. Resolved a second time for the seat, on top of the team's values.
+team_model="$LAUNCH_MODEL"; team_model_src="$LAUNCH_MODEL_SRC"; team_effort="$LAUNCH_EFFORT"; team_effort_src="$LAUNCH_EFFORT_SRC"
+launch_resolve_model "$f_model" "$f_model_set" "$f_effort" "$f_effort_set" 1
+seat_model="$LAUNCH_MODEL"; seat_model_src="$LAUNCH_MODEL_SRC"; seat_effort="$LAUNCH_EFFORT"; seat_effort_src="$LAUNCH_EFFORT_SRC"
 model_for() {  # <index in names> — the seat is names[0]
-  if [ "$1" = 0 ]; then LAUNCH_MODEL="$seat_model"; LAUNCH_MODEL_SRC="$seat_model_src"
-  else LAUNCH_MODEL="$team_model"; LAUNCH_MODEL_SRC="$team_model_src"; fi
+  if [ "$1" = 0 ]; then LAUNCH_MODEL="$seat_model"; LAUNCH_MODEL_SRC="$seat_model_src"; LAUNCH_EFFORT="$seat_effort"; LAUNCH_EFFORT_SRC="$seat_effort_src"
+  else LAUNCH_MODEL="$team_model"; LAUNCH_MODEL_SRC="$team_model_src"; LAUNCH_EFFORT="$team_effort"; LAUNCH_EFFORT_SRC="$team_effort_src"; fi
 }
+model_for 1
 
 names=("$seat"); prompts=("$SEAT_PROMPT")
 for i in $(seq 1 "$n"); do names+=("${prefix}${i}"); prompts+=("$SIB_PROMPT"); done
@@ -92,6 +95,7 @@ if [ "$DRY" -eq 1 ]; then
   echo "[dry-run] nothing will be launched or saved"
   launch_describe_env
   if [ "$seat_model" != "$team_model" ]; then echo "seat model $seat_model ($seat_model_src)"; fi
+  if [ "$seat_effort" != "$team_effort" ]; then echo "seat effort $seat_effort ($seat_effort_src)"; fi
   src="none (built-in defaults)"
   if [ -n "$TEAM_SEAT$TEAM_PREFIX$TEAM_N$TEAM_MODE$TEAM_TERMINAL" ]; then src="team: block in ${TEAM_CONF#"$REPO"/}"; fi
   echo "team       seat=${seat} siblings=${n} prefix=${prefix} mode=${LAUNCH_MODE} terminal=${f_term:-${TEAM_TERMINAL:-auto}}   config: ${src}; flags override"

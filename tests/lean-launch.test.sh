@@ -191,6 +191,41 @@ out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo
 has "bad seat_model refused rc 64" "rc=64" "$out"
 has "bad seat_model says why" "team block: seat_model 'not;a;model' is not valid" "$out"
 
+# 7c. Your own seat choice (scripts/seat-model.sh, ~/.orchestration-kit/seat-model) is one person's choice for
+#     every project on their machine: for the seat it beats the team block, model and effort both, at a team start
+#     and at a seat recycle. The other windows never see it, a flag still wins, and a bad value is refused.
+OWN="$TMP/.orchestration-kit/seat-model"; mkdir -p "$TMP/.orchestration-kit"   # lrun's HOME is $TMP
+printf 'model: haiku\neffort: max\n' > "$OWN"
+printf 'team:\n  seat: ZzSeat\n  model: sonnet[1m]\n  seat_model: fable\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+out="$(lrun bash "$ST" --dry-run --terminal manual --repo "$R" --prefix ZzSib --siblings 2 2>&1)"
+count "own choice: the seat carries its model and effort" 1 '--name ZzSeat --model haiku --effort max ' "$out"
+count "own choice: the two siblings keep the team model" 2 '--model sonnet\[1m\] ' "$out"
+count "own choice: only the seat gets the effort" 1 '--effort max' "$out"
+has "own choice: the dry-run names the model's source" "seat model haiku (your seat choice)" "$out"
+has "own choice: the dry-run names the effort's source" "seat effort max (your seat choice)" "$out"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzSeat 2>&1)"
+has "own choice: a seat recycle takes the model" "model      haiku (your seat choice)" "$out"
+has "own choice: a seat recycle takes the effort" "effort     max (your seat choice)" "$out"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1)"
+has "own choice: a sibling recycle keeps the team model" "model      sonnet[1m] (team block)" "$out"
+has "own choice: a sibling recycle gets no effort from it" "effort     default (not passed)" "$out"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" --model 'opus[1m]' --effort low ZzSeat 2>&1)"
+has "own choice: a --model flag beats it" "model      opus[1m] (--model)" "$out"
+has "own choice: an --effort flag beats it" "effort     low (--effort)" "$out"
+out="$(lrun bash "$ST" --dry-run --terminal manual --repo "$R" --prefix ZzSib --siblings 2 --model 'opus[1m]' 2>&1)"
+count "own choice: --model on a team start still names every window" 3 '--model opus\[1m\] ' "$out"
+printf 'effort: xhigh\n' > "$OWN"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzSeat 2>&1)"
+has "own effort alone: the model comes from the block's seat_model" "model      fable (team block seat_model)" "$out"
+has "own effort alone: the effort is yours" "effort     xhigh (your seat choice)" "$out"
+printf 'model: not;a;model\n' > "$OWN"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzSeat 2>&1; echo "rc=$?")"
+has "bad own model refused rc 64" "rc=64" "$out"
+has "bad own model says why" "your seat choice: model 'not;a;model' is not valid" "$out"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+has "a bad own choice does not stop a sibling's launch" "rc=0" "$out"
+rm -f "$OWN"
+
 # 8. A model value must look like a model, not a flag. A flag-shaped value would be
 #    spliced into `claude --name N --model <value> ...` and read by claude as ITS OWN flag
 #    (`--model --dangerously-skip-permissions`), so every entry point refuses it with exit 64:

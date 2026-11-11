@@ -4,6 +4,7 @@ Newest first.
 
 ## Unreleased
 
+- **New: a model selector for the seat.** `scripts/seat-model.sh` saves your own seat model and effort once per machine, for every project. (PRS 2026-11-10)
 - **New: `seat_model:` in the team block, the seat's own default model.** (PRS 2026-11-10)
 - **Fixed: a session's context window is Claude Code's own figure, never a reading of the model id.** (PRS 2026-11-10)
 - **Changed: the GitHub repository is now `Artekka/orcastration-kit`** (was `claude-orchestration-kit`). Install with `claude plugin marketplace add Artekka/orcastration-kit`; the plugin id (`orchestration-kit@artekka-kits`), its slash commands and `~/.orchestration-kit/` do not change. GitHub redirects the old URL, so existing installs keep working. README, GETTING-STARTED, CONTRIBUTING, SECURITY, the issue-template link and the Code of Conduct contact link use the new name; the plugin manifest gains `homepage` and `repository`.

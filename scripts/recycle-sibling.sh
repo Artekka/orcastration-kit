@@ -32,7 +32,8 @@
 #     --account N|DIR moves it (1 = default ~/.claude, N = ~/.claude-acctN). docs/MULTI-ACCOUNT.md
 #     model: ALWAYS passed to the fresh session, never inherited from the old one (the account is,
 #     the model is not). --model M = opus[1m] | sonnet[1m] | haiku | fable | a full model id; default =
-#     the team block's `model:` (for the seat: its `seat_model:` first), else opus[1m]. --effort low|medium|high|xhigh|max is passed only when
+#     the team block's `model:` (for the seat: your own seat choice from scripts/seat-model.sh, then the
+#     block's `seat_model:`, first), else opus[1m]. --effort low|medium|high|xhigh|max is passed only when
 #     given. Bad values exit 64. The lane -> model table is in skills/orchestrate ("Model per lane").
 #     --new-tab: skip the in-place path and open a new window, as before v0.7.0.
 #     Live work: the old session's live shells (background gate runs, loops) die or run on orphaned when

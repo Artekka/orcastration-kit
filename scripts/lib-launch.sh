@@ -61,9 +61,10 @@ launch_mode_flags() {
 # is ALWAYS passed explicitly: a fresh session must never silently inherit whatever the old terminal,
 # the account default or the last `/model` happened to be. A recycle does NOT read the old session's
 # model either (unlike its account, which is inherited on purpose: that is where the login lives).
-# Default, first found: --model flag > (the seat only) `seat_model:` in the team block > `model:` in the team
-# block of ORCHESTRATION.md > LAUNCH_DEFAULT_MODEL (below). `seat_model:` lets the seat sit a tier above or below
-# its lanes without a flag on every seat launch and recycle; the lanes still get the model the seat picks. --effort is passed only when given (flag > team block `effort:`), else the CLI's own default.
+# Default, first found: --model flag > (the seat only) your own seat choice (scripts/seat-model.sh) > (the seat
+# only) `seat_model:` in the team block > `model:` in the team block of ORCHESTRATION.md > LAUNCH_DEFAULT_MODEL
+# (below). The seat's two sources let it sit a tier above or below its lanes without a flag on every seat launch
+# and recycle; the lanes still get the model the seat picks. --effort is passed only when given (flag > team block `effort:`), else the CLI's own default.
 # Validated before anything launches: a malformed model or unknown effort is refused, exit 64, whether it
 # came from a flag, an EMPTY flag value, or the team block (a bad block value is refused too: warning and
 # quietly launching on the default is the silent-wrong-model failure this block exists to prevent).
@@ -689,15 +690,40 @@ launch_cap_warn() {  # <adding>
   return 0
 }
 
+# Your own choice for the seat, for every project on this machine: ${KIT_STATE_DIR:-~/.orchestration-kit}/seat-model,
+# `model: M` and `effort: E` lines, written by scripts/seat-model.sh. It is one person's choice at their own
+# machine, so for the seat it beats the team block (which travels with the project to everyone who clones it).
+# Sets OWN_SEAT_MODEL / OWN_SEAT_EFFORT ('' = not chosen). A value that is no model or effort EXITS 64, like a
+# bad team block: quietly launching the seat on something else is the failure this exists to prevent.
+launch_own_seat() {
+  local f="${KIT_STATE_DIR:-$HOME/.orchestration-kit}/seat-model"
+  OWN_SEAT_MODEL=""; OWN_SEAT_EFFORT=""
+  [ -f "$f" ] || return 0
+  OWN_SEAT_MODEL="$(sed -n 's/^[[:space:]]*model:[[:space:]]*//p' "$f" | tail -1 | sed 's/[[:space:]]*$//')"
+  OWN_SEAT_EFFORT="$(sed -n 's/^[[:space:]]*effort:[[:space:]]*//p' "$f" | tail -1 | sed 's/[[:space:]]*$//')"
+  if [ -n "$OWN_SEAT_MODEL" ] && ! launch_valid_model "$OWN_SEAT_MODEL"; then
+    echo "your seat choice: model '$OWN_SEAT_MODEL' is not valid (fix it with scripts/seat-model.sh, or delete $f) — refusing to launch" >&2; exit 64
+  fi
+  if [ -n "$OWN_SEAT_EFFORT" ] && ! launch_valid_effort "$OWN_SEAT_EFFORT"; then
+    echo "your seat choice: effort '$OWN_SEAT_EFFORT' is not valid (fix it with scripts/seat-model.sh, or delete $f) — refusing to launch" >&2; exit 64
+  fi
+}
+
 # launch_resolve_model <flag-model> <model-given 0|1> <flag-effort> <effort-given 0|1> [for-the-seat 0|1]
-# flags > team block (`seat_model:` first when the session launched is the seat) > defaults; exit 64 on a bad flag. "Given" is tracked apart from "empty": an empty
+# flags > (the seat only) your own seat choice > team block (`seat_model:` first for the seat) > defaults; exit 64
+# on a bad flag. "Given" is tracked apart from "empty": an empty
 # `--model=` is a GIVEN, invalid value (refused), never "not given" (which would fall through to the block).
 # Call after launch_team_conf. Never reads a running session: nothing is inherited.
 launch_resolve_model() {
+  local seat="${5:-0}"
+  OWN_SEAT_MODEL=""; OWN_SEAT_EFFORT=""
+  if [ "$seat" = 1 ]; then launch_own_seat; fi
   if [ "${2:-0}" = 1 ]; then launch_set_model "$1" "--model"
-  elif [ "${5:-0}" = 1 ] && [ -n "${TEAM_SEAT_MODEL:-}" ]; then launch_set_model "$TEAM_SEAT_MODEL" "team block seat_model"
+  elif [ -n "$OWN_SEAT_MODEL" ]; then launch_set_model "$OWN_SEAT_MODEL" "your seat choice"
+  elif [ "$seat" = 1 ] && [ -n "${TEAM_SEAT_MODEL:-}" ]; then launch_set_model "$TEAM_SEAT_MODEL" "team block seat_model"
   elif [ -n "${TEAM_MODEL:-}" ]; then launch_set_model "$TEAM_MODEL" "team block"; fi
   if [ "${4:-0}" = 1 ]; then launch_set_effort "$3" "--effort"
+  elif [ -n "$OWN_SEAT_EFFORT" ]; then launch_set_effort "$OWN_SEAT_EFFORT" "your seat choice"
   elif [ -n "${TEAM_EFFORT:-}" ]; then launch_set_effort "$TEAM_EFFORT" "team block"; fi
 }
 
