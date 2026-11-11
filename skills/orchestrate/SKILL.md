@@ -61,9 +61,10 @@ The seat chooses a session's model at launch; a recycled session **never inherit
 | Routine work: UI, wire/schema plumbing, ordinary features, test-only fixes | mid tier, 1M — `sonnet[1m]` |
 | Board and log entries, write-ups, anything that states SHAs, counts or verdicts | mid tier, 1M — `sonnet[1m]` (facts need a model that does not fabricate) |
 | Copy changes, mechanical sweeps, searches that only locate code | small tier, 200K window — `haiku` (never writes facts, see below) |
+| A row the top tier has already failed twice (two fix rounds that did not pass); a fault whose cause is still unknown after one top-tier attempt | the tier above, 1M — `fable` (a fresh session, not the same builder again) |
 
 - Launch: `bash scripts/recycle-sibling.sh <Name> [prompt] --model <m> [--effort <e>]`; `start-team.sh --model <m>` gives the whole team one model. The default when you pass nothing is the team block's `model:` in `ORCHESTRATION.md`, else `opus[1m]`; the seat's own start and recycle take the block's `seat_model:` first.
-- A tier above the top tier, where the account has one (`fable`, 1M), is yours to give a lane that needs more than the top tier. Name it by its alias, never a version id: the alias moves to each new release by itself.
+- Name `fable` by its alias, never a version id: the alias moves to each new release by itself. An account without that tier keeps such a row on the top tier.
 - **The small model never writes facts** — log entries, board entries, verdicts, measured numbers, SHAs. Small models invent them. Give it text to move, not claims to make.
 - Put the model on the row's brief so the builder, the verifier and the next seat can see what the lane was given.
 
