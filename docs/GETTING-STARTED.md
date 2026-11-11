@@ -375,8 +375,10 @@ and it will make the change for you. For example:
   scripts find a running session by matching `claude --name <Name>`. Keep names one word.
 - **A dedicated validator:** add a sibling that only verifies and never builds, and name it
   in ORCHESTRATION.md → Validator seat. It is independent of every row by construction.
-- **Upgrading the plugin:** `claude plugin marketplace update artekka-kits`, then
+- **Upgrading the plugin:** ask Claude "update the kit" (`/orchestration-kit:kit-update`), or by hand
+  `claude plugin marketplace update artekka-kits`, then
   `claude plugin update orchestration-kit@artekka-kits`, restart sessions, and re-run
-  `/orchestration-kit:kit-init` (it only adds what's missing).
+  `/orchestration-kit:kit-init` (it only adds what's missing). kit-init never overwrites a project's copied
+  session scripts; `scripts/kit-update.sh projects` lists the older ones and `refresh <project>` replaces them.
 - Further reading: `skills/orchestrate/SKILL.md` (the seat's loop) and `docs/LESSONS.md`
   (why each rule exists).
