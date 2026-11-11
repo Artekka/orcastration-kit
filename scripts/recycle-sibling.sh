@@ -31,8 +31,8 @@
 #     account: the fresh session INHERITS the old one's Claude Code account (its CLAUDE_CONFIG_DIR);
 #     --account N|DIR moves it (1 = default ~/.claude, N = ~/.claude-acctN). docs/MULTI-ACCOUNT.md
 #     model: ALWAYS passed to the fresh session, never inherited from the old one (the account is,
-#     the model is not). --model M = opus[1m] | sonnet[1m] | haiku | a full model id; default = the
-#     team block's `model:`, else opus[1m]. --effort low|medium|high|xhigh|max is passed only when
+#     the model is not). --model M = opus[1m] | sonnet[1m] | haiku | fable | a full model id; default =
+#     the team block's `model:` (for the seat: its `seat_model:` first), else opus[1m]. --effort low|medium|high|xhigh|max is passed only when
 #     given. Bad values exit 64. The lane -> model table is in skills/orchestrate ("Model per lane").
 #     --new-tab: skip the in-place path and open a new window, as before v0.7.0.
 #     Live work: the old session's live shells (background gate runs, loops) die or run on orphaned when
@@ -90,7 +90,8 @@ if [ "$name" = "${TEAM_SEAT:-Orca}" ]; then default_prompt="/orchestration-kit:o
 prompt="${args[1]:-$default_prompt}"
 launch_check_args "$name" "$prompt"
 launch_set_mode "${MODE:-${TEAM_MODE:-normal}}"
-launch_resolve_model "$MODEL" "$MODEL_SET" "$EFFORT" "$EFFORT_SET"
+is_seat=0; if [ "$name" = "${TEAM_SEAT:-Orca}" ]; then is_seat=1; fi
+launch_resolve_model "$MODEL" "$MODEL_SET" "$EFFORT" "$EFFORT_SET" "$is_seat"
 launch_init "$REPO" "${TERM_OPT:-${TEAM_TERMINAL:-}}"
 # A recycle replaces a session; only one with no old process adds one to the host.
 [ -n "$(launch_pids "${args[0]}")" ] || launch_cap_warn 1

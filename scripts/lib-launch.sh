@@ -61,22 +61,23 @@ launch_mode_flags() {
 # is ALWAYS passed explicitly: a fresh session must never silently inherit whatever the old terminal,
 # the account default or the last `/model` happened to be. A recycle does NOT read the old session's
 # model either (unlike its account, which is inherited on purpose: that is where the login lives).
-# Default, first found: --model flag > `model:` in the team block of ORCHESTRATION.md > LAUNCH_DEFAULT_MODEL
-# (below). --effort is passed only when given (flag > team block `effort:`), else the CLI's own default.
+# Default, first found: --model flag > (the seat only) `seat_model:` in the team block > `model:` in the team
+# block of ORCHESTRATION.md > LAUNCH_DEFAULT_MODEL (below). `seat_model:` lets the seat sit a tier above or below
+# its lanes without a flag on every seat launch and recycle; the lanes still get the model the seat picks. --effort is passed only when given (flag > team block `effort:`), else the CLI's own default.
 # Validated before anything launches: a malformed model or unknown effort is refused, exit 64, whether it
 # came from a flag, an EMPTY flag value, or the team block (a bad block value is refused too: warning and
 # quietly launching on the default is the silent-wrong-model failure this block exists to prevent).
 LAUNCH_DEFAULT_MODEL="opus[1m]"   # the seat and the top-tier lanes; an alias, so it tracks the newest opus
 # Must START with a letter: a leading `-` is a flag (`--model --dangerously-skip-permissions` would hand
 # claude a second flag) and a leading `.` is no model id. Lowercase letters, digits, `.` and `-` only.
-LAUNCH_MODEL_RE='^[a-z][a-z0-9.-]*(\[1m\])?$'   # opus[1m] | sonnet[1m] | haiku | a full model id
+LAUNCH_MODEL_RE='^[a-z][a-z0-9.-]*(\[1m\])?$'   # opus[1m] | sonnet[1m] | haiku | fable | a full model id
 LAUNCH_MODEL="$LAUNCH_DEFAULT_MODEL"; LAUNCH_MODEL_SRC="default"
 LAUNCH_EFFORT=""; LAUNCH_EFFORT_SRC=""
 launch_valid_model()  { [[ "$1" =~ $LAUNCH_MODEL_RE ]]; }
 launch_valid_effort() { case "$1" in low|medium|high|xhigh|max) return 0 ;; *) return 1 ;; esac; }
 launch_set_model() {  # <model> <source label>
   launch_valid_model "$1" || {
-    echo "--model must look like opus[1m], sonnet[1m], haiku or a full model id (lowercase letters, digits . -): '$1'" >&2; exit 64; }
+    echo "--model must look like opus[1m], sonnet[1m], haiku, fable or a full model id (lowercase letters, digits . -): '$1'" >&2; exit 64; }
   LAUNCH_MODEL="$1"; LAUNCH_MODEL_SRC="${2:---model}"
 }
 launch_set_effort() {  # <effort> <source label>
@@ -642,13 +643,13 @@ launch_recycle_inplace() {
 launch_team_conf() {  # <repo>
   local conf="$1/docs/orchestration/ORCHESTRATION.md" k v
   # shellcheck disable=SC2034  # TEAM_CONF is read by start-team.sh
-  TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""; TEAM_TERMINAL=""; TEAM_MODEL=""; TEAM_EFFORT=""; TEAM_MAX=""
+  TEAM_CONF="$conf"; TEAM_SEAT=""; TEAM_PREFIX=""; TEAM_N=""; TEAM_MODE=""; TEAM_TERMINAL=""; TEAM_MODEL=""; TEAM_EFFORT=""; TEAM_MAX=""; TEAM_SEAT_MODEL=""
   [ -f "$conf" ] || return 0
   while IFS='=' read -r k v; do
     case "$k" in
       seat) TEAM_SEAT="$v" ;; prefix) TEAM_PREFIX="$v" ;; siblings) TEAM_N="$v" ;;
       permission_mode) TEAM_MODE="$v" ;; terminal) TEAM_TERMINAL="$v" ;;
-      model) TEAM_MODEL="$v" ;; effort) TEAM_EFFORT="$v" ;; max_sessions) TEAM_MAX="$v" ;;
+      model) TEAM_MODEL="$v" ;; seat_model) TEAM_SEAT_MODEL="$v" ;; effort) TEAM_EFFORT="$v" ;; max_sessions) TEAM_MAX="$v" ;;
     esac
   done < <(awk '
     /^team:[[:space:]]*$/ { on=1; next }
@@ -660,7 +661,10 @@ launch_team_conf() {  # <repo>
   [[ "$TEAM_MAX" =~ ^[1-9][0-9]*$ ]] || TEAM_MAX=""
   launch_valid_mode "$TEAM_MODE" || TEAM_MODE=""
   if [ -n "$TEAM_MODEL" ] && ! launch_valid_model "$TEAM_MODEL"; then
-    echo "team block: model '$TEAM_MODEL' is not valid (opus[1m], sonnet[1m], haiku or a full model id; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
+    echo "team block: model '$TEAM_MODEL' is not valid (opus[1m], sonnet[1m], haiku, fable or a full model id; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
+  fi
+  if [ -n "$TEAM_SEAT_MODEL" ] && ! launch_valid_model "$TEAM_SEAT_MODEL"; then
+    echo "team block: seat_model '$TEAM_SEAT_MODEL' is not valid (opus[1m], sonnet[1m], haiku, fable or a full model id; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
   fi
   if [ -n "$TEAM_EFFORT" ] && ! launch_valid_effort "$TEAM_EFFORT"; then
     echo "team block: effort '$TEAM_EFFORT' is not valid (low|medium|high|xhigh|max; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
@@ -685,12 +689,13 @@ launch_cap_warn() {  # <adding>
   return 0
 }
 
-# launch_resolve_model <flag-model> <model-given 0|1> <flag-effort> <effort-given 0|1>
-# flags > team block > defaults; exit 64 on a bad flag. "Given" is tracked apart from "empty": an empty
+# launch_resolve_model <flag-model> <model-given 0|1> <flag-effort> <effort-given 0|1> [for-the-seat 0|1]
+# flags > team block (`seat_model:` first when the session launched is the seat) > defaults; exit 64 on a bad flag. "Given" is tracked apart from "empty": an empty
 # `--model=` is a GIVEN, invalid value (refused), never "not given" (which would fall through to the block).
 # Call after launch_team_conf. Never reads a running session: nothing is inherited.
 launch_resolve_model() {
   if [ "${2:-0}" = 1 ]; then launch_set_model "$1" "--model"
+  elif [ "${5:-0}" = 1 ] && [ -n "${TEAM_SEAT_MODEL:-}" ]; then launch_set_model "$TEAM_SEAT_MODEL" "team block seat_model"
   elif [ -n "${TEAM_MODEL:-}" ]; then launch_set_model "$TEAM_MODEL" "team block"; fi
   if [ "${4:-0}" = 1 ]; then launch_set_effort "$3" "--effort"
   elif [ -n "${TEAM_EFFORT:-}" ]; then launch_set_effort "$TEAM_EFFORT" "team block"; fi

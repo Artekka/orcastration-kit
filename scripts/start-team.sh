@@ -14,9 +14,10 @@
 #                         [--terminal BACKEND|auto|list] [--repo DIR]
 #   --terminal list   print every backend and whether it is available here, then exit
 #   --account N|DIR   launch the whole team on that Claude Code account (docs/MULTI-ACCOUNT.md)
-#   --model M         the model for EVERY window (opus[1m] | sonnet[1m] | haiku | a full id). Always
-#                     passed explicitly; default = the team block's `model:`, else opus[1m]. One value
-#                     for the whole team: give each lane its own with `recycle-sibling.sh <Name> --model`.
+#   --model M         the model for EVERY window (opus[1m] | sonnet[1m] | haiku | fable | a full id). Always
+#                     passed explicitly; default = the team block's `model:`, else opus[1m]; without the
+#                     flag the seat's window takes the block's `seat_model:` when it has one. Give each
+#                     lane its own with `recycle-sibling.sh <Name> --model`.
 #   --effort E        low|medium|high|xhigh|max; passed only when given. Bad values exit 64.
 #
 # Precedence: flags > the optional `team:` block in docs/orchestration/ORCHESTRATION.md > defaults.
@@ -28,6 +29,7 @@
 #     permission_mode:  normal
 #     terminal:         auto
 #     model:            opus[1m]      (optional: the default for every launch)
+#     seat_model:       opus[1m]      (optional: the seat's own default, at start and at every seat recycle)
 #     effort:           high          (optional)
 set -euo pipefail
 # shellcheck source-path=SCRIPTDIR source=lib-launch.sh
@@ -72,6 +74,13 @@ if ! [[ "$n" =~ ^[0-9]$ ]]; then echo "--siblings must be 0..9: '$n'" >&2; exit 
 launch_set_mode "${f_mode:-${TEAM_MODE:-normal}}"
 launch_set_account "$f_account"
 launch_resolve_model "$f_model" "$f_model_set" "$f_effort" "$f_effort_set"
+# The seat's own default (`seat_model:`), unless --model named one model for every window.
+team_model="$LAUNCH_MODEL"; team_model_src="$LAUNCH_MODEL_SRC"; seat_model="$team_model"; seat_model_src="$team_model_src"
+if [ "$f_model_set" != 1 ] && [ -n "${TEAM_SEAT_MODEL:-}" ]; then seat_model="$TEAM_SEAT_MODEL"; seat_model_src="team block seat_model"; fi
+model_for() {  # <index in names> — the seat is names[0]
+  if [ "$1" = 0 ]; then LAUNCH_MODEL="$seat_model"; LAUNCH_MODEL_SRC="$seat_model_src"
+  else LAUNCH_MODEL="$team_model"; LAUNCH_MODEL_SRC="$team_model_src"; fi
+}
 
 names=("$seat"); prompts=("$SEAT_PROMPT")
 for i in $(seq 1 "$n"); do names+=("${prefix}${i}"); prompts+=("$SIB_PROMPT"); done
@@ -82,6 +91,7 @@ launch_init "$REPO" "${f_term:-${TEAM_TERMINAL:-}}"
 if [ "$DRY" -eq 1 ]; then
   echo "[dry-run] nothing will be launched or saved"
   launch_describe_env
+  if [ "$seat_model" != "$team_model" ]; then echo "seat model $seat_model ($seat_model_src)"; fi
   src="none (built-in defaults)"
   if [ -n "$TEAM_SEAT$TEAM_PREFIX$TEAM_N$TEAM_MODE$TEAM_TERMINAL" ]; then src="team: block in ${TEAM_CONF#"$REPO"/}"; fi
   echo "team       seat=${seat} siblings=${n} prefix=${prefix} mode=${LAUNCH_MODE} terminal=${f_term:-${TEAM_TERMINAL:-auto}}   config: ${src}; flags override"
@@ -94,7 +104,7 @@ else
   if [ "$LAUNCH_BACKEND" = manual ]; then
     echo "No terminal this script can open windows in ($LAUNCH_REASON)." >&2
     echo "Open one terminal per session and run:" >&2
-    for i in "${!names[@]}"; do echo "  $(launch_manual_cmd "${names[$i]}" "${prompts[$i]}")" >&2; done
+    for i in "${!names[@]}"; do model_for "$i"; echo "  $(launch_manual_cmd "${names[$i]}" "${prompts[$i]}")" >&2; done
     exit 2
   fi
   echo "terminal   $LAUNCH_BACKEND ($LAUNCH_REASON)"
@@ -106,7 +116,7 @@ launch_cap_warn "$adding"
 
 failed=0
 for i in "${!names[@]}"; do
-  name="${names[$i]}"; prompt="${prompts[$i]}"
+  name="${names[$i]}"; prompt="${prompts[$i]}"; model_for "$i"
   running="$(launch_pids "$name")"
   if [ -n "$running" ]; then
     echo "SKIP   $name — already running (pid $(echo "$running" | tr '\n' ' ' | sed 's/ $//'))"

@@ -165,6 +165,32 @@ printf 'team:\n  model: not;a;model\n' > "$R/docs/orchestration/ORCHESTRATION.md
 out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" --model haiku ZzNone 2>&1; echo "rc=$?")"
 has "a valid --model does not route around a broken team block" "rc=64" "$out"
 
+# 7b. `seat_model:` is the seat's own default: the seat's window at a team start and every seat recycle take it,
+#     the other windows keep `model:` (or the built-in default); --model still names one model for every window.
+printf 'team:\n  seat: ZzSeat\n  model: sonnet[1m]\n  seat_model: fable\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+out="$(lrun bash "$ST" --dry-run --terminal manual --repo "$R" --prefix ZzSib --siblings 2 2>&1)"
+count "seat_model: one window (the seat) carries it" 1 '--name ZzSeat --model fable ' "$out"
+count "seat_model: the two siblings keep the team model" 2 '--model sonnet\[1m\] ' "$out"
+has "seat_model: the dry-run names it" "seat model fable (team block seat_model)" "$out"
+out="$(lrun bash "$ST" --dry-run --terminal manual --repo "$R" --prefix ZzSib --siblings 2 --model haiku 2>&1)"
+count "seat_model: --model names one model for every window" 3 '--model haiku ' "$out"
+hasnt "seat_model: --model leaves no window on it" "fable" "$out"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzSeat 2>&1)"
+has "seat_model: a seat recycle takes it" "model      fable (team block seat_model)" "$out"
+has "seat_model: the seat recycle's command" '--name ZzSeat --model fable /orchestration-kit:orchestrate' "$out"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1)"
+has "seat_model: a sibling recycle keeps the team model" "model      sonnet[1m] (team block)" "$out"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" --model 'opus[1m]' ZzSeat 2>&1)"
+has "seat_model: a flag beats it" "model      opus[1m] (--model)" "$out"
+printf 'team:\n  seat: ZzSeat\n  seat_model: fable\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+out="$(lrun bash "$ST" --dry-run --terminal manual --repo "$R" --prefix ZzSib --siblings 1 2>&1)"
+count "seat_model alone: the seat carries it" 1 '--name ZzSeat --model fable ' "$out"
+count "seat_model alone: the sibling gets the built-in default" 1 '--model opus\[1m\] ' "$out"
+printf 'team:\n  seat: ZzSeat\n  seat_model: not;a;model\n' > "$R/docs/orchestration/ORCHESTRATION.md"
+out="$(lrun bash "$RS" --dry-run --terminal manual --repo "$R" ZzNone 2>&1; echo "rc=$?")"
+has "bad seat_model refused rc 64" "rc=64" "$out"
+has "bad seat_model says why" "team block: seat_model 'not;a;model' is not valid" "$out"
+
 # 8. A model value must look like a model, not a flag. A flag-shaped value would be
 #    spliced into `claude --name N --model <value> ...` and read by claude as ITS OWN flag
 #    (`--model --dangerously-skip-permissions`), so every entry point refuses it with exit 64:
