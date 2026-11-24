@@ -64,10 +64,10 @@ else
 fi
 
 # ── 2b. Session scripts (context measurement + sibling recycling) ────────────
-for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh seat-merge.sh lib-waiting-tickets.sh lib-builder-worktree.sh pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh; do
+for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh seat-merge.sh lib-waiting-tickets.sh lib-builder-worktree.sh pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh bottleneck-watch.sh lib-prompt-dialog.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py; do
   install_if_missing "scripts/$f" "scripts/$f"
 done
-[ "$DRY" -eq 1 ] || chmod +x "$TARGET"/scripts/{start-team.sh,recycle-sibling.sh,ctx-fill.py,statusline-ctx.sh,gate-throttle.sh,quiet-mode.sh,seat-merge.sh,pending-work.sh,tmux-session.sh,sibling-shell.sh,retro-worktrees.sh,docker-cache-cap.sh,gate-disk-guard.sh}
+[ "$DRY" -eq 1 ] || chmod +x "$TARGET"/scripts/{start-team.sh,recycle-sibling.sh,ctx-fill.py,statusline-ctx.sh,gate-throttle.sh,quiet-mode.sh,seat-merge.sh,pending-work.sh,tmux-session.sh,sibling-shell.sh,retro-worktrees.sh,docker-cache-cap.sh,gate-disk-guard.sh,bottleneck-watch.sh,main-checkout-sync.sh,sync-main-checkout.sh,launched_window.py}
 
 # ── 2c. Institutional-memory docs (status doc + append-only log) ─────────────
 install_if_missing templates/AI_CONTEXT.md docs/AI_CONTEXT.md

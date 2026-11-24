@@ -23,7 +23,8 @@ Override: `ALLOW_CONFLICT_MARKERS=1 git commit ...` (a prefix assignment) or ALL
 Read-only: every git call runs with `--no-optional-locks`, so `git status` never refreshes `.git/index`. Time-bounded: one deadline
 (CONFLICT_MARKER_GUARD_DEADLINE_S, default 8 s, under the registered 10 s hook timeout) covers the whole run; past it the hook fails
 open with one stderr line.
-Known gaps (deliberate-evasion shapes): `git commit <path>` (commits the path from disk), `git add` of an UNTRACKED file through a
+Also judged: `git commit <path>...` (with or without -i/--include, -o/--only): those paths are read from disk, as `git add` would.
+Known gaps (deliberate-evasion shapes): `git add` of an UNTRACKED file through a
 directory or glob, aliases and wrapper functions, a path list built by substitution, an `add`/`commit` in a script the command
 only runs, and `git commit --dry-run` (judged like a commit).
 """
@@ -42,7 +43,7 @@ DEADLINE_S = 8.0  # the registered hook timeout is 10 s; a hanging git must not 
 # Paths (relative to the repo root) that hold marker lines at column 0 on purpose: this guard and its test.
 ALLOWLIST = {
     "hooks/conflict-marker-guard.py",
-    "tests/hooks-conflict-marker.test.sh",
+    "tests/hook-conflict-marker-guard.test.sh",
 }
 FIX = (
     "Fix: resolve the markers in each file (keep the right side, delete the marker lines), `git add` it again, then retry "
@@ -183,6 +184,37 @@ def commit_all(args):
     return False
 
 
+COMMIT_LONG_VALUE = {
+    "--message", "--file", "--author", "--date", "--template", "--cleanup", "--reuse-message", "--reedit-message", "--fixup",
+    "--squash", "--trailer", "--pathspec-from-file", "--gpg-sign-key",
+}
+
+
+def commit_paths(args):
+    """The pathspecs of `git commit [options] [--] <path>...` (also with -i/--include or -o/--only): what the commit takes from disk."""
+    paths, rest, i = [], False, 0
+    while i < len(args):
+        a = args[i]
+        if rest:
+            paths.append(a)
+        elif a == "--":
+            rest = True
+        elif a in COMMIT_LONG_VALUE:
+            i += 1  # its value is the next word
+        elif a.startswith("--") or a == "-":
+            pass  # a flag, or `--opt=value`
+        elif a.startswith("-"):
+            for j, ch in enumerate(a[1:], 1):
+                if ch in "mFCct":  # takes a value: the rest of the cluster, else the next word
+                    if j == len(a) - 1:
+                        i += 1
+                    break
+        else:
+            paths.append(a)
+        i += 1
+    return paths
+
+
 def judge(sweep, command, here, depth=0):
     """(form, repo directory, [(path, line)]) for the first continuing command in `command` that would commit a marker, else None."""
     text, subs, _ = sweep.scan(sweep.strip_heredocs(command))
@@ -250,6 +282,17 @@ def judge(sweep, command, here, depth=0):
         if everything:
             for rel in dirty_files(top, where, []):
                 found |= file_hits(top, rel)
+        if name == "commit" and not everything:
+            # `git commit <path>` (also -i / --include, -o / --only) commits those paths FROM DISK, whatever the index holds.
+            cpaths = commit_paths(args)
+            if not any(sweep.SUB in c or "$" in c or "`" in c for c in cpaths):
+                for c in cpaths:
+                    full = c if os.path.isabs(c) else os.path.join(where, c)
+                    if os.path.isfile(full):
+                        found |= file_hits(top, os.path.relpath(os.path.realpath(full), top))
+                    else:
+                        for rel in dirty_files(top, where, [c]):
+                            found |= file_hits(top, rel)
         found = {h for h in found if h[0] not in ALLOWLIST}
         # a lone `=======` (no start or end marker in the same file) is documentation, not a conflict
         real = {h[0] for h in found if h[2] in "<>"}

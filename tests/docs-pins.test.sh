@@ -53,5 +53,10 @@ bv="$(grep -m1 -E 'placeholder: "[0-9]' "$ROOT/.github/ISSUE_TEMPLATE/bug_report
 [ "$bv" = "$pv" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL bug-report placeholder is '$bv', plugin.json is '$pv'"; }
 rv="$(awk '/^## What.s new/{on=1;next} on && /^v[0-9]+\.[0-9]+\.[0-9]+/{sub(/^v/,"");sub(/:.*/,"");print;exit}' "$ROOT/README.md")"
 [ "$rv" = "$pv" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL README What's new starts at '$rv', plugin.json is '$pv'"; }
+# the orchestrate skill lists the seat's poll, and every script it names ships
+for sc in pending-work.sh bottleneck-watch.sh main-checkout-sync.sh; do
+  pin "orchestrate poll names $sc" $O "bash scripts/$sc"
+  [ -f "$ROOT/scripts/$sc" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL the poll names scripts/$sc but it does not ship"; }
+done
 echo "docs-pins: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

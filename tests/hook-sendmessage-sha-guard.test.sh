@@ -19,6 +19,8 @@ for m in "tip $SHA" "tip $SHORT" "tree ${TREE:0:10}" "blob ${BLOB:0:10}" "ref [$
          "path src/$FAKE/x" "file.$FAKE" "color #FF00FF" "uuid 3fa85f64-5717-4562-b3fc-2c963f66afa6" "no hex here" "deadbeef" "1234567" "word facade1"; do
   out="$(msg "$m")"; if [ "$m" = "word facade1" ]; then has "passes or refuses cleanly: $m" "rc=" "$out"; else eq "passes: $m" "rc=0 " "$out"; fi
 done
+# only an 8-hex id after `session` / `job` is skipped; a longer one is checked like any sha (the CHANGELOG says so)
+for m in "job $FAKE" "session id: $FAKE" "job id: deadbee123"; do has "refuses a longer id: $m" "rc=2" "$(msg "$m")"; done
 eq "a non-SendMessage tool passes" "rc=0 " "$(feed "$H" "$(mkjson Bash command "echo $FAKE" "$TMP/repo")")"
 for stdin in 'not json' '' '{}' '{"tool_name":"SendMessage","tool_input":{}}'; do eq "fail open on [$stdin]" "rc=0 " "$(feed "$H" "$stdin")"; done
 eq "a cwd that is not a repo fails open" "rc=0 " "$(feed "$H" "$(mkjson SendMessage message "tip $FAKE" "$TMP")")"

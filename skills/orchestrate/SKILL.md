@@ -81,6 +81,10 @@ The seat chooses a session's model at launch; a recycled session **never inherit
 
 - Siblings report at phase boundaries: claimed → RED → GREEN + self-gate (literal pass line) → blocked/done.
 - Silent >30 min mid-build → `git log origin/main` + board + message. Truly stalled → banner the stall, reassign (never two silent owners on one row).
+- **The seat's poll, about every 10 min** (read-only except the sync; each line is one command, and a missing script means the project did not install it: skip that line):
+  - `bash scripts/pending-work.sh`: built work that never reached main. Exit 3 lists rows; route each one (merge, verify, fix round, or drop with a board note).
+  - `bash scripts/bottleneck-watch.sh`: anything past its time budget (merge 55 min, gate 70, no merge on main 90, a pane stuck on a permission prompt, low free disk; budgets are env vars). Exit 3 = act this poll on every `OUTLIER:` line. It names what to CHECK and never kills; the seat decides.
+  - `bash scripts/main-checkout-sync.sh`: fast-forwards the shared main checkout to origin/main so a fresh session loads current skills and scripts. It never stashes or forces, prints one line, and always exits 0.
 - A correction that changes a builder's next hour goes in a **top-of-board banner**, not only a message.
 - **A knob beats etiquette** (LESSON 54). Before telling siblings "don't run X", check whether the toolchain runs X for them; if so the rule is unachievable — ship an env knob and announce it. "I didn't run X" ≠ "X didn't run".
 - **Keep a builder's hedges when you summarize** (LESSON 52). "A small piece of evidence" stays exactly that on the board.

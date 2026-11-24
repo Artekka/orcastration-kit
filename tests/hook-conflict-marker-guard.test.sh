@@ -26,6 +26,33 @@ for c in 'git add -u && git commit -m x' 'git add -A && git cherry-pick --contin
 done
 eq "an unstaged marker alone passes" "rc=0 " "$(run 'git commit -m x')"
 eq "a path without a marker passes" "rc=0 " "$(run 'git add d/none.txt && git commit -m x')"
+# `git commit <path>` (also -i / --include, -o / --only) commits those paths FROM DISK: an UNSTAGED marker in them is refused
+new; mark u.txt
+for c in 'git commit u.txt -m x' 'git commit -m x u.txt' 'git commit -i u.txt -m x' 'git commit --include u.txt -m x' 'git commit -o u.txt -m x' 'git commit --only u.txt -m x' 'git commit -m x -- u.txt' 'git commit -mx u.txt' 'git commit -a u.txt' 'git add d/m.txt && git commit u.txt -m x'; do
+  out="$(run "$c")"; has "refuses a path commit: $c" "rc=2" "$out"; has "names file:line: $c" "u.txt:2" "$out"
+done
+new; mark d/m.txt
+has "refuses a directory commit: git commit d -m x" "rc=2" "$(run 'git commit d -m x')"
+# the value of an option is not a path, and a clean path or another file passes
+new; mark u.txt
+eq "a message that names the file passes: -m u.txt" "rc=0 " "$(run 'git commit -m u.txt')"
+eq "-F value is not a path: -F u.txt" "rc=0 " "$(run 'git commit -F u.txt')"
+eq "--message value is not a path: --message u.txt" "rc=0 " "$(run 'git commit --message u.txt')"
+new; mark d/m.txt
+eq "a message that names the file passes: -m u.txt" "rc=0 " "$(run 'git commit -m u.txt')"
+eq "-F value is not a path" "rc=0 " "$(run 'git commit -F msg.txt')"
+eq "a clean path passes: git commit u.txt -m x" "rc=0 " "$(run 'git commit u.txt -m x')"
+eq "a path with a marker that is not committed passes: git commit u.txt (marker is in d/m.txt)" "rc=0 " "$(run 'git commit u.txt')"
+# the allowlist names files that exist (a stale name once pointed at a test file that was never there)
+for f in $(python3 - "$H" <<'PY'
+import re, sys
+src = open(sys.argv[1]).read()
+block = re.search(r"ALLOWLIST = \{(.*?)\}", src, re.S).group(1)
+print(" ".join(re.findall(r'"([^"]+)"', block)))
+PY
+); do
+  [ -f "$ROOT/$f" ] && ok || bad "ALLOWLIST names $f, which does not exist"
+done
 # only column-0 marker lines count; a lone ======= (a setext underline) is documentation
 new; printf 'Title\n=======\nbody\n' > "$TMP/r/u.txt"; G -C "$TMP/r" add u.txt; eq "a lone ======= passes" "rc=0 " "$(run 'git commit -m x')"
 printf '  %s HEAD\n  x\n  %s topic\nquote "%s" in text\n' "$S" "$E" "$S" > "$TMP/r/u.txt"; G -C "$TMP/r" add u.txt; eq "indented or quoted marker text passes" "rc=0 " "$(run 'git commit -m x')"
