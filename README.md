@@ -28,41 +28,16 @@ Orca> filed rows, assigned A to Sib1 and B to Sib2 (disjoint file fences)
 Orca> Sib2 reads Sib1's row (contract only); B goes to a fresh verifier agent, because the seat never makes a mutual pair; both PASS; merged one at a time, gate green
 ```
 
-That's **team mode**, the default: the seat plans, assigns, routes verification and merges; the siblings build.
+That's the whole loop: the seat plans, assigns, routes verification and merges; the siblings build.
 Walkthrough, Windows/macOS/Linux notes and failure modes: **[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)**.
 How the whole loop fits together: **[`HOW-IT-WORKS.md`](HOW-IT-WORKS.md)**. Terms:
 [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
 
-## Two modes
+## One way to run it
 
-| Mode | Who coordinates | Start with |
-|---|---|---|
-| **Team** (default) | A **seat** session plans, assigns, routes verification, merges one row at a time, deploys in trains, recycles full sessions. You talk only to the seat | the Quickstart above; reopen later with `bash scripts/start-team.sh` (opens the seat + 2 siblings) — [GETTING-STARTED §3](docs/GETTING-STARTED.md#3-team-mode--who-does-what-the-default) |
-| **Solo** (practice) | You, by hand, in the orchestrator's chair, with two sibling terminals and no seat. A practice ground for learning the loop by hand | [Practice mode](#practice-mode-solo-be-the-orchestrator-yourself) below |
-
-## Practice mode (Solo): be the orchestrator yourself
-
-Answer **Practice mode (Solo)** in `kit-init` (it starts nothing) and open two terminals yourself. You do what the seat
-would do: file rows on the board, hand one to each sibling, let each verify the *other's* row, and reconcile.
-You learn how rows are claimed with file fences, why every session builds in its own worktree, and why the verifier
-sees only the contract. Once you trust the loop, graduate to a seat: when you are the one relaying between
-windows or deciding who takes what, say "turn on the git guard" and run `bash scripts/start-team.sh`.
-
-```bash
-cd ~/projects/myapp
-claude --name Dev1 /orchestration-kit:orient    # terminal 1
-claude --name Dev2 /orchestration-kit:orient    # terminal 2
-```
-
-```text
-Dev1> add rows to the board for: <task A>; <task B>
-Dev1> claim Dev1-1 and build it in your own worktree
-Dev2> claim Dev1-2 and build it in your own worktree
-Dev2> verify Dev1-1 against its row — contract only, don't fix anything
-Dev1> /orchestration-kit:reconcile Dev1-1
-```
-
-The guided demo, step by step: [`docs/GETTING-STARTED.md`, Practice](docs/GETTING-STARTED.md#4-practice-mode-solo-be-the-orchestrator-yourself).
+A **seat** session plans, assigns, routes verification, merges one row at a time, deploys in trains and recycles full
+sessions. You talk only to the seat; the siblings build. Start with the Quickstart above; reopen the windows later with
+`bash scripts/start-team.sh` (opens the seat + 2 siblings), see [GETTING-STARTED §3](docs/GETTING-STARTED.md#3-who-does-what-the-seat-and-the-siblings).
 
 This repo is a Claude Code **plugin** and its own **marketplace** (`artekka-kits`).
 A project "depends" on the kit the way it depends on a package: install it, get the
@@ -157,7 +132,7 @@ board-format/protocol change = major bump with a migration note. After upgrading
 `/orchestration-kit:kit-init` in a project to be offered the template deltas (managed
 markers keep your customizations safe).
 
-## The team-mode workflow in one paragraph
+## The workflow in one paragraph
 
 The seat takes the board with an `ORCHESTRATOR ACTIVE` banner; siblings `/orchestration-kit:orient` and send
 READY. `git fetch origin && git rebase origin/main` → read `docs/orchestration/AGENT_BOARD.md`
@@ -172,6 +147,8 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 ## What's new
 
 v0.11.0: the guarded seat merge (`seat-merge.sh`), `pending-work.sh`, the tmux entry point (`tmux-session.sh`), a hardened `gate-throttle.sh` (deploy mode, one slot per worktree, a reuse-check hook), a measured, checkable context fill (`ctx-fill.py --line`), and disk cleanup (`retro-worktrees.sh`, `docker-cache-cap.sh`, a low-disk guard).
+
+v0.10.0: the kit has one way to run, a seat plus siblings; the two-terminal practice setup is gone. The CHANGELOG says what to do if you used it.
 
 v0.9.0: Team mode (a seat + siblings) is the default start; Solo is now Practice mode, where you play the orchestrator by hand with two sibling terminals to learn the loop.
 
