@@ -24,7 +24,7 @@
 #
 # Usage:
 #   scripts/recycle-sibling.sh [--dry-run] [--mode normal|accept-edits|auto] [--account N|DIR]
-#                              [--model M] [--effort E] [--new-tab] [--force]
+#                              [--model M] [--effort E] [--new-tab] [--force|--force-children]
 #                              [--terminal BACKEND|auto|list] [--repo DIR] <Name> [prompt]
 #     prompt defaults to /orchestration-kit:orient, or /orchestration-kit:orchestrate for the seat.
 #     mode / terminal default to the team block (ORCHESTRATION.md), else normal / auto-detect.
@@ -37,7 +37,7 @@
 #     --new-tab: skip the in-place path and open a new window, as before v0.7.0.
 #     Live work: the old session's live shells (background gate runs, loops) die or run on orphaned when
 #     it is SIGTERMed, so the script REFUSES (exit 3) and lists them while any are running. Wait for them,
-#     or have the session stop them; --force recycles anyway. Subagents are invisible to this check: the
+#     or have the session stop them; --force (alias --force-children) recycles anyway. Subagents are invisible to this check: the
 #     session's "retro complete" must say none are running. --dry-run lists the live shells too.
 #   scripts/recycle-sibling.sh Orca          # seat self-recycle
 #   scripts/recycle-sibling.sh Sib2 --model 'sonnet[1m]' --effort high
@@ -63,7 +63,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY=1 ;;
     --new-tab) FORCE_NEW_TAB=1 ;;
-    --force) FORCE=1 ;;
+    --force|--force-children) FORCE=1 ;;
     --repo) shift; REPO="${1:?--repo needs a directory}" ;;
     --mode) shift; MODE="${1:?--mode needs normal|accept-edits|auto}" ;;
     --account) shift; ACCOUNT="${1:?--account needs a number (1, 2, 3...) or a config directory}" ;;
@@ -100,7 +100,7 @@ manual_help() {
 No terminal this script can open windows in ($LAUNCH_REASON). Do it by hand:
   1. Open a new terminal.
   2. Run:  $(launch_manual_cmd "$name" "$prompt")
-  3. Once the fresh session is up, close the old '${name}' terminal (or: pkill -TERM -f '$(launch_pattern "$name")').
+  3. Once the fresh session is up, close the old '${name}' terminal (or: kill -TERM <pid>; list the pid with: pgrep -f '$(launch_pattern "$name")').
 HELP
 }
 
@@ -143,6 +143,10 @@ if [ -n "$wrapper_pid" ] && launch_is_ancestor "$old"; then
   fi
 fi
 [ -z "$wrapper_pid" ] || mode=in-place
+
+# The CLI half of the model guard (a full id the CLI does not know), once the account is final and BEFORE the old
+# session is touched: a refused model must leave the old claude running. A dry run skips it (it would call the CLI).
+[ "$DRY" -eq 1 ] || launch_preflight_model
 
 # Live work under the old session (see launch_live_shells). The detached copy of a self-recycle skips it:
 # the parent already checked, and the seat's own tool shell, an ancestor then, is no longer one now.
@@ -224,6 +228,6 @@ fi
 
 # shellcheck disable=SC2086  # $old may hold several pids, one per line
 # (In the in-place fallback `old` may already be dead: it was SIGTERMed there.)
-if [ -n "$old" ]; then kill -TERM $old 2>/dev/null || true; fi
+launch_term_old "$name" $old
 echo "fresh ${name}: ${LAUNCH_FRESH} · mode: ${mode} · account $(launch_account_label) · model ${LAUNCH_MODEL} · SIGTERM old: ${old:-none} · via ${LAUNCH_BACKEND} · $(date '+%H:%M:%S %Z')"
 if [ "$LAUNCH_BACKEND" = tmux-detached ]; then echo "attach with: tmux attach -t $(launch_tmux_session)"; fi

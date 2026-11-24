@@ -116,7 +116,7 @@ eq "W8 nothing launched" 0 "$(nlaunch)"
 
 # 9. The wrapper survives its own script file being rewritten in place mid-run (the loop is parsed up
 #    front): the stub truncates and rewrites a COPY on launch 1, then asks for a relaunch.
-sandbox; n=$(nameFor W9); cp "$WRAPPER" "$SB/sibling-shell-copy.sh"
+sandbox; n=$(nameFor W9); cp "$WRAPPER" "$SB/sibling-shell-copy.sh"; cp "$ROOT/scripts/lib-model-tag.sh" "$SB/lib-model-tag.sh"
 stage_handoff 1 "$(handoff 'opus[1m]' '' '' again)"
 WRAPPER_UNDER_TEST="$SB/sibling-shell-copy.sh"; WENV=(STUB_REWRITE="$SB/sibling-shell-copy.sh"); W "$n" --model 'opus[1m]'; WENV=(); unset WRAPPER_UNDER_TEST
 eq "W9 two launches" 2 "$(nlaunch)"; hasnt "W9 the rewritten text never ran" HIJACKED "$OUT$ERR"; eq "W9 exit 0" 0 "$RC"

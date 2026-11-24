@@ -41,6 +41,10 @@
 # Test hook (tests only, never in docs for users): LAUNCH_CMD_OVERRIDE replaces the
 # `claude --name ...` part (`{name}` is substituted); the pgrep pattern then matches it instead.
 
+# The model guard (shape, family-without-claude-prefix, CLI preflight) is one file for every launcher.
+# shellcheck source=lib-model-tag.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib-model-tag.sh" || { echo "lib-launch: lib-model-tag.sh is missing beside this file; refusing to launch an unchecked model" >&2; exit 64; }
+
 LAUNCH_NAME_RE='^[A-Za-z0-9_-]+$'
 LAUNCH_PROMPT_RE='^[A-Za-z0-9 /._:,@=+-]*$'
 LAUNCH_EMULATORS="gnome-terminal konsole xfce4-terminal kitty alacritty wezterm foot xterm"
@@ -67,17 +71,19 @@ launch_mode_flags() {
 # came from a flag, an EMPTY flag value, or the team block (a bad block value is refused too: warning and
 # quietly launching on the default is the silent-wrong-model failure this block exists to prevent).
 LAUNCH_DEFAULT_MODEL="opus[1m]"   # the seat and the top-tier lanes; an alias, so it tracks the newest opus
-# Must START with a letter: a leading `-` is a flag (`--model --dangerously-skip-permissions` would hand
-# claude a second flag) and a leading `.` is no model id. Lowercase letters, digits, `.` and `-` only.
-LAUNCH_MODEL_RE='^[a-z][a-z0-9.-]*(\[1m\])?$'   # opus[1m] | sonnet[1m] | haiku | a full model id
+# The shape rules (must START with a letter: a leading `-` would hand claude a second flag) live in
+# lib-model-tag.sh, the one guard every launcher shares.
 LAUNCH_MODEL="$LAUNCH_DEFAULT_MODEL"; LAUNCH_MODEL_SRC="default"
 LAUNCH_EFFORT=""; LAUNCH_EFFORT_SRC=""
-launch_valid_model()  { [[ "$1" =~ $LAUNCH_MODEL_RE ]]; }
 launch_valid_effort() { case "$1" in low|medium|high|xhigh|max) return 0 ;; *) return 1 ;; esac; }
 launch_set_model() {  # <model> <source label>
-  launch_valid_model "$1" || {
-    echo "--model must look like opus[1m], sonnet[1m], haiku or a full model id (lowercase letters, digits . -): '$1'" >&2; exit 64; }
+  model_tag_static "$1" || { echo "$MODEL_TAG_ERR" >&2; exit 64; }
   LAUNCH_MODEL="$1"; LAUNCH_MODEL_SRC="${2:---model}"
+}
+# The CLI half of the guard, for a launcher that has resolved the account: a full id the CLI does not know would
+# open a TUI that refuses at its first prompt. Call it after launch_set_account and BEFORE anything is killed.
+launch_preflight_model() {
+  model_tag_preflight "$LAUNCH_MODEL" "$LAUNCH_ACCOUNT_DIR" || { echo "$MODEL_TAG_ERR" >&2; exit 64; }
 }
 launch_set_effort() {  # <effort> <source label>
   launch_valid_effort "$1" || { echo "--effort must be one of low|medium|high|xhigh|max: '$1'" >&2; exit 64; }
@@ -571,6 +577,20 @@ launch_live_shells() {  # <pid>...
   done <<< "$first"
 }
 
+# SIGTERM the named pids and nothing else. Each pid was resolved earlier (a few seconds to a minute ago: the live
+# check and the preflight run in between), so its identity is re-read first: a pid that is gone, or was reused by
+# another process, no longer has an argv of `claude --name <Name> ...` and is skipped with a line, never signalled.
+# Never a pattern kill: the pattern only FINDS pids, this signals one pid at a time.
+launch_term_old() {  # <name> <pid>...
+  local name="$1" pid args; shift
+  for pid in "$@"; do
+    [ -n "$pid" ] || continue
+    args="$(ps -o args= -p "$pid" 2>/dev/null | sed 's/^ *//')"
+    if printf '%s\n' "$args" | grep -Eq -- "$(launch_pattern "$name")"; then kill -TERM "$pid" 2>/dev/null || true
+    else echo "not signalling pid ${pid}: it is no longer a '${name}' session process" >&2; fi
+  done
+}
+
 # The hand-off, written tmp + mv so the wrapper never reads half of it. The prompt travels as base64 on
 # one line, so no quote, `;`, `$` or newline needs escaping between here and claude's argv.
 launch_write_handoff() {  # <name> <prompt> — model/effort/mode/account come from the LAUNCH_* globals
@@ -615,7 +635,7 @@ launch_recycle_inplace() {
   next="$(launch_state_dir)/$name.next"; revoked="$next.revoked.$$"
   launch_write_handoff "$name" "$prompt" || { echo "cannot write the hand-off file in $(launch_state_dir); using a new tab" >&2; return 1; }
   # SIGTERM the old claude ONLY: signalling the wrapper would end the very loop that starts the next one.
-  kill -TERM "$old" 2>/dev/null || true
+  launch_term_old "$name" "$old"
   if launch_wait_inplace "$name" "$old" "$wpid" "$t"; then
     return 0
   # No fresh child yet. REVOKE the hand-off the way the wrapper claims it: an atomic mv, so exactly one
@@ -662,8 +682,8 @@ launch_team_conf() {  # <repo>
   [[ "$TEAM_N" =~ ^[0-9]$ ]] || TEAM_N=""
   [[ "$TEAM_MAX" =~ ^[1-9][0-9]*$ ]] || TEAM_MAX=""
   launch_valid_mode "$TEAM_MODE" || TEAM_MODE=""
-  if [ -n "$TEAM_MODEL" ] && ! launch_valid_model "$TEAM_MODEL"; then
-    echo "team block: model '$TEAM_MODEL' is not valid (opus[1m], sonnet[1m], haiku or a full model id; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
+  if [ -n "$TEAM_MODEL" ] && ! model_tag_static "$TEAM_MODEL"; then
+    echo "team block: model '$TEAM_MODEL' is not valid ($MODEL_TAG_ERR; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64
   fi
   if [ -n "$TEAM_EFFORT" ] && ! launch_valid_effort "$TEAM_EFFORT"; then
     echo "team block: effort '$TEAM_EFFORT' is not valid (low|medium|high|xhigh|max; fix ${conf#"$1"/}) — refusing to launch" >&2; exit 64

@@ -105,7 +105,7 @@ TERM
 sbenv() {  # prints NAME=VALUE words for `env`; extra pairs may follow as arguments
   printf '%s\n' "PATH=$SB/bin:$PATH" "HOME=$SB/home" "SIBLING_STATE_DIR=$SB/state" "STUB_DIR=$SB/stub" \
     "SIBLING_MIN_RUN_SECS=0" "FAKE_TERM_DIR=$SB" "DISPLAY=:0" "RECYCLE_POLL_SECS=0.2" "RECYCLE_INPLACE_TIMEOUT=20" \
-    "FAKE_TERM_MODE=run" \
+    "FAKE_TERM_MODE=run" "MODEL_PREFLIGHT=0" "KIT_RUNTIME_DIR=$SB/runtime" \
     "WSL_DISTRO_NAME=" "WSL_INTEROP=" "TMUX=" "WT_EXE=$SB/no-such-wt.exe" "$@"
 }
 # ISOLATION (the m7 incident, 2026-10-03): lib-launch auto-detects the terminal. On a WSL box that is the
