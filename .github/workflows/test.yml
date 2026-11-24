@@ -37,16 +37,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      # scripts/env.sh points cargo at $OBSERVATORY_RUST_DIR/{rustup,cargo}; here those are links to the runner's own.
-      OBSERVATORY_RUST_DIR: ${{ runner.temp }}/station-rust
-      # Outside the rust dir, so env.sh respects it, and one fixed path for the cache.
-      CARGO_TARGET_DIR: ${{ runner.temp }}/station-target
+      # The two paths under the runner's temp dir are set by the first step (the `runner` context is not available in a
+      # job-level env, and GitHub then refuses the whole file: "workflow file issue", no job starts).
       # Pinned: clippy runs with -D warnings, so an unpinned stable could turn CI red with no change in the kit. Raise it on purpose.
       RUST_VERSION: "1.100.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Paths under the runner's temp dir
+        shell: bash
+        run: |
+          # scripts/env.sh points cargo at $OBSERVATORY_RUST_DIR/{rustup,cargo}; here those are links to the runner's own.
+          echo "OBSERVATORY_RUST_DIR=$RUNNER_TEMP/station-rust" >> "$GITHUB_ENV"
+          # Outside the rust dir, so env.sh respects it, and one fixed path for the cache.
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/station-target" >> "$GITHUB_ENV"
       - name: Toolchain (rustup on the runner), Windows target, software Vulkan for the snapshot tests
         shell: bash
         run: |
