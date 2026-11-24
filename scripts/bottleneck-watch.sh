@@ -77,7 +77,7 @@ while read -r pid ppid stat secs args; do
   min=$((secs / 60))
   case "$stat" in
     Z*)
-      # A finished child nobody reaped. Under a stopped (SIGSTOPped) parent it never clears, and a wait on it hangs forever.
+      # A finished child nobody reaped. Under a stopped (SIGSTOPped) parent it never goes away, and a wait on it hangs forever.
       case "$(state_of "$ppid")" in
         T*)
           # A stopped chain's poll `sleep` is always a zombie while a front merge runs: that is the plan. Counted into one summary
@@ -126,7 +126,7 @@ while read -r pid ppid stat secs args; do
   esac
 done <<<"$procs"
 
-[ "$poll_zombies" -eq 0 ] || echo "bottleneck-watch: $poll_zombies poll-sleep zombie(s) under stopped parents (paused on purpose; they clear when it resumes them)."
+[ "$poll_zombies" -eq 0 ] || echo "bottleneck-watch: $poll_zombies poll-sleep zombie(s) under stopped parents (paused on purpose; they go away when it resumes them)."
 if [ "$queued_n" -gt 0 ]; then
   if [ "$queued_oldest" -gt "$BUDGET_GATE" ]; then
     flag "$queued_n gate(s) queued in the throttle; the oldest (pid $queued_pid) has waited ${queued_oldest} min, budget ${BUDGET_GATE}."
