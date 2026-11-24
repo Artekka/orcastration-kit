@@ -68,7 +68,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
      elif grep -q '^team:[[:space:]]*$' "$C"; then sed -i "/^team:[[:space:]]*\$/a\  $KEY:        $VAL" "$C"
      else printf '\nteam:\n  %s:        %s\n' "$KEY" "$VAL" >> "$C"; fi
    }
-   KEY=worktrees VAL=<advised|enforced> setkey; KEY=git_guard VAL=<on if a team was started, else off> setkey; KEY=ctx_guard VAL=<on if a team was started, else off> setkey
+   KEY=worktrees VAL=<advised|enforced> setkey; KEY=git_guard VAL=on setkey; KEY=ctx_guard VAL=on setkey
    git add "$C" && git commit -m "chore(orchestration): worktrees + git_guard + ctx_guard settings"
    ```
    Both take effect at once: the plugin's PreToolUse hooks read the file on every call (only in repos with `.kit-hooks`).

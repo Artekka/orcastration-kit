@@ -37,7 +37,7 @@ How the whole loop fits together: **[`HOW-IT-WORKS.md`](HOW-IT-WORKS.md)**. Term
 
 A **seat** session plans, assigns, routes verification, merges one row at a time, deploys in trains and recycles full
 sessions. You talk only to the seat; the siblings build. Start with the Quickstart above; reopen the windows later with
-`bash scripts/start-team.sh` (opens the seat + 2 siblings), see [GETTING-STARTED §3](docs/GETTING-STARTED.md#3-team-mode--who-does-what-the-default).
+`bash scripts/start-team.sh` (opens the seat + 2 siblings), see [GETTING-STARTED §3](docs/GETTING-STARTED.md#3-who-does-what-the-seat-and-the-siblings).
 
 This repo is a Claude Code **plugin** and its own **marketplace** (`artekka-kits`).
 A project "depends" on the kit the way it depends on a package: install it, get the
@@ -129,7 +129,7 @@ board-format/protocol change = major bump with a migration note. After upgrading
 `/orchestration-kit:kit-init` in a project to be offered the template deltas (managed
 markers keep your customizations safe).
 
-## The team-mode workflow in one paragraph
+## The workflow in one paragraph
 
 The seat takes the board with an `ORCHESTRATOR ACTIVE` banner; siblings `/orchestration-kit:orient` and send
 READY. `git fetch origin && git rebase origin/main` → read `docs/orchestration/AGENT_BOARD.md`
@@ -145,7 +145,7 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 v0.10.0: the kit has one way to run, a seat plus siblings; the two-terminal practice setup is gone. The CHANGELOG says what to do if you used it.
 
-v0.9.0: Team mode (a seat + siblings) became the default start.
+v0.9.0: Team mode (a seat + siblings) is the default start; Solo is now Practice mode, where you play the orchestrator by hand with two sibling terminals to learn the loop.
 
 v0.8.2: the status HUD's WORK/QUIET chip shows only where the quiet-mode script exists, explains itself, and shows a failed press in red.
 v0.8.1: the guide's loop diagram fits phones, and the guide explains `LAUNCH_LIVE_RECHECK` (a refused recycle).
@@ -159,7 +159,7 @@ its next recycle. See "Recycling in place" below.
 v0.6.0: a model per lane (`--model` / `--effort` on both launch scripts, always passed, never inherited),
 lean builder starts (`/orchestration-kit:orient --brief <ROW>` from a brief file), per-window context marks
 (120K/150K on a 200K window), optional multi-account teams, and a note on keeping `CLAUDE.md` slim.
-v0.5.0: a git guard hook, the `falsify` skill, a
+v0.5.0: solo mode as the starting path, a git guard hook (on in team mode, off solo), the `falsify` skill, a
 context-fill statusline, MIT LICENSE, tests (`bash tests/run.sh`), a glossary, and the worked
 example session. Full history: [`CHANGELOG.md`](CHANGELOG.md).
 

@@ -28,17 +28,23 @@ pin "max_sessions in the overlay" $T "max_sessions:     8"
 K=skills/kit-init/SKILL.md; R=README.md
 row="$(grep -F 'Start the team now?' "$ROOT/$K" | head -1)"
 case "$row" in *"| **Seat + 2 siblings (Recommended)** ·"*) pass=$((pass+1));; *) fail=$((fail+1)); echo "FAIL kit-init start question: first option is not '**Seat + 2 siblings (Recommended)**'";; esac
+pin "kit-init writes both guards on, on every path (manual backend included)" $K "KEY=git_guard VAL=on setkey; KEY=ctx_guard VAL=on setkey"
 pin "every start turns the guards on" $K "every start (seat + 1–9 siblings) → \`git_guard: on\` and \`ctx_guard: on\`"
-for stale in "solo mode" "Practice mode" "practice (Solo)" "Solo (practice)" "Solo practice" "Solo** (start here)" "recommended first time" "recommended start" "Team** (Advanced)" "Not now" "The way to begin" "Start solo"; do
-  for f in $R $G docs/GLOSSARY.md HOW-IT-WORKS.md docs/how-it-works.html .claude-plugin/plugin.json $K $T; do
-    grep -qiF -- "$stale" "$ROOT/$f" && { fail=$((fail+1)); echo "FAIL removed wording '$stale' is back in $f"; } || pass=$((pass+1))
+# The README keeps its dated "What's new" history lines (v0.9.0, v0.5.0) as they were; they are the only exception.
+RH="$(mktemp)"; grep -vE '^v0\.(9\.0|5\.0):' "$ROOT/$R" > "$RH"
+for stale in "team mode" "team-mode" "(the default)" "Two sessions:" "Pick your size" "solo mode" "Practice mode" "practice (Solo)" "Solo (practice)" "Solo practice" "Solo** (start here)" "recommended first time" "recommended start" "Team** (Advanced)" "Not now" "The way to begin" "Start solo"; do
+  for f in README.md $G docs/GLOSSARY.md HOW-IT-WORKS.md docs/how-it-works.html .claude-plugin/plugin.json $K $T; do
+    src="$ROOT/$f"; [ "$f" = README.md ] && src="$RH"
+    grep -qiF -- "$stale" "$src" && { fail=$((fail+1)); echo "FAIL removed wording '$stale' is back in $f"; } || pass=$((pass+1))
   done
 done
+rm -f "$RH"
 # The README has no "choose a mode" step: no mode table and no second mode heading.
 grep -qE '^## (Two modes|Practice mode)' "$ROOT/$R" && { fail=$((fail+1)); echo "FAIL README has a mode-choice heading again"; } || pass=$((pass+1))
 # Version: plugin.json, marketplace.json and the newest CHANGELOG heading must agree (0.10.0 shipped as one number).
 pv="$(grep -m1 '"version"' "$ROOT/.claude-plugin/plugin.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/')"
-mv="$(grep -m1 '"version"' "$ROOT/.claude-plugin/marketplace.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/')"
+# The orchestration-kit entry BY NAME: the status-hud entry (or any other) can never satisfy this pin.
+mv="$(python3 -c "import json,sys; print(next((p.get('version','') for p in json.load(open(sys.argv[1]))['plugins'] if p['name']=='orchestration-kit'), ''))" "$ROOT/.claude-plugin/marketplace.json")"
 cv="$(grep -m1 -E '^## [0-9]+\.[0-9]+\.[0-9]+' "$ROOT/CHANGELOG.md" | sed -E 's/^## ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
 [ -n "$pv" ] && [ "$pv" = "$mv" ] && [ "$pv" = "$cv" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL version mismatch: plugin.json=$pv marketplace.json=$mv newest CHANGELOG heading=$cv"; }
 echo "docs-pins: $pass passed, $fail failed"

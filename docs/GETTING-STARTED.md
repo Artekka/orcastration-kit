@@ -2,7 +2,7 @@
 
 For someone who today opens a terminal and runs `claude` in one repo — on **Windows (WSL),
 macOS or Linux**. One **seat** (an orchestrator session you talk to) plans, assigns,
-verifies and merges for two or more **siblings** (builders), each in its own window. ([§3](#3-team-mode--who-does-what-the-default))
+verifies and merges for two or more **siblings** (builders), each in its own window. ([§3](#3-who-does-what-the-seat-and-the-siblings))
 
 New words (seat, sibling, row, fence, gate …) are defined in [`GLOSSARY.md`](GLOSSARY.md).
 Want the big picture first? [`HOW-IT-WORKS.md`](../HOW-IT-WORKS.md) explains the whole loop in one diagram (`kit-init` offers it at the end of setup).
@@ -107,9 +107,9 @@ which permission mode the sessions should use, and whether separate worktrees pe
 advised or enforced. The git guard (below) follows your first answer: **on** if you start a
 team.
 
-**Team mode (default):** answer with a team size ("Seat + 2 siblings"), approve the one command it runs,
+**Starting the team:** answer with a team size ("Seat + 2 siblings"), approve the one command it runs,
 and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). The setup summary
-says how they open on your machine ("Windows will open via: …"). You can close the setup session; continue at [§3](#3-team-mode--who-does-what-the-default).
+says how they open on your machine ("Windows will open via: …"). You can close the setup session; continue at [§3](#3-who-does-what-the-seat-and-the-siblings).
 
 **Start with 1 seat + 2 siblings.** You can change the team size, names, permission mode or worktree setting at
 any time — just ask Claude to change it.
@@ -162,7 +162,7 @@ git guard" / "turn off the git guard", or `git_guard: on|off`.
 Want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
 Claude to). Sessions already running are skipped; `--dry-run` previews without opening anything.
 
-## 3. Team mode — who does what (the default)
+## 3. Who does what: the seat and the siblings
 
 | Seat (Orca) | Siblings (Sib1, Sib2, …) |
 |---|---|
@@ -199,7 +199,7 @@ nobody gets pinged.
 | `/orchestration-kit:orient` | A fresh session catches up and tells the seat it's READY |
 | `/orchestration-kit:board` | Claiming, updating and archiving board rows |
 | `/orchestration-kit:orient-brief` | Lean start for a builder: the row's brief and the seat banner arrive already loaded (`/orchestration-kit:orient-brief <ROW>`) |
-| `/orchestration-kit:assemble-train` · `/orchestration-kit:audit-train` | Team mode: land approved rows onto a train branch one merge at a time with a dry run · a validator checks the finished train before it ships |
+| `/orchestration-kit:assemble-train` · `/orchestration-kit:audit-train` | Land approved rows onto a train branch one merge at a time with a dry run · a validator checks the finished train before it ships |
 | Status HUD (optional plugin) | A band above the prompt showing every session's context fill, model and activity. `kit-init` asks once (default: no); `/hud band`, `/hud pane`, `/hud off`, `/hud quiet` switch it. Host load meters work on Linux and WSL only |
 | `/orchestration-kit:falsify` | Prove a new test or guard can actually fail (mutation check) before trusting it |
 | `/orchestration-kit:reconcile` | Merging one finished worktree onto main and re-running the gate |
