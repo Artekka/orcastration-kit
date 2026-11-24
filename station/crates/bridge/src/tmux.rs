@@ -360,4 +360,31 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn a_screen_read_that_hangs_is_killed_and_fails() {
+        // The deadline and the kill in run_within: a hung read refuses the send in time.
+        let mut c = Command::new("sleep");
+        c.arg("5").stdout(Stdio::piped()).stderr(Stdio::piped());
+        let started = Instant::now();
+        let r = Tmux::run_within(c, Duration::from_millis(200));
+        assert!(
+            r.as_ref().is_err_and(|e| e.contains("did not answer")),
+            "{r:?}"
+        );
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "the deadline held"
+        );
+    }
+
+    #[test]
+    fn a_screen_read_returns_what_the_program_printed() {
+        let mut c = Command::new("printf");
+        c.arg("box").stdout(Stdio::piped()).stderr(Stdio::piped());
+        assert_eq!(
+            Tmux::run_within(c, Duration::from_secs(5)),
+            Ok("box".to_owned())
+        );
+    }
 }
