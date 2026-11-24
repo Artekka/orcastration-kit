@@ -4,6 +4,21 @@ Newest first.
 
 ## Unreleased
 
+## 0.13.0 — 2026-11-24
+
+Safety hooks: the accidents that shared checkouts kept producing, now refused by a hook instead of a sentence in a rules file.
+
+- **Added: five opt-in PreToolUse hooks** (python3; each fails open on anything it cannot read, and prints ONE line naming the safe form). Off until the repo has the `docs/orchestration/.kit-hooks` marker AND `safety_guards: on` in the team block of `ORCHESTRATION.md`.
+  - `hooks/discard-guard.py`: `git checkout -- <path>`, `git checkout <path>`, `git checkout -f`, `git switch -f`, `git restore <path>` and `git reset --hard` are refused while the paths they would overwrite have uncommitted edits in THAT worktree; names them. `ALLOW_DISCARD=1` overrides.
+  - `hooks/pkill-full-guard.py`: `pkill -f` / `--full` (any flag cluster, any position, inside chains, `bash -c`, `$(...)`, wrappers and `ssh`); no override, `kill <pid>` is the safe form.
+  - `hooks/prettier-dir-guard.py`: `prettier --write` (or `-w`) on `.`, a directory or a glob that matches one, behind `npx`, `pnpm exec`, `xargs`, `find -exec`.
+  - `hooks/conflict-marker-guard.py`: a `git commit` or `--continue` that would commit a conflict marker at column 0, also one an earlier command of the same chain would stage (`git add -u && git commit`). `ALLOW_CONFLICT_MARKERS=1` overrides.
+  - `hooks/sendmessage-sha-guard.py` (PreToolUse on SendMessage): a message that names a 7 to 40 hex sha git cannot resolve to any object; session refs in brackets, `session`/`job` ids, paths and color codes are skipped.
+- **Added: `hooks/lib/shellscan.py`** (the shell-command scanner the git-aware hooks share: chains, heredocs, `bash -c`, `$(...)`, `cd` and `git -C` followed) and **`hooks/lib/kitgate.py`** (the opt-in switch).
+- **Added: `safety_guards: off` in the `ORCHESTRATION.md` template**, with its paragraph.
+- **Added: tests**, ported with each hook: `tests/hook-discard-guard.test.sh`, `hook-pkill-full-guard`, `hook-prettier-dir-guard`, `hook-conflict-marker-guard`, `hook-sendmessage-sha-guard` (case tables in `tests/hook-cases/`), and `tests/hook-gate.test.sh` (the opt-in switch, the hooks.json wiring).
+- Not in this release (they overlap the kit's `git-guard.sh` and `worktree-guard.sh`, or need a seam): the context-fill claim guard (needs `ctx-fill.py --check`), the test-runner guard and the CPU-burn guard.
+
 - **Changed: the GitHub repository is now `Artekka/orcastration-kit`** (was `claude-orchestration-kit`). Install with `claude plugin marketplace add Artekka/orcastration-kit`; the plugin id (`orchestration-kit@artekka-kits`), its slash commands and `~/.orchestration-kit/` do not change. GitHub redirects the old URL, so existing installs keep working. README, GETTING-STARTED, CONTRIBUTING, SECURITY, the issue-template link and the Code of Conduct contact link use the new name; the plugin manifest gains `homepage` and `repository`.
 - **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
 - **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)

@@ -334,7 +334,7 @@ turn of every session.
 | `recycle-sibling.sh` exits 3 | The old session still has live shells (a background gate, a loop); a recycle would kill or orphan them. Wait, or have that session stop them; `--force` only if they are disposable. An idle session refused over a shell that is gone a moment later: set `LAUNCH_LIVE_RECHECK=3` (the guide's "If a recycle is refused" explains the two-look check) |
 | A recycle opened a new tab instead of reusing the old one | The old session was started by hand (not under `sibling-shell.sh`), or no `setsid` (macOS) for a seat self-recycle, or Git Bash. It moves over at its next recycle |
 | Gates never start | Quiet mode is on (`bash scripts/quiet-mode.sh status`), the load is above `GATE_MAX_LOAD`, available memory is below `GATE_MIN_FREE_MB` while one gate already runs, or all `gate_slots` are busy (status lists who) |
-| The hooks do nothing | They are opt-in: the repo needs `docs/orchestration/.kit-hooks`, plus `git_guard: on` / `ctx_guard: on` / `worktrees: enforced` for each guard |
+| The hooks do nothing | They are opt-in: the repo needs `docs/orchestration/.kit-hooks`, plus `git_guard: on` / `ctx_guard: on` / `safety_guards: on` / `worktrees: enforced` for each guard |
 
 ## 8. Changing things later
 
