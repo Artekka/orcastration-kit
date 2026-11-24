@@ -1,4 +1,5 @@
-# Runs the kit's test suite and a gitleaks scan of the new commits on every push and pull request.
+# Runs the kit's test suite, the Station's own checks (station/, Rust) and a gitleaks scan of the new commits on every
+# push and pull request.
 # Actions are pinned by commit SHA (the tag is in the comment); gitleaks is a pinned release whose
 # checksum is verified before it runs.
 name: test
@@ -28,6 +29,49 @@ jobs:
       - name: Run tests/run.sh
         shell: bash
         run: bash tests/run.sh
+
+  # The Orcastration Station (station/): its own gate (privacy checks, fmt, clippy, tests, Windows cross-check). This is
+  # the ONLY place Rust is built for the kit: no build runs on a maintainer's machine. Read-only token, no secrets, and
+  # the third-party code (cargo crates, the Station's own build scripts) runs only inside this runner.
+  station:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # scripts/env.sh points cargo at $OBSERVATORY_RUST_DIR/{rustup,cargo}; here those are links to the runner's own.
+      OBSERVATORY_RUST_DIR: ${{ runner.temp }}/station-rust
+      # Outside the rust dir, so env.sh respects it, and one fixed path for the cache.
+      CARGO_TARGET_DIR: ${{ runner.temp }}/station-target
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Toolchain (rustup on the runner), Windows target, software Vulkan for the snapshot tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy --target x86_64-pc-windows-gnu
+          rustup default stable
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mesa-vulkan-drivers libvulkan1 bc
+          mkdir -p "$OBSERVATORY_RUST_DIR"
+          ln -s "$HOME/.rustup" "$OBSERVATORY_RUST_DIR/rustup"
+          ln -s "$HOME/.cargo" "$OBSERVATORY_RUST_DIR/cargo"
+      - name: Cache cargo registry and the build
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/station-target
+          key: station-${{ runner.os }}-${{ hashFiles('station/Cargo.lock') }}
+          restore-keys: station-${{ runner.os }}-
+      - name: The Station gate (last line must be GATE PASS)
+        shell: bash
+        working-directory: station
+        run: |
+          set -o pipefail
+          bash scripts/gate.sh 2>&1 | tee "$RUNNER_TEMP/station-gate.log"
+          tail -n 1 "$RUNNER_TEMP/station-gate.log" | grep -qE '^GATE PASS \([0-9]+ tests\)$'
 
   gitleaks:
     runs-on: ubuntu-latest
