@@ -29,7 +29,9 @@
 # honoured ONLY when --install-root and --bridge-dir both resolve under $HOME, not under /mnt/ (drvfs is
 # case-insensitive, so no string compare is safe there), and the bridge dir is not its real default.
 set -uo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$HERE/lib-shortcut.sh"
+cd "$HERE/.."
 REPO="$(pwd)"
 
 DRY=0 ALLOW_UNLANDED=0 SHORTCUT=1 WOULD_REFUSE=0
@@ -262,10 +264,8 @@ else
   lnk_win="$(wslpath -w "$SHORTCUT_DIR")\\Orcastration Station.lnk"
   exe_win="$(wslpath -w "$INSTALL_ROOT")\\observatory.exe"
   dir_win="$(wslpath -w "$INSTALL_ROOT")"
-  # One fixed file name: re-running rewrites the same .lnk, never a second one.
-  ps="\$s=(New-Object -ComObject WScript.Shell).CreateShortcut('$lnk_win');"
-  ps+="if(\$s.TargetPath -eq '$exe_win'){'shortcut already points at $exe_win'}else{"
-  ps+="\$s.TargetPath='$exe_win';\$s.WorkingDirectory='$dir_win';\$s.Description='Orcastration Station';\$s.Save();'shortcut written: $lnk_win'}"
+  # One fixed file name: re-running rewrites the same .lnk, never a second one. Paths are quoted by lib-shortcut.sh.
+  ps="$(shortcut_ps "$lnk_win" "$exe_win" "$dir_win")"
   if [ "$DRY" = 1 ]; then
     echo "[dry-run] powershell.exe: Orcastration Station.lnk in $SHORTCUT_DIR -> $exe_win (rewritten only if it points elsewhere)"
   else

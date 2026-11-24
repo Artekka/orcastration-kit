@@ -1,13 +1,13 @@
-# Observatory — product brief
+# Orcastration Station — product brief
 
-> Source of truth for WHAT Observatory is. Project-, team- and machine-specific values never live in
+> Source of truth for WHAT the Station is. Project-, team- and machine-specific values never live in
 > the repository: they go in the private bridge config (`crates/bridge/README.md` → Config).
 
 ## Why
 
 People who run one or more orchestration-kit teams have every agent in its own terminal: a
 `claude --name <Name>` session per agent, a seat (`Orca` by the kit's defaults) and its siblings
-(`Sib1`…). Terminal text is hard to read across many agents. Observatory is **one window where every
+(`Sib1`…). Terminal text is hard to read across many agents. The Station is **one window where every
 agent's chat, in every configured project, reads like the VS Code Claude panel**.
 
 ## Scope
@@ -31,7 +31,7 @@ sessions from the app. The kit's scripts keep starting and restarting agents.
 
 From GitHub's docs for the Copilot app: the sidebar is the main navigation, "sessions are grouped by
 repository in the sidebar", you "click any session to switch to it", and the session chat fills the
-main pane with the prompt box at the bottom. Observatory maps that to:
+main pane with the prompt box at the bottom. The Station maps that to:
 
 - **Sidebar**: one group per configured project. Seats first (names from the config's `seats`),
   siblings below. Each row: name, role, status dot (working / idle / needs you / gone), last-activity

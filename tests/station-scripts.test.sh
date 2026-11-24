@@ -20,7 +20,7 @@ GIT="git -c user.name=t -c user.email=t@example.com"
 git init -q --bare -b main "$SB/origin.git"
 git clone -q "$SB/origin.git" "$SB/main" 2>/dev/null
 mkdir -p "$SB/main/station/scripts"
-cp "$ROOT/station/scripts/deploy.sh" "$ROOT/station/scripts/env.sh" "$SB/main/station/scripts/"
+cp "$ROOT/station/scripts/deploy.sh" "$ROOT/station/scripts/env.sh" "$ROOT/station/scripts/lib-shortcut.sh" "$SB/main/station/scripts/"
 printf '[workspace.package]\nversion = "9.9.9"\n' > "$SB/main/station/Cargo.toml"
 echo kit > "$SB/main/README.md"
 ( cd "$SB/main" && git add -A && $GIT commit -qm init && git push -q origin HEAD:main && git fetch -q origin ) 2>/dev/null
@@ -88,6 +88,17 @@ cp "$ROOT/station/scripts/env.sh" "$SB/other/station/scripts/"
 tb="$(td "$SB/other")"
 [ -n "$tb" ] && [ "$ta" != "$tb" ] && ok || bad "7 two trees share a target dir: '$ta' '$tb'"
 [ "$(cd "$SB/main/station/scripts" && . env.sh >/dev/null 2>&1 && echo "$CARGO_TARGET_DIR")" = "$ta" ] && ok || bad "7 a subfolder gives another dir"
+
+# 8. the shortcut PowerShell: a single quote inside a path is doubled, so it cannot end the string early or run code
+. "$ROOT/station/scripts/lib-shortcut.sh"
+ps="$(shortcut_ps "D:\\apps\\O'Brien\\Orcastration Station.lnk" "D:\\apps\\O'Brien\\observatory.exe" "D:\\apps\\O'Brien")"
+case "$ps" in *"CreateShortcut('D:\\apps\\O''Brien\\Orcastration Station.lnk')"*) ok ;; *) bad "8 the .lnk path is not quoted: $ps" ;; esac
+case "$ps" in *"TargetPath='D:\\apps\\O''Brien\\observatory.exe'"*) ok ;; *) bad "8 the exe path is not quoted: $ps" ;; esac
+case "$ps" in *"WorkingDirectory='D:\\apps\\O''Brien'"*) ok ;; *) bad "8 the working dir is not quoted: $ps" ;; esac
+inj="$(shortcut_ps "D:\\a" "x'; calc; '" "D:\\a")"
+case "$inj" in *"TargetPath='x''; calc; '''"*) ok ;; *) bad "8 an injected quote ends the string: $inj" ;; esac
+plain="$(shortcut_ps "D:\\a\\s.lnk" "D:\\a\\o.exe" "D:\\a")"
+case "$plain" in *"CreateShortcut('D:\\a\\s.lnk')"*"TargetPath='D:\\a\\o.exe'"*) ok ;; *) bad "8 a plain path changed: $plain" ;; esac
 
 echo "station-scripts: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

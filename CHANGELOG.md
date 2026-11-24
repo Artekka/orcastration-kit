@@ -4,6 +4,19 @@ Newest first.
 
 ## Unreleased
 
+## 0.16.0 — 2026-11-24
+
+The Orcastration Station joins the kit: a desktop window for watching, and typing to, several teams at once. It is optional, and the CLI stays the default. The window is the work of an outside author (a pull request), adapted here under the name Orcastration Station.
+
+- **Added: `station/`** (moved with `git mv` from the pull request's `extras/observatory/`, so history stays): two Rust programs (`observatory.exe`, a Windows window; `observatory-bridge`, a WSL bridge that reads Claude Code's session logs and can type into a tmux pane), their scripts and the product brief. Credit line: "Orcastration Station, adapted from Omar's Observatory".
+- **Added: the README section "Orcastration Station"**: what it is, the two programs, requirements, build-from-source install (prebuilt binaries are stated as arriving in 0.17.0), config, the typing safety rules and every known limit as the author wrote them. The rustup step says it is a `curl | sh` install and links the manual one.
+- **Added: the interface question in `kit-init`** (a new step after the HUD): CLI (the default, writes nothing) or the Station. The answer is the `interface: cli | station` line in the team block of `ORCHESTRATION.md`, set by `scripts/station-interface.sh`, which runs from the plugin and prints the install paths for the Station without running anything.
+- **Added: a `station` job in `.github/workflows/test.yml`**: the Station's own gate (privacy checks, fmt, clippy, every test, the Windows cross-check) on ubuntu-latest, plus a pinned `cargo audit` of the locked crates. Pinned action shas, a read-only token, no secrets, cached cargo. This is where Rust is built for the kit.
+- **Changed: the Station's scripts judge only `station/`**: `deploy.sh` no longer refuses over a dirty or unpushed file elsewhere in the kit, and a `station/` folder identical to `origin/main`'s counts as landed. The cargo target dir is named `station-<tree>-<hash>`. Shell messages and the desktop shortcut say Orcastration Station.
+- **Fixed: the desktop shortcut command** doubles a single quote in a path (PowerShell single-quoted strings), so a path such as `O'Brien` can no longer end the string and run the rest as code.
+- **Added: tests** `tests/station-scripts.test.sh` (deploy scoping, target dir, shortcut quoting; dry runs and stand-ins, no cargo) and `tests/station-interface.test.sh` (a CLI answer changes nothing; a Station answer runs nothing).
+- Not in this release: prebuilt binaries and their release workflow, a native Linux window and installer, renaming the crates, binaries, config folders and `OBSERVATORY_*` variables (0.17.0).
+
 ## 0.13.0 — 2026-11-24
 
 Safety hooks: the accidents that shared checkouts kept producing, now refused by a hook instead of a sentence in a rules file.

@@ -62,9 +62,16 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            ~/.cargo/bin/cargo-audit
             ${{ runner.temp }}/station-target
           key: station-${{ runner.os }}-${{ hashFiles('station/Cargo.lock') }}
           restore-keys: station-${{ runner.os }}-
+      - name: Known-vulnerability check of the locked crates (cargo-audit, pinned; reads the RustSec advisory database)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo install cargo-audit --version 0.23.0 --locked
+          cargo audit --file station/Cargo.lock
       - name: The Station gate (last line must be GATE PASS)
         shell: bash
         working-directory: station

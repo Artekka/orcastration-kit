@@ -166,6 +166,8 @@ plant project-word   "collision O7""a-1 renamed"
 plant project-word   "row VE106""a-1 shipped"
 clean project-word   "the kit's own example ids S2E10-3, S2-1, O7-1 and T9-6; also utf8-1, x86-64, sha256-1, base64-1"
 clean project-word   "ported from the project that grew the script; ORCA is a word, row ids are not shipped"
+# UUID fragments from the Station's synthetic fixtures (a letter, digits, letters, then a dash and digits): hex ids are not row ids
+clean project-word   "synthetic ids e15a-5086 c5dd-5827 f0ec-516b b31b-508a d980d86f-5958 f2b362bd-022f be2d-61458207687a e7ce-5306"
 clean email          "Co-Authored-By: Claude <noreply""@anthropic.com> and 12345+someone""@users.noreply.github.com"
 clean email          "t""@example.com, git""@github.com:owner/repo.git, plugin@marketplace-name"
 clean anthropic-key  "an Anthropic key starts with sk-ant- and the docs never show one"

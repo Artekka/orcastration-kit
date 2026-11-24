@@ -56,6 +56,7 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/assemble-train` · `skills/audit-train` | release trains: the seat lands approved rows one merge at a time with a dry run (`trial.sh`, `cptrial.sh`, `gsum.sh`) · a validator sweeps the finished train (`audit.sh` exits 0 when every merge is clean, 1 when a line needs explaining, 2 on a usage error) |
 | `deploy_policy: ask \| auto-when-green` | the Deploy block of `ORCHESTRATION.md`: whether the seat asks you before every deploy (default) or deploys a green, audited train on its own and tells you after |
 | `scripts/gate-throttle.sh` · `scripts/quiet-mode.sh` | run heavy commands through N machine-wide slots plus a priority slot (`gate_slots`); a second slot only while 3 GB of memory is available (`GATE_MIN_FREE_MB`); `--log <file>` writes the gate's log with the tested commit first and its exit code last; first come, first served, load-aware (tasks stuck in D state are not load), ONE slot per worktree (exit 3; `GATE_ALLOW_SECOND_SLOT=1` is the seat's escape), the priority list re-read on every poll, a TERM/HUP stops the command's whole process tree, and the command gets `GATE_WORKERS` (CPUs / slots, at least 2); **deploy mode**: while a priority gate runs, new normal gates wait and every other running gate's process tree is confined (taskset, reversible, nothing signaled) to the first 25% of the CPUs (`GATE_DEPLOY_OTHERS_PCT`, at least 2), each process getting its own mask back on exit, on a dead owner and at the next start; `gate_reuse_check:` / `GATE_REUSE_CHECK` asks first whether the tree already has a green record (a hit exits 0 without queueing) · quiet mode holds every new run while you use the machine (`status` also says whether deploy mode is on) |
+| `station/` | **optional** Orcastration Station, adapted from Omar's Observatory: a Windows window (plus a WSL bridge) that watches every agent of several teams and can type to one in tmux; see the README section "Orcastration Station"; `kit-init` asks (default: CLI) |
 | `plugins/status-hud` | **optional** second plugin (`status-hud@artekka-kits`): a band or pane that shows every session's context fill, model and activity; `kit-init` asks (default: no), `/hud band\|pane\|off\|quiet` switches it. Host meters work on Linux and WSL only |
 | `HOW-IT-WORKS.md` · `docs/how-it-works.html` | the guide to the whole loop: one diagram, one short section per system (what it does, why it exists, which setting changes it), and how to make it your own |
 | `skills/falsify` | mutation-prove a guard/test can fail: commit GREEN first, diff-verified mutant, prediction written before the run, red observed unfiltered, byte-clean restore, re-green |
@@ -146,6 +147,8 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
+v0.16.0: the Orcastration Station (`station/`, adapted from Omar's Observatory): an optional Windows window plus a WSL bridge that watches every agent of several teams and can type to one in tmux. Built from source for now (prebuilt binaries arrive in 0.17.0); `kit-init` asks which interface you want, CLI or the Station, and CLI stays as it was; CI builds and tests it on every push.
+
 v0.13.0: five safety hooks, off until you turn them on (`safety_guards: on`): they refuse a discard of uncommitted edits, `pkill -f`, `prettier --write` on a directory, a commit that carries a conflict marker, and a message that cites a sha git cannot resolve.
 
 v0.11.0: the guarded seat merge (`seat-merge.sh`), `pending-work.sh`, the tmux entry point (`tmux-session.sh`), a hardened `gate-throttle.sh` (deploy mode, one slot per worktree, a reuse-check hook), a measured, checkable context fill (`ctx-fill.py --line`), and disk cleanup (`retro-worktrees.sh`, `docker-cache-cap.sh`, a low-disk guard).
@@ -216,6 +219,71 @@ session about 2 s later (`RECYCLE_DETACH_DELAY`) so the seat's last command fini
 the `ps` code path that macOS uses (forced with `LAUNCH_NO_PROC=1`), but it has **not been run on a real Mac or in Git Bash**. Git
 Bash (no `pgrep`) and the `manual` backend keep launching a bare `claude` and the old new-window recycle. On WSL a kit path that
 contains a space cannot cross the `wt.exe` command line, so those tabs fall back to a bare `claude` too.
+
+## Orcastration Station
+
+Orcastration Station, adapted from Omar's Observatory. It is a desktop window for watching, and typing to, several kit teams at once. Every agent has its own terminal; the Station puts them all in one place: a sidebar of every agent in every project you list, and the selected agent's chat rendered like Claude Code's own panel (Markdown, folded tool calls, live updates). It lives in `station/` and is **optional**: the kit works the same without it, and a CLI-only team never needs it. It reads; it starts and stops nothing.
+
+**The two programs.**
+
+- **`observatory.exe`** is a native Rust window (eframe/egui, no web view) for Windows.
+- **`observatory-bridge`** is a small program inside WSL. The window starts it over `wsl.exe`; the two talk in JSON lines on stdin and stdout, with no network port. The bridge reads Claude Code's session logs (`~/.claude/projects/**.jsonl`) and session registry (`~/.claude/sessions/*.json`) locally, follows them with inotify, and sends parsed messages to the window.
+
+Until 0.17.0 the programs, the config folders (`~/.config/observatory/`, `~/.local/share/observatory/`) and the `OBSERVATORY_*` environment variables keep the working name `observatory`. The commands below use those names as they are.
+
+**What you get.** One sidebar group per project (seats first, then siblings, each with a status dot: working, idle, needs you, gone). The selected agent's chat, with your messages as bubbles, replies as Markdown, tool calls folded to one line, thinking behind a toggle, and a restarted agent continuing the same thread after a divider. Images agents save appear as thumbnails, and each project can show a **Visuals** gallery of folders you list. A list of the claude.ai pages agents published. Typing to an agent that runs in tmux (rules below). Out of scope on purpose: approve and deny buttons, diffs, editing code, starting or stopping sessions.
+
+**Requirements.**
+
+- Windows 10/11 with WSL2 (developed on Ubuntu). The window runs on Windows; the bridge and every build step run in WSL.
+- In WSL: a Rust toolchain via rustup with the `x86_64-pc-windows-gnu` target, the MinGW cross compiler (`gcc-mingw-w64-x86-64` on Ubuntu), `python3` and `git`. `tmux` only for typing.
+- Claude Code sessions started the kit's way (`claude --name <Name>`), in tmux if you want to type to them.
+
+**Install.** Prebuilt binaries arrive in 0.17.0; until then the one path is to build from source, in WSL, from a checkout of this repository (a plugin cache copy is not one):
+
+The rustup line downloads an installer script from sh.rustup.rs and runs it (`curl | sh`). To avoid that, install rustup by hand ([the manual install page](https://rust-lang.github.io/rustup/installation/other.html)) with `RUSTUP_HOME` and `CARGO_HOME` set to the same two folders, then continue at the `rustup target add` line.
+
+```bash
+cd station
+export OBSERVATORY_RUST_DIR=~/observatory-rust   # rustup, cargo and a target dir per checkout live here
+RUSTUP_HOME=$OBSERVATORY_RUST_DIR/rustup CARGO_HOME=$OBSERVATORY_RUST_DIR/cargo \
+  sh -c 'curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path'
+. scripts/env.sh && rustup target add x86_64-pc-windows-gnu
+bash scripts/deploy.sh --dry-run --install-root /mnt/c/Apps/OrcastrationStation   # every step, nothing built
+bash scripts/deploy.sh --install-root /mnt/c/Apps/OrcastrationStation
+```
+
+`deploy.sh` runs the gate first, builds both programs, copies `observatory.exe` and `VERSION.txt` into the folder you chose and the bridge into `~/.local/share/observatory/bin` (the window looks for it there), proves each copy by sha256, and makes a desktop shortcut named "Orcastration Station". It has no default install folder. It refuses a dirty `station/` folder, a `station/` folder that is not on `origin/main` (`--allow-unlanded` overrides), and a gate whose last line is not `GATE PASS (<N> tests)`. To try the window with built-in sample sessions and no bridge: `. scripts/env.sh && cargo run -p observatory-app -- --demo` (WSLg). `station/README.md` has the details, and `station/docs/BRIEF.md` is the product spec.
+
+**Config.** The bridge reads one JSON file, outside the repository: `--config <path>`, else `$OBSERVATORY_BRIDGE_CONFIG`, else `$XDG_CONFIG_HOME/observatory/bridge.json`, else `~/.config/observatory/bridge.json`. Every field is optional; an unknown field is an error the bridge reports, then it starts with defaults. Without a file only sessions started in the home folder appear, with a sidebar note saying where the file goes. The window reads it once at startup.
+
+| key | default | meaning |
+|---|---|---|
+| `projects[].name` / `.root` | required | the sidebar heading; the folder (a session belongs to the project whose `root` or `worktree_roots` holds its launch folder, longest match wins) |
+| `projects[].worktree_roots` | `[]` | folders holding the project's kit worktrees |
+| `projects[].gallery` | `[]` | image folders for the Visuals view, scanned recursively (`*` and `?` match in a path segment) |
+| `projects[].exact` | `false` | claim only `root` itself (use it for the home folder) |
+| `seats` | `[]` | names shown as seats; with none set, the kit's default seat name `Orca` |
+| `cutoff_days` / `liveness_secs` / `coalesce_ms` | `7` / `5` / `250` | how far back to read at startup (`0` = all); how often running processes are re-checked; how long updates to one session wait to go out together |
+
+**Typing to an agent: the safety rules.** Typing is the only thing the Station does besides reading, so it is narrow on purpose.
+
+- **Only on an explicit Send.** Nothing is typed until you click Send or press Enter (Shift+Enter is a new line). Nothing sends on startup, reconnect or focus, and a draft is never resent on its own.
+- **Only to the selected agent's own live tmux pane.** At send time the bridge finds the pane from the running process tree (that agent's `claude` process and the tmux pane it is in), never by name. It refuses when the agent is not running, is not in tmux, or the process or pane is ambiguous.
+- **Refused while the agent waits for an answer.** If Claude Code's session registry says a question or permission dialog is open, nothing is sent and the window says why.
+- The text is pasted as one block (`tmux load-buffer` plus a bracketed `paste-buffer`, so newlines stay inside the message), the pane is checked again, then Enter is pressed once. If the re-check finds that something changed after the paste began, the window says the result is uncertain and keeps your draft. A change in the moment between the last check and the Enter is not detected (see the limits).
+
+**Known limits.**
+
+- **A question that opens at the wrong moment.** The "waiting" check happens just before the paste. If the agent opens a question in the instant between that check and the paste, the pasted text lands in the question, though the bridge does not press Enter on it. Claude Code also writes "waiting" to its registry slightly after the dialog appears, which widens that window. Whether stray keys can pick an option in a real dialog has not been tested.
+- **A change right before the Enter.** The last check runs just before Enter is pressed. If a question opens or the pane changes between that check and the Enter, it is not detected, and the Enter goes to whatever is on screen then. Nothing checks the pane after the Enter.
+- **A session status the bridge does not know.** Claude Code's registry sometimes reports `shell` for live sessions. The bridge treats it as running, so sending is allowed. Where that status comes from has not been traced.
+- **The privacy checks are heuristics.** `real-data-check.py` does not yet catch timestamps rounded to the second or with zeroed milliseconds, epoch-millisecond numbers, or ids with changed case or dashes. `clean-tree.py` does not catch a term split across lines, a term inside base64, `%xx` or HTML entities, or a term spelled only with hex letters inside a long hex run.
+- **The log format is undocumented.** The parser follows Claude Code's local files as they are today and skips unknown record types. A new Claude Code version can still change what shows.
+- **Windows with WSL only, for now.** The window expects the bridge at `~/.local/share/observatory/bin/observatory-bridge` in the default WSL distro. The bridge itself starts directly on Linux, but there is no native Linux window build or installer yet (planned for 0.17.0).
+- Pages older than `cutoff_days` do not appear in the pages list. Raise it to see older ones, at some cost in startup time.
+
+**Choosing it in setup.** `/orchestration-kit:kit-init` asks once: interface = CLI (the default; nothing changes) or the Station. The answer is stored as `interface: cli | station` in the team block of `ORCHESTRATION.md`. Choosing the Station prints the install steps above and runs nothing.
 
 ## Assumed plugins (user-level — documented, never copied)
 

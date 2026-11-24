@@ -1,9 +1,11 @@
-# Observatory
+# Orcastration Station
+
+Orcastration Station, adapted from Omar's Observatory.
 
 A desktop window for watching, and typing to, several orchestration-kit teams at once.
 
 When a kit team runs, every agent has its own terminal: a seat plus its siblings, often in more
-than one project. Observatory puts them all in one place. The sidebar lists every agent in every
+than one project. Orcastration Station puts them all in one place. The sidebar lists every agent in every
 project you configure, and the main pane shows the selected agent's chat rendered like the Claude
 Code chat panel (Markdown, folded tool calls, live updates as the agent works).
 
@@ -54,7 +56,7 @@ sessions. The kit's own scripts keep doing that.
 | `crates/app` | the egui app; `tests/` has UI tests with snapshot images |
 | `scripts/gate.sh` | the full check: privacy checks, fmt, clippy, tests, Windows cross-build check |
 | `scripts/deploy.sh` | release build + install of both programs |
-| `scripts/env.sh` | points cargo at Observatory's own toolchain and a target dir per checkout |
+| `scripts/env.sh` | points cargo at the Station's own toolchain and a target dir per checkout |
 
 ## Requirements
 
@@ -66,7 +68,11 @@ sessions. The kit's own scripts keep doing that.
 
 ## Build and run
 
-All commands run in WSL, from this folder.
+All commands run in WSL, from this folder (`station/` in the kit repository). Until 0.17.0 the programs,
+the config folders and the environment variables keep the working name `observatory`; the commands below
+use those names as they are.
+
+The rustup line downloads an installer script from sh.rustup.rs and runs it (`curl | sh`). To avoid that, install rustup by hand ([the manual install page](https://rust-lang.github.io/rustup/installation/other.html)) with `RUSTUP_HOME` and `CARGO_HOME` set to the same two folders, then continue at the `rustup target add` line.
 
 ```bash
 # Toolchain: env.sh uses $OBSERVATORY_RUST_DIR (default ~/observatory-rust) for rustup, cargo and the
@@ -84,12 +90,12 @@ bash scripts/gate.sh             # last line: GATE PASS (<N> tests)
 # Install: builds both programs in release mode, runs the gate first, then copies
 #   observatory.exe + VERSION.txt into the folder you choose, and the bridge into
 #   ~/.local/share/observatory/bin (the app looks for it there), plus a desktop shortcut.
-bash scripts/deploy.sh --dry-run --install-root /mnt/c/Apps/Observatory   # see every step first
-bash scripts/deploy.sh --install-root /mnt/c/Apps/Observatory
+bash scripts/deploy.sh --dry-run --install-root /mnt/c/Apps/OrcastrationStation   # see every step first
+bash scripts/deploy.sh --install-root /mnt/c/Apps/OrcastrationStation
 ```
 
 `deploy.sh` has no default install folder: pass `--install-root`, set `OBSERVATORY_INSTALL_ROOT`, or put
-`install_root=<dir>` in `~/.config/observatory/deploy.conf`. It refuses a dirty tree, a commit that isn't
+`install_root=<dir>` in `~/.config/observatory/deploy.conf`. It refuses a dirty `station/` folder (the rest of the repository is not checked), a commit whose `station/` folder isn't
 on `origin/main` (`--allow-unlanded` overrides), and any gate run whose last line isn't
 `GATE PASS (<N> tests)`. It runs the gate through the kit's `scripts/gate-throttle.sh` when it finds one,
 either in this folder or at the repository root.
@@ -147,7 +153,7 @@ A leading `~/` means `$HOME`. The app reads this config once at startup, so rest
 
 ## Typing to an agent: the safety rules
 
-Typing is the only thing Observatory does besides reading, so it is narrow on purpose:
+Typing is the only thing the Station does besides reading, so it is narrow on purpose:
 
 - **Only on an explicit Send.** Nothing is typed until you click Send or press Enter (Shift+Enter is a
   new line). Nothing sends on startup, reconnect or focus, and a draft is never resent on its own.
