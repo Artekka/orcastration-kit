@@ -41,7 +41,7 @@ has "manifest: showForNames defaults to the kit's default seat" "seatdefault=Orc
 has "manifest: quiet-mode flag defaults to the kit's runtime file" "flagdefault=~/.orchestration-kit/runtime/quiet-mode" "$man"
 has "manifest: on command is the kit's quiet-mode script" "ondefault=bash scripts/quiet-mode.sh on" "$man"
 has "manifest: the chip is gated on the kit's quiet-mode script" '"default": "scripts/quiet-mode.sh"' "$(cat "$M")"
-# ORCA175-4: every place a user learns the HUD explains the WORK/QUIET chip (what it does, when it shows)
+# every place a user learns the HUD explains the WORK/QUIET chip (what it does, when it shows)
 for f in "$HUD/README.md" "$ROOT/README.md" "$ROOT/HOW-IT-WORKS.md" "$ROOT/docs/GETTING-STARTED.md" "$ROOT/docs/how-it-works.html"; do
   t="$(cat "$f" 2>/dev/null)"
   has "$(basename "$f"): chip paragraph heading" "What the WORK/QUIET chip does and when you'll see it" "$t"

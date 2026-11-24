@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Guard: no kit test may reach the CALLER'S tmux (ORCA322-7 r2). Since the tmux port, sibling-shell.sh runs
+# Guard: no kit test may reach the CALLER'S tmux. Since the tmux port, sibling-shell.sh runs
 # `tmux rename-window -t $TMUX_PANE <Name>`, so a suite run inside a tmux pane renamed the REAL window (ZzW...), and the
 # `tmux` backend of lib-launch.sh keys on $TMUX. Every test file must therefore unset both before it starts anything, and
 # tests/run.sh must start each file without them. Run: bash tests/no-real-tmux.test.sh

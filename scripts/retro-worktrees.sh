@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A retiring session removes its MERGED worktrees (run by /retro, Step 4b). Ported from a project whose disk filled with
-# hundreds of stale worktrees (ORCA301-7 b).
+# hundreds of stale worktrees.
 # Usage: scripts/retro-worktrees.sh --prefix <branch-prefix> [--dry-run]     (e.g. --prefix s5e307/)
 # Candidates: worktrees (git worktree list --porcelain) whose branch starts with the prefix. A tree whose tip is not an
 # ancestor of origin/main is kept (its commits are not on main yet). The rest go through worktree_removal_blocker
@@ -24,6 +24,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ "$have_prefix" = 1 ] && [ -n "$prefix" ] || usage
+# A prefix without its closing slash would also match a longer session id (s5e30 matches s5e307/a): require the slash.
+case "$prefix" in */) ;; *) echo "retro-worktrees: --prefix must end with / (e.g. s5e307/), or it can match another session's branches" >&2; exit 2 ;; esac
 
 here=$(git rev-parse --show-toplevel) || exit 2
 # One retry. A stale origin/main only makes fewer trees look merged, which is the safe direction.

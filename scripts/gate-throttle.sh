@@ -60,7 +60,9 @@ log=""
 if [ "${1:-}" = --log ]; then
   [ $# -ge 3 ] && [ -n "$2" ] || { echo "usage: gate-throttle.sh [--log <file>] <command> [args...]" >&2; exit 64; }
   log="$2"; shift 2
-  : > "$log" || { echo "gate-throttle: cannot write the log $log" >&2; exit 73; }
+  # append, not truncate: a refusal below (disk guard, one slot per worktree, reuse check) must leave an earlier log intact;
+  # the log is emptied only where the command actually starts (the redirect further down).
+  : >> "$log" || { echo "gate-throttle: cannot write the log $log" >&2; exit 73; }
 fi
 [ $# -ge 1 ] || { echo "usage: gate-throttle.sh [--log <file>] <command> [args...]" >&2; exit 64; }
 # The command, logged when --log was given: commit and dirty count first, read now, exit code last.

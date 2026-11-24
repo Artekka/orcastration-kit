@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for scripts/pending-work.sh: ported from the Einherjar project's ORCA211-126 / 257-8 line of fixes.
+# Tests for scripts/pending-work.sh: ported from the project that grew the script, with its fix history.
 # Run: bash tests/pending-work.test.sh   (PENDING_SCRIPT=<path> points the run at a mutant copy)
 # Safety: every repo is a throwaway under mktemp (a bare "origin" plus a clone); committer dates are planted so every age is
 # exact against a fixed PENDING_NOW; PENDING_NO_FETCH=1, no network; git config is isolated.
@@ -127,7 +127,7 @@ pw -- --help; eq "T17 --help exit" 2 "$RC"; has "T17 --help shows usage" "Usage:
 repo nomain; cm a.txt a $((NOW - D)); pw -- ; eq "T17 no origin/main exit" 2 "$RC"; has "T17 says which ref" "origin/main" "$ERR"
 pw PENDING_MAIN_REF=origin/trunk -- ; eq "T17 PENDING_MAIN_REF is honored (a missing ref)" 2 "$RC"; has "T17 names origin/trunk" "origin/trunk" "$ERR"
 
-# ---- UNPUSHED GREEN-FINAL (ORCA257-8): a reported GREEN-FINAL SHA (or cleared branch) that is on NO remote
+# ---- UNPUSHED GREEN-FINAL: a reported GREEN-FINAL SHA (or cleared branch) that is on NO remote
 repo up
 cm base.txt base $((NOW - 3*D)); G -C "$R" push -q origin main
 declare -A SH

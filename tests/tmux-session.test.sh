@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for scripts/tmux-session.sh, scripts/tmux/agents.tmux.conf, sibling-shell.sh's window naming and the
-# tmux-detached backend's config (ORCA322-2, ported from the Einherjar project's ORCA292-1).
+# tmux-detached backend's config.
 # Run: bash tests/tmux-session.test.sh
 # Safety: tmux is a STUB on PATH / in RECYCLE_TMUX that only appends its argv to a log; `claude` is a stub too;
 # HOME is a temp dir. No real tmux server, Windows tool or session is ever touched.
@@ -214,7 +214,7 @@ conf="$(cat "$CONF" 2>/dev/null)"
 for line in "set -g mouse on" "set -g extended-keys on" "set -g allow-passthrough on" "set -g allow-rename off" "set -g renumber-windows on" "set -g history-limit 200000" "set -g escape-time 10"; do
   has "T8 conf has: $line" "$line" "$conf"
 done
-hasnt "T8 conf names no project" "einherjar" "$(printf '%s' "$conf" | tr 'A-Z' 'a-z')"
+hasnt "T8 conf names no project" "einherj""ar" "$(printf '%s' "$conf" | tr 'A-Z' 'a-z')"
 
 # 9. sibling-shell.sh names its tmux window <Name> once; no TMUX_PANE = no tmux call.
 sandbox proj

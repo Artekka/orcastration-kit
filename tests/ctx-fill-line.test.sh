@@ -182,22 +182,22 @@ exit "${SSH_RC:-0}"
 SH
 chmod +x "$BIN/ssh"
 export SSH_ARGS_OUT="$TMP/ssh.args"
-out="$(PATH="$BIN:$PATH" SSH_RC=0 cf --host art@box 3f9a1c2e --window 1m --line; echo "rc=$?")"
+out="$(PATH="$BIN:$PATH" SSH_RC=0 cf --host user@host 3f9a1c2e --window 1m --line; echo "rc=$?")"
 has "--host relays the remote output" "remote said hi" "$out"; has "--host relays exit 0" "rc=0" "$out"
 args="$(cat "$SSH_ARGS_OUT")"
-has "--host targets the host" "art@box" "$args"
+has "--host targets the host" "user@host" "$args"
 has "--host runs ctx-fill.py remotely with the args" "scripts/ctx-fill.py" "$args"
 has "--host passes the uuid and flags through" "--window" "$args"
 hasnt "--host does not forward its own flag" "--host" "$args"
 has "--host never prompts for a password" "BatchMode=yes" "$args"
-out="$(PATH="$BIN:$PATH" SSH_RC=3 cf --host art@box --check x; echo "rc=$?")"
+out="$(PATH="$BIN:$PATH" SSH_RC=3 cf --host user@host --check x; echo "rc=$?")"
 has "--host relays a non-zero exit code" "rc=3" "$out"
 # the remote checkout: KIT_REMOTE_REPO wins; with none, the local checkout's path under $HOME is assumed on the remote too
-PATH="$BIN:$PATH" KIT_REMOTE_REPO='$HOME/elsewhere/proj' cf --host art@box x >/dev/null
+PATH="$BIN:$PATH" KIT_REMOTE_REPO='$HOME/elsewhere/proj' cf --host user@host x >/dev/null
 has "KIT_REMOTE_REPO sets the remote checkout" '$HOME/elsewhere/proj/scripts/ctx-fill.py' "$(cat "$SSH_ARGS_OUT")"
 out="$(cf --host; echo "rc=$?")"
 has "--host without a target is a usage error" "usage" "$out"
-hasnt "no project name is hard-coded" "einherjar" "$(cat "$CF")"
+hasnt "no project name is hard-coded" "einherj""ar" "$(cat "$CF")"
 
 echo "ctx-fill-line: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

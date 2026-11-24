@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # seat-merge.sh — the seat's merge path: merge a READ-passed branch onto a fresh origin/main, run the project's checks on
-# the MERGED tree, and push only when they are green. Ported from the Einherjar project, where 25 fix rounds hardened it;
+# the MERGED tree, and push only when they are green. Ported from the project that grew it, where 25 fix rounds hardened it;
 # every project-specific part is a config hook (see CONFIG below).
 #
 #   scripts/seat-merge.sh <branch> <expected-sha> "<merge message>"      (run from a clean merge worktree)

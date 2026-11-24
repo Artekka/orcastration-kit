@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for the gate-throttle.sh features ported from a project that has run the throttle daily (ORCA322-7):
+# Tests for the gate-throttle.sh features ported from a project that has run the throttle daily:
 #   unknown --option refusal · start-time stamps that survive load · the priority list re-read on every poll with one
 #   canonical path form · ONE slot per worktree · a signal stops the command's whole tree · D-state-aware load ·
 #   the worker cap handed to the command.
@@ -7,7 +7,7 @@
 # Run: bash tests/gate-throttle-port.test.sh   (needs bash, git, flock, timeout; skips without flock)
 set -u
 unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
-# the disk guard (scripts/gate-disk-guard.sh) refuses under 20 GB free: this suite is about throttling, not disk, so it must not turn red on a full host (ORCA324-5 r1)
+# the disk guard (scripts/gate-disk-guard.sh) refuses under 20 GB free: this suite is about throttling, not disk, so it must not turn red on a full host
 export KIT_GATE_MIN_FREE_GB=0
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; GT="$ROOT/scripts/gate-throttle.sh"; QM="$ROOT/scripts/quiet-mode.sh"
 command -v flock >/dev/null 2>&1 || { echo "gate-throttle-port: skipped (no flock)"; exit 0; }

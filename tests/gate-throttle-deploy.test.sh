@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for gate-throttle.sh DEPLOY MODE and the reuse-check hook, ported from a project that has run them daily (ORCA322-9):
+# Tests for gate-throttle.sh DEPLOY MODE and the reuse-check hook, ported from a project that has run them daily:
 #   a priority gate that runs confines every OTHER running gate's tree to a CPU subset (taskset; affinity is reversible, nice is
 #   not), holds new normal gates, never signals anyone, and gives each process back its OWN recorded mask on exit, on a dead owner
 #   (monitor) and at the next throttle start (a SIGKILLed release gate cannot leave anything confined).
@@ -8,7 +8,7 @@
 # Run: bash tests/gate-throttle-deploy.test.sh   (needs bash, flock, timeout, taskset; the mask cases need 4+ CPUs)
 set -u
 unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
-# the disk guard (scripts/gate-disk-guard.sh) refuses under 20 GB free: this suite is about throttling, not disk, so it must not turn red on a full host (ORCA324-5 r1)
+# the disk guard (scripts/gate-disk-guard.sh) refuses under 20 GB free: this suite is about throttling, not disk, so it must not turn red on a full host
 export KIT_GATE_MIN_FREE_GB=0
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; GT="$ROOT/scripts/gate-throttle.sh"; QM="$ROOT/scripts/quiet-mode.sh"
 command -v flock >/dev/null 2>&1 || { echo "gate-throttle-deploy: skipped (no flock)"; exit 0; }
@@ -236,7 +236,7 @@ has "--reuse-check after the command reaches the command" "gate got: --reuse-che
 out="$(cd "$TMP/work" && timeout 10 bash "$GT" --reuse-check bash -c true 2>&1; echo "rc=$?")"
 has "a LEADING --reuse-check is refused (exit 2)" "rc=2" "$out"; has "and named" "unknown option '--reuse-check'" "$out"
 
-# ── 17. (ORCA322-9 r1) a child born confined that a LATER sweep sees is not pinned ──
+# ── 17. a child born confined that a LATER sweep sees is not pinned ──
 # Test 9 stops the monitor after one sweep. Here the monitor keeps sweeping (0.3 s) while the late child sits on the confined mask:
 # the sweep must skip it (recording the confined mask as its "original" would pin it forever), so the restore frees it from its
 # gate's recorded mask. Mutant: drop the born-confined skip in dm_sweep.
@@ -253,7 +253,7 @@ if [ "$NPROC" -ge 8 ]; then
   until_ 10 equals "$la" "$before" && ok || bad "a born-confined child that a later sweep saw stayed pinned"
 else echo "gate-throttle-deploy: test 17 skipped (< 8 CPUs)"; fi
 
-# ── 18. (ORCA322-9 r1) restore frees an UNRECORDED confined process even when a record with a WRONG start time names its pid ──
+# ── 18. restore frees an UNRECORDED confined process even when a record with a WRONG start time names its pid ──
 # A dead deployer's state built by hand (no real deploy runs): the root is registered and recorded, the child sits on the confined
 # mask (3) and its record belongs to a reused pid. Mutant: dm_orig_of matches by pid only (the child would count as "recorded").
 if [ "$NPROC" -ge 4 ]; then
@@ -271,7 +271,7 @@ if [ "$NPROC" -ge 4 ]; then
   eq "the wrong-start record does not count as recorded: the child gets its gate's mask" "$full" "$(mask "$ch")"
 fi
 
-# ── 19. (ORCA322-9 r1) a leave while a sweep is mid-flight does not re-confine what it just restored ──
+# ── 19. a leave while a sweep is mid-flight does not re-confine what it just restored ──
 # KIT_DEPLOY_SWEEP_DELAY makes every sweep dawdle after reading the tree, so the leave lands INSIDE a sweep. The sweep visits the
 # gate's processes one by one, so the throttle AND its payload are both sampled: whichever the sweep had not reached yet at the
 # leave is the one a sweep without the owner re-check would confine afterwards. The masks are SAMPLED for 4 s, because the stale
@@ -288,7 +288,7 @@ if [ "$NPROC" -ge 4 ]; then
   eq "a leave mid-sweep: no process of the gate was re-confined" "$before/$beforeT " "$u"
 fi
 
-# ── 20. (ORCA322-9 r1) INT to the priority throttle restores and drops the state (the EXIT trap), like TERM and HUP in test 7 ──
+# ── 20. INT to the priority throttle restores and drops the state (the EXIT trap), like TERM and HUP in test 7 ──
 # A job started with `&` from a non-interactive shell ignores INT and cannot trap it, so the throttle is started through python3
 # with the default disposition restored (exec keeps it).
 if [ "$NPROC" -ge 4 ] && command -v python3 >/dev/null 2>&1; then

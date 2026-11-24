@@ -48,5 +48,10 @@ pv="$(grep -m1 '"version"' "$ROOT/.claude-plugin/plugin.json" | sed 's/.*"versio
 mv="$(python3 -c "import json,sys; print(next((p.get('version','') for p in json.load(open(sys.argv[1]))['plugins'] if p['name']=='orchestration-kit'), ''))" "$ROOT/.claude-plugin/marketplace.json")"
 cv="$(grep -m1 -E '^## [0-9]+\.[0-9]+\.[0-9]+' "$ROOT/CHANGELOG.md" | sed -E 's/^## ([0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
 [ -n "$pv" ] && [ "$pv" = "$mv" ] && [ "$pv" = "$cv" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL version mismatch: plugin.json=$pv marketplace.json=$mv newest CHANGELOG heading=$cv"; }
+# The bug-report placeholder and the first line under README "What's new" name the same version.
+bv="$(grep -m1 -E 'placeholder: "[0-9]' "$ROOT/.github/ISSUE_TEMPLATE/bug_report.yml" | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')"
+[ "$bv" = "$pv" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL bug-report placeholder is '$bv', plugin.json is '$pv'"; }
+rv="$(awk '/^## What.s new/{on=1;next} on && /^v[0-9]+\.[0-9]+\.[0-9]+/{sub(/^v/,"");sub(/:.*/,"");print;exit}' "$ROOT/README.md")"
+[ "$rv" = "$pv" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL README What's new starts at '$rv', plugin.json is '$pv'"; }
 echo "docs-pins: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

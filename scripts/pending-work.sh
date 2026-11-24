@@ -203,7 +203,7 @@ for text in texts:
 
 def branches_for(row, shas):
     low = row.lower()
-    # a boundary on both sides: row orca211-11 must not claim the branch for orca211-110
+    # a boundary on both sides: row s2e11-1 must not claim the branch for s2e11-10
     pat = re.compile(r"(?<![a-z0-9-])" + re.escape(low) + r"(?![a-z0-9]|-\d)")
     hit = [n for n in branches if pat.search(n.lower().split("/", 1)[-1])]
     if hit:

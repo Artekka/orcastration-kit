@@ -7,7 +7,7 @@
 # Every direct call carries a timeout, so a regression that blocks shows as a FAIL, not a hung suite.
 set -u
 unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
-# the disk guard (scripts/gate-disk-guard.sh) refuses under 20 GB free: this suite is about throttling, not disk, so it must not turn red on a full host (ORCA324-5 r1)
+# the disk guard (scripts/gate-disk-guard.sh) refuses under 20 GB free: this suite is about throttling, not disk, so it must not turn red on a full host
 export KIT_GATE_MIN_FREE_GB=0
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; GT="$ROOT/scripts/gate-throttle.sh"; QM="$ROOT/scripts/quiet-mode.sh"
 command -v flock >/dev/null 2>&1 || { echo "gate-throttle: skipped (no flock)"; exit 0; }

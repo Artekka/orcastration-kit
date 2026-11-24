@@ -45,14 +45,14 @@ bash "$BS" "$P" >/dev/null 2>&1
 cp "$ROOT/templates/CLAUDE-slimness.md" "$P/docs/orchestration/CLAUDE-slimness.md"
 [ -x "$P/scripts/start-team.sh" ] && ok || bad "start-team.sh not executable"
 [ -x "$P/scripts/seat-merge.sh" ] && ok || bad "seat-merge.sh not executable"
-# seat-merge sources its two libs from its own directory, so all three must travel together (ORCA322-7)
+# seat-merge sources its two libs from its own directory, so all three must travel together
 for lib in lib-waiting-tickets.sh lib-builder-worktree.sh; do
   grep -q "$lib" "$ROOT/scripts/seat-merge.sh" && ok || bad "seat-merge.sh no longer sources $lib (update this pin)"
   grep -q "quiet-mode.sh .*$lib" "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install $lib"
   bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q "^\\[bootstrap\\] CREATE scripts/$lib" && ok || bad "dry-run did not list $lib"
 done
 grep -q 'seat-merge.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install seat-merge.sh"
-# tmux-session.sh loads scripts/tmux/agents.tmux.conf from its own directory, so the two travel together (ORCA322-7 r1)
+# tmux-session.sh loads scripts/tmux/agents.tmux.conf from its own directory, so the two travel together
 [ -x "$P/scripts/tmux-session.sh" ] && ok || bad "tmux-session.sh not executable"
 grep -q 'tmux/agents.tmux.conf' "$ROOT/scripts/tmux-session.sh" && ok || bad "tmux-session.sh no longer loads tmux/agents.tmux.conf (update this pin)"
 bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/tmux-session.sh' && ok || bad "dry-run did not list tmux-session.sh"
@@ -61,14 +61,14 @@ cmp -s "$ROOT/scripts/tmux/agents.tmux.conf" "$P/scripts/tmux/agents.tmux.conf" 
 grep -q 'tmux-session.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install tmux-session.sh"
 grep -q 'for f in .*tmux/agents.tmux.conf.*; do SRC="\$K/scripts/\$f"' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install scripts/tmux/agents.tmux.conf"
 grep -q 'chmod +x .*scripts/tmux-session.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not chmod tmux-session.sh"
-# sibling-shell.sh: tmux-session.sh --seat and the in-place recycle both run "$script_dir/sibling-shell.sh" (ORCA322-7 r2)
+# sibling-shell.sh: tmux-session.sh --seat and the in-place recycle both run "$script_dir/sibling-shell.sh"
 grep -q 'sibling-shell.sh' "$ROOT/scripts/tmux-session.sh" && ok || bad "tmux-session.sh no longer runs sibling-shell.sh (update this pin)"
 grep -q 'sibling-shell.sh' "$ROOT/scripts/recycle-sibling.sh" && ok || bad "recycle-sibling.sh no longer uses sibling-shell.sh (update this pin)"
 [ -x "$P/scripts/sibling-shell.sh" ] && ok || bad "sibling-shell.sh not executable"
 bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/sibling-shell.sh' && ok || bad "dry-run did not list sibling-shell.sh"
 grep -q 'pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh; do SRC' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install sibling-shell.sh"
 grep -q 'chmod +x .*scripts/sibling-shell.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not chmod sibling-shell.sh"
-# pending-work.sh is one file (its python is inline), installed and made executable by both paths (ORCA322-7)
+# pending-work.sh is one file (its python is inline), installed and made executable by both paths
 [ -x "$P/scripts/pending-work.sh" ] && ok || bad "pending-work.sh not executable"
 bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/pending-work.sh' && ok || bad "dry-run did not list pending-work.sh"
 grep -q 'quiet-mode.sh .*pending-work.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install pending-work.sh"

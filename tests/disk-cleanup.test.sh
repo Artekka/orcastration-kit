@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for the kit's disk cleanup (ORCA324-5 phase 1), ported from the project whose SSD filled (>=170 GB of old Docker images,
+# Tests for the kit's disk cleanup, ported from the project whose SSD filled (>=170 GB of old Docker images,
 # worktrees and leftovers): scripts/retro-worktrees.sh, scripts/docker-cache-cap.sh, scripts/gate-disk-guard.sh and its wiring into
 # scripts/gate-throttle.sh. Run: bash tests/disk-cleanup.test.sh
 # Safety: every repo is a throwaway under mktemp (a bare "origin" plus a clone); `df` and `docker` are FAKE scripts, so no real
@@ -48,6 +48,7 @@ sandbox
 out="$(rw)"; has "no --prefix: usage" "usage: scripts/retro-worktrees.sh" "$out"; has "no --prefix: exit 2" "rc=2" "$out"
 out="$(rw --prefix '')"; has "an empty prefix is refused (it would match every worktree)" "rc=2" "$out"
 out="$(rw --bogus)"; has "an unknown option is refused" "rc=2" "$out"
+out="$(rw --prefix s5e30)"; has "a prefix without a closing slash is refused (it would match s5e307/)" "rc=2" "$out"
 
 sandbox; tree s5e307/a 1; a="$TREE"
 out="$(rw --prefix s5e307/)"
@@ -64,6 +65,15 @@ sandbox; tree s5e307/a 1; echo dirty > "$TREE/new.txt"
 out="$(rw --prefix s5e307/)"
 has "a dirty tree is kept with the reason" "kept" "$out"; has "dirty reason" "uncommitted or untracked" "$out"; [ -d "$TREE" ] && ok || bad "a dirty tree was removed"
 
+# keep rule: an IGNORED file that is not rebuildable output (a secrets file such as .env) keeps an otherwise merged, clean, idle tree
+sandbox; printf '.env\n' >> "$SB/work/.git/info/exclude"; tree s5e307/a 1; echo 'TOKEN=x' > "$TREE/.env"; find "$TREE" -type f -not -path '*/.git/*' -exec touch -d '3 hours ago' {} +
+out="$(rw --prefix s5e307/)"
+has "an ignored non-build file (.env) keeps the tree" "ignored file that is not rebuildable output" "$out"; [ -f "$TREE/.env" ] && ok || bad "the .env file was deleted with its tree"
+# keep rule: the shared check itself refuses a tree whose branch has local commits that origin/main lacks
+sandbox; tree s5e307/a 0; echo y > "$TREE/y.txt"; G -C "$TREE" add y.txt; G -C "$TREE" commit -q -m "local only"; find "$TREE" -type f -not -path '*/.git/*' -exec touch -d '3 hours ago' {} +
+out="$(cd "$SB/work" && . "$ROOT/scripts/lib-builder-worktree.sh" && worktree_removal_blocker "$TREE" s5e307/a "" 2>&1)"
+has "a worktree with local commits not on origin/main is kept" "1 commit(s) not on origin/main" "$out"
+
 sandbox; tree s5e307/a 0; echo y > "$TREE/y.txt"; G -C "$TREE" add y.txt; G -C "$TREE" commit -q -m "unmerged work"; find "$TREE" -type f -not -path '*/.git/*' -exec touch -d '3 hours ago' {} +
 out="$(rw --prefix s5e307/)"
 has "an unmerged branch is kept" "is not merged into origin/main" "$out"; [ -d "$TREE" ] && ok || bad "an unmerged tree was removed"
@@ -71,7 +81,7 @@ has "an unmerged branch is kept" "is not merged into origin/main" "$out"; [ -d "
 sandbox; tree s5e307/a 1
 ( cd "$TREE" && exec sleep 30 ) & holder=$!; sleep 0.3
 out="$(rw --prefix s5e307/)"; kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
-has "a merged, idle tree with a live process cwd inside is kept (ORCA324-5 r1)" "has its cwd inside it" "$out"; [ -d "$TREE" ] && ok || bad "a tree with a live process inside was removed"
+has "a merged, idle tree with a live process cwd inside is kept" "has its cwd inside it" "$out"; [ -d "$TREE" ] && ok || bad "a tree with a live process inside was removed"
 
 sandbox; tree s5e307/a 1; touch "$TREE/README.md"
 out="$(rw --prefix s5e307/)"
@@ -148,6 +158,9 @@ command -v flock >/dev/null 2>&1 && {
   out="$(gt 5)"; has "a low disk refuses the gate (exit 1)" "rc=1" "$out"; has "with the guard's message" "GATE REFUSED" "$out"
   eq "the command did not run" 0 "$(wc -l < "$TMP/ran")"
   eq "and no ticket or run entry was created" "" "$(ls "$RTD/queue" "$RTD/running" 2>/dev/null | tr -d '\n')"
+  printf 'OLD LOG\n' > "$TMP/keep.log"
+  out="$(cd "$TMP" && env KIT_RUNTIME_DIR="$RTD" GATE_POLL=0.1 GATE_SLOTS=2 KIT_DF_BIN="$FDF" FAKE_FREE_GB=5 bash "$GT" --log "$TMP/keep.log" bash -c true 2>&1; echo "rc=$?")"
+  has "--log: a refused gate exits 1" "rc=1" "$out"; eq "--log: a refusal leaves the earlier log intact" "OLD LOG" "$(cat "$TMP/keep.log")"
   out="$(gt 100)"; has "enough disk: the gate runs" "rc=0" "$out"; eq "the command ran once" 1 "$(wc -l < "$TMP/ran")"
   out="$(gt 5 KIT_GATE_MIN_FREE_GB=1)"; has "a lowered minimum lets it through" "rc=0" "$out"
   # a project that did not copy the guard script has no check

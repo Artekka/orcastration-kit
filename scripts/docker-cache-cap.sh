@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cap the Docker BUILD cache at KIT_BUILD_CACHE_KEEP (default 40GB), keeping the most recently used layers.
 # Call it AFTER a deploy that passed its health check, never before: a deploy that is still failing keeps the layers it needs
-# to be re-run fast. Every deploy adds layers; with no cap one project's cache reached 180 GB and filled the disk (ORCA301-7 c).
+# to be re-run fast. Every deploy adds layers; with no cap one project's cache reached 180 GB and filled the disk.
 # Usage: scripts/docker-cache-cap.sh [--dry-run]
 #   --dry-run  print the command it would run and change nothing.
 # A prune failure only WARNS and still exits 0: the deploy it follows has already succeeded. No docker on the host = a note, exit 0.

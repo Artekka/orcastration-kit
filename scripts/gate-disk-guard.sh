@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Refuse to start a gate when free space is below the minimum. gate-throttle.sh runs it before it queues.
-# WHY: leaked test-container volumes, old images and build output filled a host disk to 100% (ORCA211-17). A gate writes a lot
+# WHY: leaked test-container volumes, old images and build output filled a host disk to 100%. A gate writes a lot
 # (builds, containers), so it must not run into a full disk.
 # Minimum, in GB: env KIT_GATE_MIN_FREE_GB, else `gate_min_free_gb:` in the team block of docs/orchestration/ORCHESTRATION.md
 # (read from the MAIN checkout), else 20. 0 turns the guard off. The disk checked is KIT_GATE_DISK_PATH (default /).

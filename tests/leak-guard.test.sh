@@ -4,6 +4,7 @@
 #   - an email address (only noreply forms and the reserved example.* domains are allowed)
 #   - AWS, GitHub, Anthropic and OpenAI key shapes
 #   - a private-key header
+#   - a project word: the originating project's name or one of its board row ids (the deny list is in CLASSES)
 # It scans every tracked file plus untracked files that are not ignored, so a planted file fails before
 # it is committed. Part 1 plants each class in a sandbox (the scanner must catch it); part 2 scans the repo.
 # The planted values are built from pieces at run time, so this file never holds a matching string itself.
@@ -25,6 +26,10 @@ github-token	\bgithub_pat_[A-Za-z0-9_]{22,}
 anthropic-key	\bsk-ant-[A-Za-z0-9_-]{20,}
 openai-key	\bsk-(proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}
 private-key	-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY( BLOCK)?-----
+# project-word: the kit is public, so a project's name and its board row ids must not ship. The deny list is these two
+# patterns; a bracket in the name keeps this file from matching itself. Add a word by adding a line.
+project-word	einherj[a]r
+project-word	orca[0-9]+-[0-9]+
 EOF
 )"
 # home-path (READ r0-r2): home or users counts only as the FIRST directory of an absolute path. That is, at the start of a
@@ -55,7 +60,7 @@ leak_scan() {  # <dir> → "label file:line: match" per finding, nothing when cl
   while IFS=$'\t' read -r label re; do
     case "$label" in home-path) allow="$ALLOW_HOME" ;; email) allow="$ALLOW_EMAIL" ;; openai-key) allow="$ALLOW_OPENAI" ;; *) allow='' ;; esac
     # -I skips binary files; -o prints each match on its own line; -H keeps file:line: with one file
-    local gi=""; [ "$label" = home-path ] && gi=i   # a home path in any case (C:\USERS, /HOME)
+    local gi=""; { [ "$label" = home-path ] || [ "$label" = project-word ]; } && gi=i   # a home path in any case (C:\USERS, /HOME)
     (cd "$dir" && grep -HonIE$gi -- "$re" "${files[@]}" 2>/dev/null) | while IFS= read -r hit; do
       local m="${hit#*:}"; m="${m#*:}"
       local subject="$m" icase=""
@@ -147,6 +152,10 @@ plant openai-key     "OPENAI_API_KEY=sk-""${L}"
 plant private-key    "-----BEGIN ""PRIVATE KEY-----"
 plant private-key    "-----BEGIN ""OPENSSH PRIVATE KEY-----"
 plant private-key    "-----BEGIN ""RSA PRIVATE KEY-----"
+plant project-word   "ported from the Einherj""ar project"
+plant project-word   "ported from the EINHERJ""AR project"
+plant project-word   "fixed in OR""CA322-9 r1"
+clean project-word   "ported from the project that grew the script; ORCA is a word, row ids are not shipped"
 clean email          "Co-Authored-By: Claude <noreply""@anthropic.com> and 12345+someone""@users.noreply.github.com"
 clean email          "t""@example.com, git""@github.com:owner/repo.git, plugin@marketplace-name"
 clean anthropic-key  "an Anthropic key starts with sk-ant- and the docs never show one"

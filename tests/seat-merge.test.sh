@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests for scripts/seat-merge.sh (+ lib-builder-worktree.sh, lib-waiting-tickets.sh): ported from the Einherjar project's
-# ORCA271-3 / 289-5 / 298-11 / 301-7 / 311-8 / 281-1 line of fixes. Run: bash tests/seat-merge.test.sh
+# Tests for scripts/seat-merge.sh (+ lib-builder-worktree.sh, lib-waiting-tickets.sh): ported from the project that grew the script,
+# with its fix history. Run: bash tests/seat-merge.test.sh
 # Safety: every repo is a throwaway under mktemp (a bare "origin", a builder clone, a merge clone); HOME and the runtime dir are
 # temp; git config is isolated; no network. Processes are killed only by exact pid.
 set -u
