@@ -17,8 +17,8 @@
 //! id (bracketed paste, line feeds kept as they are, the buffer deleted), then ONE
 //! `send-keys Enter`. The bridge re-resolves the pane right before the paste and right before
 //! the Enter (see `Bridge::on_request_line`), and reads the pane's visible text
-//! (`capture-pane -p`) at both points: a menu open there ([`crate::screen`]), or a read that
-//! fails or takes over two seconds, refuses the send. The text never passes through a shell
+//! (`capture-pane -p`) at both points: unless Claude Code's idle input box is on screen
+//! ([`crate::screen`]), or when a read fails or takes over two seconds, the send is refused. The text never passes through a shell
 //! or through `send-keys`, so nothing in it is a key name or an expansion. Only the subcommands in
 //! [`SUBCOMMANDS`] are ever run (`tests/read_only.rs` checks this file's literals).
 

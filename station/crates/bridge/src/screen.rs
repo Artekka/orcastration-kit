@@ -1,55 +1,86 @@
-//! Is a Claude Code menu (a permission dialog or a question) open on an agent's screen?
-//! A send reads the pane right before the paste and right before the Enter, because Claude
-//! Code writes `waiting` to its registry only after the dialog is drawn, and an Enter into a
-//! permission menu picks its highlighted option ("Yes").
+//! May a send type into this pane now? A send reads the pane right before the paste and
+//! right before the Enter, because Claude Code writes `waiting` to its registry only after a
+//! dialog is drawn, and an Enter into a menu picks its highlighted option.
 //!
-//! **Rule** ([`menu_open`]): in the bottom [`BOTTOM_ROWS`] rows of the pane (trailing empty
-//! rows dropped), a menu is open when a row starts, after spaces, with the cursor `❯` and a
-//! numbered option (`❯ 2. Table`), and no input-box rule (a row of `─` only) comes after
-//! that row. Claude Code draws its input box between two such rules, so text typed there,
-//! even a quoted menu, is never a menu.
+//! **ALLOW rule** ([`input_box_ready`]): a send may type only when Claude Code's idle input
+//! box is seen at the bottom of the pane. Every other screen refuses: an empty capture, a
+//! question or permission menu, any dialog, a shell, a shape not seen before. From the
+//! bottom, trailing empty rows dropped:
+//! 1. a footer of at most [`MAX_FOOTER_ROWS`] rows ([`MAX_FOOTER_TEXT_ROWS`] with text, at
+//!    least one): status and hint rows, each starting with exactly two spaces, no `❯`;
+//! 2. the bottom rule: a row of `─` only;
+//! 3. the box: the prompt row, starting with `❯` in the first column, then any rows that
+//!    are not rules (text typed into the box);
+//! 4. the top rule: a row of `─` only, or `─` rows around a session name (`──── Ada ─`).
 //!
-//! This follows how Claude Code draws its screen today (the cursor glyph, numbered options,
-//! the ruled input box). If that drawing changes, the check can miss a menu; the registry
-//! status check still runs (README, Known limits).
+//! The shape follows real `tmux capture-pane -p` captures of Claude Code 2.1.322 (README,
+//! Known limits): if Claude Code draws its input box differently, sends refuse.
+
+/// Rows (blank ones included) allowed under the input box.
+pub const MAX_FOOTER_ROWS: usize = 12;
+/// Rows with text allowed under the input box.
+pub const MAX_FOOTER_TEXT_ROWS: usize = 6;
+
+/// Claude Code's prompt, in the first column of the input box.
+const PROMPT: char = '❯';
 
 /// Whether the idle input box is seen at the bottom of `screen`: the only screen a send may
 /// type into.
 pub fn input_box_ready(screen: &str) -> bool {
-    // RED stub: the old deny rule (the fix replaces it).
-    !menu_open(screen)
-}
-
-/// Rows at the bottom of the pane that are searched. Menus sit at the bottom of the screen.
-pub const BOTTOM_ROWS: usize = 15;
-
-/// The cursor Claude Code puts on the selected option of a menu.
-const CURSOR: char = '❯';
-
-/// Whether `screen` (the visible text of a pane) shows an open menu.
-pub fn menu_open(screen: &str) -> bool {
-    let rows: Vec<&str> = screen.lines().map(str::trim_end).collect();
-    let last = rows.iter().rposition(|r| !r.is_empty());
-    let end = last.map_or(0, |i| i + 1);
-    let bottom = &rows[end.saturating_sub(BOTTOM_ROWS)..end];
-    let Some(option) = bottom.iter().rposition(|r| is_cursor_option(r)) else {
+    let mut rows: Vec<&str> = screen.lines().map(str::trim_end).collect();
+    while rows.last().is_some_and(|r| r.is_empty()) {
+        rows.pop();
+    }
+    // 1. The footer, up to the bottom rule.
+    let Some(bottom) = rows.iter().rposition(|r| is_rule(r)) else {
         return false;
     };
-    !bottom[option + 1..].iter().any(|r| is_rule(r))
-}
-
-/// `❯ 1. Yes`: the cursor, then a number and a dot.
-fn is_cursor_option(row: &str) -> bool {
-    let Some(rest) = row.trim_start().strip_prefix(CURSOR) else {
+    let footer = &rows[bottom + 1..];
+    let text_rows = footer.iter().filter(|r| !r.is_empty()).count();
+    if footer.len() > MAX_FOOTER_ROWS
+        || text_rows == 0
+        || text_rows > MAX_FOOTER_TEXT_ROWS
+        || !footer.iter().all(|r| r.is_empty() || is_hint(r))
+    {
+        return false;
+    }
+    // 2 to 4. The nearest top rule above, with the prompt row right under it and no rule
+    // row between it and the bottom rule.
+    let Some(top) = rows[..bottom].iter().rposition(|r| is_top_rule(r)) else {
         return false;
     };
-    let rest = rest.trim_start();
-    let digits = rest.chars().take_while(char::is_ascii_digit).count();
-    digits > 0 && rest[digits..].starts_with(". ")
+    let inside = &rows[top + 1..bottom];
+    inside.first().is_some_and(|r| r.starts_with(PROMPT))
+        && !inside.iter().any(|r| is_rule(r) || is_top_rule(r))
 }
 
-/// A row of box-drawing `─` only (the input box's top and bottom edges).
+/// A hint or status row: exactly two spaces, then text, and never the prompt or a cursor.
+fn is_hint(row: &str) -> bool {
+    row.strip_prefix("  ")
+        .is_some_and(|t| !t.starts_with(' ') && !t.is_empty())
+        && !row.contains(PROMPT)
+}
+
+/// A row of box-drawing `─` only, at least ten wide.
 fn is_rule(row: &str) -> bool {
-    let r = row.trim();
-    r.chars().count() >= 10 && r.chars().all(|c| c == '─')
+    row.chars().count() >= 10 && row.chars().all(|c| c == '─')
+}
+
+/// A rule, or a rule with a session name in it: `─` rows, ` name `, then `─` to the end.
+fn is_top_rule(row: &str) -> bool {
+    if is_rule(row) {
+        return true;
+    }
+    let head = row.len() - row.trim_start_matches('─').len();
+    let tail = row.len() - row.trim_end_matches('─').len();
+    let name = &row[head..row.len() - tail];
+    // `─` is three bytes, so three rule characters are nine bytes.
+    head >= 9
+        && tail >= 3
+        && row.chars().count() >= 10
+        && name.len() > 2
+        && name.starts_with(' ')
+        && name.ends_with(' ')
+        && !name.trim().is_empty()
+        && !name.contains('─')
 }

@@ -25,6 +25,10 @@ out, ready = sys.argv[1], sys.argv[2]
 limit = float(sys.argv[3]) if len(sys.argv) > 3 else 20
 fd = 0
 tty.setraw(fd)
+# Draw Claude Code's idle input box: the bridge types only when it sees one on screen.
+rule = "\u2500" * 60
+box = "\r\n" + rule + "\r\n\u276f\u00a0\r\n" + rule + "\r\n  ? for shortcuts\r\n"
+os.write(1, box.encode())
 os.write(1, b"\x1b[?2004h")  # ask for bracketed paste, as Claude Code does
 with open(ready, "w") as f:
     f.write(str(os.getpid()))

@@ -164,11 +164,12 @@ Typing is the only thing the Station does besides reading, so it is narrow on pu
   `idle` (the prompt is open), `busy` (a turn runs; the message queues) or `shell` (a shell command
   runs beside the open prompt). If it says `waiting` (a question or permission dialog is open), gives
   no status, or gives any other value, nothing is sent and the app says why.
-- **Refused while a menu is on screen.** Right before the paste and right before the Enter, the bridge
-  reads the pane's visible text (`tmux capture-pane -p`, read only). If a Claude Code menu (a
-  permission dialog or a question) is open at the bottom of the screen, nothing more is typed and the
-  app says why. If the screen can't be read, or the read takes over two seconds, the send is refused
-  too. This catches a dialog that opened before Claude Code wrote "waiting" to its registry.
+- **Sent only while the idle input box is on screen.** Right before the paste and right before the
+  Enter, the bridge reads the pane's visible text (`tmux capture-pane -p`, read only). It types only
+  when Claude Code's idle input box is at the bottom of the screen; any other screen (a question, a
+  permission dialog, a shell, an empty or unknown screen) refuses, and the app says why. If the screen
+  can't be read, or the read takes over two seconds, the send is refused too. This catches a dialog
+  that opened before Claude Code wrote "waiting" to its registry.
 - The text is pasted as one block (`tmux load-buffer` + a bracketed `paste-buffer`, so newlines stay
   inside the message), the pane is checked again, then Enter is pressed once. If a re-check finds that
   something changed after the paste began, the app says the result is uncertain and keeps your draft.
@@ -196,11 +197,14 @@ Each check skips when its input is missing. Create `~/.config/observatory/strict
 - **A change right before the Enter.** The last checks (status, pane, screen) run just before Enter is
   pressed. If a question opens in the few milliseconds between them and the Enter, it isn't detected,
   and the Enter goes to whatever is on screen then. Nothing checks the pane after the Enter.
-- **The menu check depends on how Claude Code draws its screen.** It looks in the bottom 15 rows for
-  the `❯` cursor on a numbered option (`❯ 1. Yes`) with no input-box rule (a row of `─`) under it.
-  If a future Claude Code draws menus differently (another cursor glyph, unnumbered options, a rule
-  under the menu), the check can miss a menu, and only the registry status check is left. It was
-  written from Claude Code's screens as they are today; it has not been run against a live dialog.
+- **The screen check depends on how Claude Code draws its input box.** A send types only when the
+  bottom of the pane shows the input box as Claude Code 2.1.322 draws it: a rule of `─` (it may
+  carry the session name), the `❯` prompt row and any typed rows, a second rule, then up to six
+  status or hint rows that start with two spaces. That shape comes from real `tmux capture-pane`
+  captures. If a future Claude Code draws the box differently, every send is refused until the
+  check is updated: an unknown screen refuses, it never sends. The refusal tests for the question
+  menu and the permission dialog use shapes derived from Claude Code's code, not captured from a
+  live dialog.
 - **What `shell` means is inferred, not documented.** Claude Code's registry reports `shell` for some
   live sessions. On one machine with ten live sessions (each registry file checked against its
   process's start time in `/proc`), every `shell` entry had a running shell child process and no idle

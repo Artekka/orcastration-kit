@@ -36,9 +36,9 @@ use crate::screen;
 use crate::tail::{Changes, Tail};
 use crate::tmux::{self, Terminal, Tmux};
 
-/// The refusal when a menu is open on the agent's screen.
-const MENU_OPEN: &str = "A question or permission menu is open in this agent's terminal. \
-                         Answer it there first.";
+/// The refusal when the agent's idle input box is not on its screen.
+const NO_INPUT_BOX: &str = "This agent's input box isn't on its screen (a question or a dialog \
+                            may be open), so nothing more is typed. Check its terminal.";
 
 /// Why a send did not complete: before anything was typed, or after the paste began.
 enum Failed {
@@ -197,9 +197,9 @@ impl<W: Write> Bridge<W> {
         Ok(target)
     }
 
-    /// Read `pane` now: refuse when a menu is open there, or when the screen can't be read
-    /// (fail closed). Claude Code marks a dialog `waiting` only after drawing it, so the
-    /// registry alone can miss one.
+    /// Read `pane` now: refuse unless Claude Code's idle input box is on screen, and when the
+    /// screen can't be read (fail closed). Claude Code marks a dialog `waiting` only after
+    /// drawing it, so the registry alone can miss one.
     fn no_menu(&mut self, pane: &str) -> Result<(), String> {
         let shown = match self.term.screen(pane) {
             Ok(s) => s,
@@ -210,8 +210,8 @@ impl<W: Write> Bridge<W> {
                 ));
             }
         };
-        if screen::menu_open(&shown) {
-            return Err(MENU_OPEN.into());
+        if !screen::input_box_ready(&shown) {
+            return Err(NO_INPUT_BOX.into());
         }
         Ok(())
     }
