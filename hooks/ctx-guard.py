@@ -13,7 +13,9 @@ forgotten without adding a line to every tool call.
 
 Opt-in: silent unless the repo's main checkout carries docs/orchestration/.kit-hooks AND
 docs/orchestration/ORCHESTRATION.md says `ctx_guard: on`. Window: `context_window: 1m|200k` there
-(default 1m); a transcript naming a Haiku model is always 200K (while the fill fits in 200K).
+(when that line is absent: the window this session was launched with, read from its own `claude --model` argument by
+scripts/launched_window.py, only when this hook's claude ancestor IS this session; else 1m). A transcript naming a Haiku
+model is always 200K, and a fill above 200K is never judged on the 200K marks (a /model switch is not in argv).
 Never fails: any error = no output, exit 0.
 """
 import json
@@ -44,16 +46,30 @@ def main_checkout(cwd):
 
 
 def config(cwd):
-    """(enabled, small_window) for the repo holding cwd."""
+    """(enabled, small_window, declared) for the repo holding cwd; declared = the team block names a context_window."""
     top = main_checkout(cwd)
     if not top or not os.path.isfile(os.path.join(top, "docs/orchestration/.kit-hooks")):
-        return False, False
+        return False, False, False
     try:
         text = open(os.path.join(top, "docs/orchestration/ORCHESTRATION.md"), encoding="utf8").read()
     except OSError:
-        return False, False
+        return False, False, False
     w = WINDOW.search(text)
-    return bool(ON.search(text)), bool(w and w.group(1).lower() in ("200k", "200000"))
+    return bool(ON.search(text)), bool(w and w.group(1).lower() in ("200k", "200000")), bool(w)
+
+
+def launched_small(session_id):
+    """True / False = this session was launched with a 200K / 1M window; None = not known (no claude ancestor that is this session)."""
+    try:
+        import importlib.util
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts", "launched_window.py")
+        spec = importlib.util.spec_from_file_location("launched_window", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        lw = mod.from_env()
+        return (lw["window"] == "200k") if mod.owns(lw, session_id) else None
+    except Exception:
+        return None
 
 
 def last_usage(path):
@@ -106,11 +122,13 @@ def main():
         sid = re.sub(r"[^A-Za-z0-9_-]", "_", hook.get("session_id") or os.path.basename(path)[:-6])
         if not path or not os.path.exists(path):
             return
-        enabled, small_window = config(hook.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+        enabled, small_window, declared = config(hook.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
         if not enabled:
             return
         fill, model = last_usage(path)
-        small = small_window or ("haiku" in model.lower() and fill <= MARKS["small"]["wall"])
+        fits = fill <= MARKS["small"]["wall"]
+        launched = None if declared else launched_small(hook.get("session_id") or os.path.basename(path)[:-6])
+        small = small_window or (launched is True and fits) or ("haiku" in model.lower() and fits)
         m = MARKS["small" if small else "large"]
         if fill < m["warn"]:
             return

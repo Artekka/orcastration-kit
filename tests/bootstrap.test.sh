@@ -23,7 +23,7 @@ echo "$out" | grep -q 'DONE' && ok || bad "dry-run plan truncated (no DONE line)
 out="$(bash "$BS" "$P" 2>&1)"; rc=$?
 [ $rc -eq 0 ] && ok || bad "first run exit $rc: $out"
 for f in docs/orchestration/AGENT_BOARD.md docs/orchestration/ORCHESTRATION.md CLAUDE.md docs/AI_CONTEXT.md \
-         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/lib-waiting-tickets.sh scripts/lib-builder-worktree.sh scripts/pending-work.sh scripts/tmux-session.sh scripts/tmux/agents.tmux.conf scripts/sibling-shell.sh scripts/retro-worktrees.sh scripts/docker-cache-cap.sh scripts/gate-disk-guard.sh .claude/agents/verifier.md \
+         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/lib-waiting-tickets.sh scripts/lib-builder-worktree.sh scripts/pending-work.sh scripts/tmux-session.sh scripts/tmux/agents.tmux.conf scripts/sibling-shell.sh scripts/retro-worktrees.sh scripts/docker-cache-cap.sh scripts/gate-disk-guard.sh scripts/bottleneck-watch.sh scripts/lib-prompt-dialog.sh scripts/main-checkout-sync.sh scripts/sync-main-checkout.sh scripts/launched_window.py .claude/agents/verifier.md \
          .claude/skills/orchestrate/SKILL.md .claude/skills/falsify/SKILL.md .claude/skills/orient-brief/brief.sh \
          docs/orchestration/briefs/README.md docs/orchestration/briefs/_TEMPLATE.md \
          docs/orchestration/CLAUDE-slimness.md; do
@@ -66,8 +66,14 @@ grep -q 'sibling-shell.sh' "$ROOT/scripts/tmux-session.sh" && ok || bad "tmux-se
 grep -q 'sibling-shell.sh' "$ROOT/scripts/recycle-sibling.sh" && ok || bad "recycle-sibling.sh no longer uses sibling-shell.sh (update this pin)"
 [ -x "$P/scripts/sibling-shell.sh" ] && ok || bad "sibling-shell.sh not executable"
 bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/sibling-shell.sh' && ok || bad "dry-run did not list sibling-shell.sh"
-grep -q 'pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh; do SRC' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install sibling-shell.sh"
+grep -q 'pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh bottleneck-watch.sh lib-prompt-dialog.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py; do SRC' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install sibling-shell.sh"
 grep -q 'chmod +x .*scripts/sibling-shell.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not chmod sibling-shell.sh"
+# bottleneck-watch.sh sources lib-prompt-dialog.sh from its own directory; sync-main-checkout.sh runs main-checkout-sync.sh from its;
+# ctx-fill.py imports launched_window.py from its: each group travels together and the scripts are executable
+for f in bottleneck-watch.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py; do
+  [ -x "$P/scripts/$f" ] && ok || bad "$f not executable"
+  bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q "^\[bootstrap\] CREATE scripts/$f" && ok || bad "dry-run did not list $f"
+done
 # pending-work.sh is one file (its python is inline), installed and made executable by both paths
 [ -x "$P/scripts/pending-work.sh" ] && ok || bad "pending-work.sh not executable"
 bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/pending-work.sh' && ok || bad "dry-run did not list pending-work.sh"

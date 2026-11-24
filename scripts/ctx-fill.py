@@ -18,6 +18,9 @@ Usage:
     python3 scripts/ctx-fill.py <path/to/x.jsonl>  # a specific transcript file
     python3 scripts/ctx-fill.py --all              # every session of this project, newest first
     python3 scripts/ctx-fill.py <uuid> --window 1m|200k --line
+                                                   # --window is optional for YOUR OWN session: its claude --model argument names the
+                                                   # window (scripts/launched_window.py). A /model switch is not in argv; a proven-
+                                                   # large peak still wins, and --window always wins.
                                                    # ONE paste line for a report; needs --window
     python3 scripts/ctx-fill.py --check "<pasted line>"
                                                    # the seat's check: MATCH / STALE / MISMATCH, exit 0 / 3 (2 = not a line)
@@ -48,6 +51,10 @@ import shlex
 import subprocess
 import sys
 import time
+
+sys.dont_write_bytecode = True   # a __pycache__ next to the scripts would litter checkouts
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import launched_window   # the window this session was launched with (its claude --model argv)
 
 CLAUDE_HOME = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 PROJECTS = os.path.join(CLAUDE_HOME, "projects")
@@ -86,10 +93,13 @@ def parse_window(text):
     return int(t) if t.isdigit() and int(t) > 0 else None
 
 
+STATED_HOW = "STATED by you with --window (from your env block, not the transcript)"
+
+
 def resolve_window(model, peak, stated):
     """(window or None, how it was known). Evidence, not a lookup table: see the module docstring."""
     if stated:
-        return stated, "STATED by you with --window (from your env block, not the transcript)"
+        return stated, STATED_HOW
     if peak > SMALL_WINDOW:
         return LARGE_WINDOW, f"PROVEN: this session already reached {peak:,}"
     if model and "haiku" in model.lower():
@@ -463,6 +473,13 @@ def main():
         print(f"(identified from {via})")
     if not path or not os.path.exists(path):
         sys.exit(f"No such session transcript: {argv[0] if argv else '?'} (looked under {PROJECTS})")
+    # No --window: the window this very session was launched with (its claude --model argv), but only when `path` IS this
+    # session; any other transcript keeps the old rule (refuse to guess). An explicit --window (or CTX_WINDOW) always wins.
+    if window is None:
+        w = launched_window.window_for_session(os.path.basename(path)[:-6])
+        if w:
+            global STATED_HOW
+            window, STATED_HOW = parse_window(w), "LAUNCHED with this window (read from this session's own claude --model argument)"
     if want_line:
         print(make_line(path, window))
         return
