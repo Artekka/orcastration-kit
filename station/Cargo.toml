@@ -10,6 +10,11 @@ version = "0.0.1"
 eframe = { version = "0.37.0", default-features = false, features = ["default_fonts", "glow", "links", "wayland", "x11"] }
 egui = "0.37.0"
 egui_extras = { version = "0.37.0", default-features = false }
+# Not called directly: eframe's `links` feature opens URLs through webbrowser (via egui-winit).
+# Naming it here turns on `hardened` for that same copy (Cargo unifies features), so the
+# browser crate itself refuses every URL that is not http or https. The app's own check
+# (markdown.rs link_target) stays the first line; this is the second.
+webbrowser = { version = "1.2.7", features = ["hardened"] }
 pulldown-cmark = { version = "0.13.6", default-features = false }
 egui_kittest = { version = "0.37.0", features = ["wgpu", "snapshot"] }
 serde = { version = "1", features = ["derive"] }
