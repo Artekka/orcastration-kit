@@ -131,8 +131,9 @@ launch_account_label() {
   local d="${LAUNCH_ACCOUNT_DIR:-$HOME/.claude}" l
   l="$(head -1 "$d/ACCOUNT" 2>/dev/null || true)"
   printf '%s' "${l:-$d}"
-  if [ -z "$LAUNCH_ACCOUNT_DIR" ]; then printf ' (default account)'; fi
 }
+# " · account <label>" for a line of output, or NOTHING when no account directory is set: a single-account user sees no account text at all.
+launch_account_note() { [ -z "$LAUNCH_ACCOUNT_DIR" ] || printf ' · account %s' "$(launch_account_label)"; }
 _launch_env() {  # <quote-fn> — the CLAUDE_CONFIG_DIR prefix, or nothing for the default account
   [ -n "$LAUNCH_ACCOUNT_DIR" ] || return 0
   if [ "$1" = _launch_q_cmd ]; then
@@ -580,7 +581,9 @@ launch_live_shells() {  # <pid>...
 # SIGTERM the named pids and nothing else. Each pid was resolved earlier (a few seconds to a minute ago: the live
 # check and the preflight run in between), so its identity is re-read first: a pid that is gone, or was reused by
 # another process, no longer has an argv of `claude --name <Name> ...` and is skipped with a line, never signalled.
-# Never a pattern kill: the pattern only FINDS pids, this signals one pid at a time.
+# Never a pattern kill: the pattern only FINDS pids, this signals one pid at a time. Residual, accepted: the identity is the command
+# line only (no start-time check), so only a reused pid whose command line is ALSO `claude --name <Name> ...` inside the microseconds
+# between the ps and the kill would be hit.
 launch_term_old() {  # <name> <pid>...
   local name="$1" pid args; shift
   for pid in "$@"; do
@@ -749,7 +752,7 @@ launch_describe_env() {
     tmux-detached) echo "tmux       session '$(launch_tmux_session)' (created if missing) — attach with: tmux attach -t $(launch_tmux_session)" ;;
   esac
   if [ -n "$LAUNCH_NVM" ]; then echo "nvm        sourced ($HOME/.nvm/nvm.sh)"; else echo "nvm        not sourced"; fi
-  echo "account    $(launch_account_label)"
+  if [ -n "$LAUNCH_ACCOUNT_DIR" ]; then echo "account    $(launch_account_label)"; fi
   echo "model      $LAUNCH_MODEL ($LAUNCH_MODEL_SRC)"
   if [ -n "$LAUNCH_EFFORT" ]; then echo "effort     $LAUNCH_EFFORT ($LAUNCH_EFFORT_SRC)"; else echo "effort     default (not passed)"; fi
   if [ "$LAUNCH_MODE" = normal ]; then echo "mode       normal (no flag)"; else echo "mode       $LAUNCH_MODE -> $(launch_mode_flags "$LAUNCH_MODE")"; fi

@@ -23,7 +23,7 @@ run() { HOME="$TMP" bash "$RS" --dry-run --terminal manual --repo "$ROOT" "$@" 2
 
 # 1. No old session, no flag -> default account, no prefix.
 out="$(run ZzNone)"
-has "default account label" "(default account)" "$out"
+hasnt "default account prints no account line (a single-account user sees nothing about accounts)" "account " "$out"
 hasnt "default account adds no prefix" "CLAUDE_CONFIG_DIR=" "$out"
 
 # 2. Explicit --account 2 -> ~/.claude-acct2 (HOME points at TMP, so link the convention path).

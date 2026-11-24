@@ -76,6 +76,18 @@ run "$TMP/acct-b" claude-opus-5-5 STUB_MODE=ok; eq "T4 another account asks agai
 has "T4 the call ran under that account" "$TMP/acct-b|claude-opus-5-5" "$(cat "$CALLS")"
 run "$TMP/acct-b" claude-opus-5-5 STUB_MODE=ok; eq "T4 that account is cached too" 3 "$(ncalls)"
 
+# T4b. The account ARGUMENT decides, not the caller's env: an explicit empty argument is the DEFAULT account (the CLI runs with
+#      CLAUDE_CONFIG_DIR unset and the cache key says "default"); no argument at all uses the caller's CLAUDE_CONFIG_DIR.
+drive() {  # <explicit-empty|none> <env account dir>
+  local call='model_tag_check claude-opus-5-5'; [ "$1" = explicit-empty ] && call='model_tag_check claude-opus-5-5 ""'
+  env PATH="$BIN:$PATH" KIT_RUNTIME_DIR="$RT" STUB_CALLS="$CALLS" CLAUDE_CONFIG_DIR="$2" MODEL_PREFLIGHT_TIMEOUT=2 bash -c ". '$LIB'; $call" >/dev/null 2>&1
+}
+reset; drive explicit-empty "$TMP/acct-env"
+eq "T4b an explicit empty account runs the CLI with CLAUDE_CONFIG_DIR unset" "default|claude-opus-5-5" "$(cat "$CALLS")"
+drive explicit-empty "$TMP/acct-other"; eq "T4b ... and is cached under the default account, whatever the env says" 1 "$(ncalls)"
+reset; drive none "$TMP/acct-env"
+eq "T4b no argument at all: the caller's account" "$TMP/acct-env|claude-opus-5-5" "$(cat "$CALLS")"
+
 # T5. A DEFINITIVE unknown-model answer refuses (exit 64), says which model, and is NOT cached.
 reset; run - claude-opus-9-9 STUB_MODE=unknown; eq "T5 unknown model refused" 64 "$RC"
 has "T5 names the model" "does not know the model 'claude-opus-9-9'" "$ERR"

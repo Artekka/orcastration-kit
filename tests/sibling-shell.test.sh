@@ -151,6 +151,15 @@ WENV=("${PFW[@]}"); W "$n" --model 'opus[1m]'; WENV=()
 ne "W12 an unknown full id on a hand-off: non-zero" 0 "$RC"; eq "W12 only the first launch ran" 1 "$(nlaunch)"; has "W12 says the CLI does not know it" "does not know the model" "$ERR"
 eq "W12 the alias launch never called the CLI (one preflight call, for the hand-off)" 1 "$(wc -l < "$SB/pf.calls" | tr -d ' ')"
 
+# 12c. M1: a hand-off to the DEFAULT account (empty account_dir) from a wrapper that runs on a second account is checked against the
+#      default account: the stand-in CLI must see CLAUDE_CONFIG_DIR unset, not the wrapper's own. (The launch then proceeds.)
+sandbox; n=$(nameFor W12c); mkdir -p "$SB/home/.claude-acct2"; mk_pfbin
+stage_handoff 1 "$(handoff 'claude-opus-9-9' '' '' x)"$'\n'
+WENV=("${PFENV[@]}" PF_MODE=ok "CLAUDE_CONFIG_DIR=$SB/home/.claude-acct2"); W "$n" --model 'opus[1m]'; WENV=()
+eq "W12c the hand-off launched" 2 "$(nlaunch)"
+eq "W12c the CLI ran under the DEFAULT account, not the wrapper's second account" "default|--model claude-opus-9-9 -p ok --output-format json --tools  --disable-slash-commands" "$(cat "$SB/pf.calls")"
+eq "W12c and the fresh session got the variable unset" "unset" "$(launch_cfg 2)"
+
 # 13. What the wrapper puts in claude's argv is exactly what scripts/launched_window.py reads: a [1m] tag is a 1M window, any other tag 200K.
 #     The recorded argv of a launch becomes a fake process (claude + that argv) under a fake /proc.
 sandbox; n=$(nameFor W13); W "$n" --model 'sonnet[1m]' go

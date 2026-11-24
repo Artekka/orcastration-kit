@@ -137,7 +137,8 @@ eq "R7b second recycle exit 0" 0 "$RC"
 eq "R7b every launch ran with CLAUDE_CONFIG_DIR unset" "unset,unset,unset" "$(cfgs)"
 hasnt "R7b the output names no account directory" ".claude-acct" "$OUT$ERR"
 hasnt "R7b no launched argv names an account" ".claude-acct" "$(for f in "$SB"/stub/argv.*; do tr '\0' ' ' < "$f"; done)"
-rematch "R7b the account line says the default account" "account .*\(default account\)" "$OUT"
+hasnt "R7b a single-account user sees no account text at all" "account" "$OUT"
+hasnt "R7b and no default-directory text" ".claude" "$OUT"
 absent "R7b the terminal was never called" "$SB/TERM-WAS-CALLED"
 
 # R8. Seat self-recycle: a target claude that is an ANCESTOR of the running recycle is still in-place, but

@@ -190,6 +190,23 @@ recycle() {  # <env pairs...> -- <recycle args...>
 
 nameFor() { echo "Zz$1$$"; }
 
+# mk_pfbin: a stand-in CLI for the model preflight, ahead of the stub claude on PATH. `--version` answers; a `--name` launch passes
+# through to the stub; any other call is a preflight: it logs "<CLAUDE_CONFIG_DIR or default>|<args>" to $SB/pf.calls and answers
+# per PF_MODE (unknown = the unknown-model answer, ok = a real one). Use with PFENV: PATH, MODEL_PREFLIGHT=1 and the log paths.
+mk_pfbin() {
+  mkdir -p "$SB/pfbin"
+  cat > "$SB/pfbin/claude" <<'PF'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then echo "9.9.9 (Stand-in)"; exit 0; fi
+if [ "${1:-}" = --name ]; then exec "$SB_REAL_CLAUDE" "$@"; fi
+echo "${CLAUDE_CONFIG_DIR:-default}|$*" >> "$SB_PF_CALLS"
+if [ "${PF_MODE:-unknown}" = unknown ]; then echo '{"result":"There is an issue with the selected model (x).","modelUsage":{}}'
+else echo '{"result":"ok","modelUsage":{"x":{"inputTokens":1}}}'; fi
+PF
+  chmod +x "$SB/pfbin/claude"
+  PFENV=("PATH=$SB/pfbin:$SB/bin:$PATH" "MODEL_PREFLIGHT=1" "SB_PF_CALLS=$SB/pf.calls" "SB_REAL_CLAUDE=$SB/bin/claude")
+}
+
 cleanup() {
   local sb f p c
   for sb in ${SANDBOXES[@]+"${SANDBOXES[@]}"}; do

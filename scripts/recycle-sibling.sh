@@ -204,7 +204,7 @@ if [ "$mode" = in-place ]; then
   [ -z "${RECYCLE_DETACHED:-}" ] || sleep "${RECYCLE_DETACH_DELAY:-2}"
   rc=0; launch_recycle_inplace "$name" "$prompt" "$old" "$wrapper_pid" || rc=$?
   case "$rc" in
-    0) echo "fresh ${name}: ${LAUNCH_FRESH} · mode: in-place · account $(launch_account_label) · model ${LAUNCH_MODEL} · SIGTERM old: ${old} · $(date '+%H:%M:%S %Z')"
+    0) echo "fresh ${name}: ${LAUNCH_FRESH} · mode: in-place$(launch_account_note) · model ${LAUNCH_MODEL} · SIGTERM old: ${old} · $(date '+%H:%M:%S %Z')"
        exit 0 ;;
     2) exit 1 ;;
   esac
@@ -229,5 +229,5 @@ fi
 # shellcheck disable=SC2086  # $old may hold several pids, one per line
 # (In the in-place fallback `old` may already be dead: it was SIGTERMed there.)
 launch_term_old "$name" $old
-echo "fresh ${name}: ${LAUNCH_FRESH} · mode: ${mode} · account $(launch_account_label) · model ${LAUNCH_MODEL} · SIGTERM old: ${old:-none} · via ${LAUNCH_BACKEND} · $(date '+%H:%M:%S %Z')"
+echo "fresh ${name}: ${LAUNCH_FRESH} · mode: ${mode}$(launch_account_note) · model ${LAUNCH_MODEL} · SIGTERM old: ${old:-none} · via ${LAUNCH_BACKEND} · $(date '+%H:%M:%S %Z')"
 if [ "$LAUNCH_BACKEND" = tmux-detached ]; then echo "attach with: tmux attach -t $(launch_tmux_session)"; fi

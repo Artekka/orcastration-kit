@@ -219,4 +219,48 @@ eq "S12 recycle refuses fable-5-2[1m]" 64 "$RC"; has "S12 names the claude- pref
 run_in_sb -- bash "$ROOT/scripts/start-team.sh" --dry-run --repo "$SB/repo" --terminal linux-xterm --model opus-5-5
 eq "S12 start-team refuses opus-5-5" 64 "$RC"; has "S12 start-team names the claude- prefix" "needs the claude- prefix" "$ERR"
 
+# S13. No path signals the old session before the preflight verdict, in place too: a wrapper-run old claude, a model the CLI refuses
+#      -> exit 64, the old claude never got a SIGTERM (term-trap records one), no hand-off was written, nothing launched again.
+sandbox; n=$(nameFor S13); mk_pfbin
+start_wrapper "$n" STUB_MODE=term-trap
+OLD13="$(launch_pid 1)"
+recycle "${FORBID[@]}" "${PFENV[@]}" -- "$n" go --model claude-opus-9-9
+eq "S13 an unknown model exits 64" 64 "$RC"
+sleep 1
+alive "$OLD13" && ok || bad "S13 the old claude died"
+absent "S13 the old claude never received a SIGTERM" "$SB/stub/sigterm.$OLD13"
+absent "S13 no hand-off was written" "$SB/state/$n.next"
+eq "S13 nothing was launched again" 1 "$(nlaunch)"
+
+# S14. The preflight in start-team.sh is real (mutant: the line deleted): an unknown full id exits 64 before any window opens.
+sandbox; mk_pfbin
+run_in_sb "${PFENV[@]}" FAKE_TERM_MODE=forbid -- bash "$ROOT/scripts/start-team.sh" --repo "$SB/repo" --terminal linux-xterm --siblings 0 --model claude-opus-9-9
+eq "S14 start-team refuses an unknown full id" 64 "$RC"; has "S14 says the CLI does not know it" "does not know the model" "$ERR"
+absent "S14 no window was opened" "$SB/TERM-WAS-CALLED"
+[ -s "$SB/pf.calls" ] && ok || bad "S14 the CLI was never asked"
+
+# S15/S16. The two kill sites really use launch_term_old: a `ps` stand-in says the old pid is no longer the session (its argv reads as
+#      another program), so the recycle must NOT signal it. A plain kill -TERM at either site (mutants) would end the old claude.
+mk_ps_reuse() {  # <pid file>: ps -o args= -p <that pid> prints "sleep 300"; everything else is the real ps
+  local real; real="$(command -v ps)"; mkdir -p "$SB/psbin"
+  printf '%s\n' '#!/usr/bin/env bash' "if [ \"\${1:-}\" = -o ] && [ \"\${2:-}\" = args= ] && [ \"\${3:-}\" = -p ] && [ \"\${4:-}\" = \"\$(cat '$1' 2>/dev/null)\" ]; then echo 'sleep 300'; exit 0; fi" "exec $real \"\$@\"" > "$SB/psbin/ps"
+  chmod +x "$SB/psbin/ps"
+}
+# S15 (lib-launch.sh in-place site): the old claude runs under the wrapper
+sandbox; n=$(nameFor S15)
+start_wrapper "$n" STUB_MODE=term-trap
+OLD15="$(launch_pid 1)"; printf '%s' "$OLD15" > "$SB/ps-reuse"; mk_ps_reuse "$SB/ps-reuse"
+recycle "${FORBID[@]}" "PATH=$SB/psbin:$SB/bin:$PATH" RECYCLE_INPLACE_TIMEOUT=2 RECYCLE_CLAIMED_GRACE=1 -- "$n" go --model haiku
+has "S15 in-place: the re-check refused the pid" "not signalling pid $OLD15" "$ERR"
+sleep 1; alive "$OLD15" && ok || bad "S15 the old claude was signalled although it no longer looked like the session"
+absent "S15 no SIGTERM reached it" "$SB/stub/sigterm.$OLD15"
+# S16 (recycle-sibling.sh new-tab site): an old claude that is not under any wrapper
+sandbox; n=$(nameFor S16)
+fake_claude "$n" plain
+printf '%s' "$FC" > "$SB/ps-reuse"; mk_ps_reuse "$SB/ps-reuse"
+recycle "PATH=$SB/psbin:$SB/bin:$PATH" STUB_MODE=term-trap -- "$n" go --model haiku
+has "S16 new-tab: the re-check refused the pid" "not signalling pid $FC" "$ERR"
+alive "$FC" && ok || bad "S16 the old claude was signalled although it no longer looked like the session"
+kill -KILL "$CHILD" "$FC" 2>/dev/null   # the fresh session (a stub) is reaped by the harness cleanup
+
 finish

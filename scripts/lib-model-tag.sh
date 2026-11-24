@@ -17,7 +17,8 @@
 #
 # API (callers print MODEL_TAG_ERR with their own prefix and exit 64):
 #   model_tag_static    <model>             layers 1-2, offline; return 0 | 64 (sets MODEL_TAG_ERR)
-#   model_tag_preflight <model> [acct dir]  layers 3-5; return 0 | 64 (sets MODEL_TAG_ERR); acct dir defaults to $CLAUDE_CONFIG_DIR
+#   model_tag_preflight <model> [acct dir]  layers 3-5; return 0 | 64 (sets MODEL_TAG_ERR); acct dir given but empty = the default account;
+#                                           no acct dir argument at all = $CLAUDE_CONFIG_DIR
 #   model_tag_check     <model> [acct dir]  both
 # Env: MODEL_PREFLIGHT=0 skips layers 4-5 (offline hosts, tests); MODEL_PREFLIGHT_TIMEOUT seconds (default 20),
 # MODEL_PREFLIGHT_VERSION_TIMEOUT (default 10) and MODEL_PREFLIGHT_KILL_AFTER (default 5: the SIGKILL after the
@@ -43,7 +44,10 @@ model_tag_static() {  # <model>
 _model_tag_warn() { echo "model-tag: warning: $* (launching anyway; MODEL_PREFLIGHT=0 silences the check)" >&2; }
 
 model_tag_preflight() {  # <model> [acct dir]
-  local m="${1-}" acct="${2:-${CLAUDE_CONFIG_DIR:-}}"
+  # An EXPLICIT account argument, even an empty one, is the account this launch will use ('' = the default account: the CLI runs with
+  # CLAUDE_CONFIG_DIR unset and the cache key says "default"). The caller's own CLAUDE_CONFIG_DIR is used only when no argument is given.
+  local m="${1-}" acct
+  if [ $# -ge 2 ]; then acct="$2"; else acct="${CLAUDE_CONFIG_DIR:-}"; fi
   MODEL_TAG_ERR=""
   [[ "$m" =~ ^(opus|sonnet|haiku|fable)(\[1m\])?$ ]] && return 0
   [ "${MODEL_PREFLIGHT:-1}" = 0 ] && return 0
@@ -60,7 +64,8 @@ model_tag_preflight() {  # <model> [acct dir]
   [ -f "$dir/$key" ] && return 0
   # An empty scratch dir as cwd: the project's own CLAUDE.md would otherwise be read into this one-word prompt. No tools, no skills.
   cwd="$rt/model-preflight-cwd"; mkdir -p "$cwd" 2>/dev/null || cwd="."
-  out="$(cd "$cwd" && env ${acct:+CLAUDE_CONFIG_DIR="$acct"} timeout -k "$kill" "${MODEL_PREFLIGHT_TIMEOUT:-20}" claude --model "$m" -p ok --output-format json --tools "" --disable-slash-commands 2>/dev/null </dev/null)" || true
+  # -u first: with the default account the caller's variable must not leak into the check.
+  out="$(cd "$cwd" && env -u CLAUDE_CONFIG_DIR ${acct:+CLAUDE_CONFIG_DIR="$acct"} timeout -k "$kill" "${MODEL_PREFLIGHT_TIMEOUT:-20}" claude --model "$m" -p ok --output-format json --tools "" --disable-slash-commands 2>/dev/null </dev/null)" || true
   verdict="$(printf '%s' "$out" | python3 -c '
 import json, sys
 try:
@@ -88,7 +93,7 @@ except Exception:
   esac
 }
 
-model_tag_check() {  # <model> [acct dir]
+model_tag_check() {  # <model> [acct dir]  (the account argument keeps its meaning: absent = the caller's env, '' = the default account)
   model_tag_static "${1-}" || return $?
-  model_tag_preflight "${1-}" "${2-}"
+  if [ $# -ge 2 ]; then model_tag_preflight "${1-}" "$2"; else model_tag_preflight "${1-}"; fi
 }
