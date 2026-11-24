@@ -32,8 +32,13 @@ use observatory_core::{Liveness, ProjectSpec};
 use crate::config::Config;
 use crate::discover::{self, Found};
 use crate::liveness::{self, LiveProc};
+use crate::screen;
 use crate::tail::{Changes, Tail};
 use crate::tmux::{self, Terminal, Tmux};
+
+/// The refusal when a menu is open on the agent's screen.
+const MENU_OPEN: &str = "A question or permission menu is open in this agent's terminal. \
+                         Answer it there first.";
 
 /// Why a send did not complete: before anything was typed, or after the paste began.
 enum Failed {
@@ -174,17 +179,41 @@ impl<W: Write> Bridge<W> {
         let target = self.resolve_now(session_id).map_err(Refused)?;
         let buffer = format!("observatory-{}-{id}", std::process::id());
         self.term.load(&buffer, text).map_err(Refused)?;
-        // Right before the paste: still the same pane and process?
+        // Right before the paste: still the same pane and process, and no menu on screen?
         if let Err(e) = self.still(session_id, &target) {
+            self.term.discard(&buffer);
+            return Err(Refused(e));
+        }
+        if let Err(e) = self.no_menu(&target.pane) {
             self.term.discard(&buffer);
             return Err(Refused(e));
         }
         self.term.paste(&target.pane, &buffer).map_err(Uncertain)?;
         std::thread::sleep(self.term.settle());
-        // Right before the Enter: still the same pane and process? Else no Enter.
+        // Right before the Enter: the same checks again. Else no Enter.
         self.still(session_id, &target).map_err(Uncertain)?;
+        self.no_menu(&target.pane).map_err(Uncertain)?;
         self.term.enter(&target.pane).map_err(Uncertain)?;
         Ok(target)
+    }
+
+    /// Read `pane` now: refuse when a menu is open there, or when the screen can't be read
+    /// (fail closed). Claude Code marks a dialog `waiting` only after drawing it, so the
+    /// registry alone can miss one.
+    fn no_menu(&mut self, pane: &str) -> Result<(), String> {
+        let shown = match self.term.screen(pane) {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(format!(
+                    "The agent's screen could not be read ({e}), so an open menu can't be \
+                     ruled out."
+                ));
+            }
+        };
+        if screen::menu_open(&shown) {
+            return Err(MENU_OPEN.into());
+        }
+        Ok(())
     }
 
     pub fn with_scan(mut self, f: impl FnMut(&Path) -> Option<Vec<LiveProc>> + 'static) -> Self {

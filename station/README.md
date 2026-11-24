@@ -164,6 +164,11 @@ Typing is the only thing the Station does besides reading, so it is narrow on pu
   `idle` (the prompt is open), `busy` (a turn runs; the message queues) or `shell` (a shell command
   runs beside the open prompt). If it says `waiting` (a question or permission dialog is open), gives
   no status, or gives any other value, nothing is sent and the app says why.
+- **Refused while a menu is on screen.** Right before the paste and right before the Enter, the bridge
+  reads the pane's visible text (`tmux capture-pane -p`, read only). If a Claude Code menu (a
+  permission dialog or a question) is open at the bottom of the screen, nothing more is typed and the
+  app says why. If the screen can't be read, or the read takes over two seconds, the send is refused
+  too. This catches a dialog that opened before Claude Code wrote "waiting" to its registry.
 - The text is pasted as one block (`tmux load-buffer` + a bracketed `paste-buffer`, so newlines stay
   inside the message), the pane is checked again, then Enter is pressed once. If a re-check finds that
   something changed after the paste began, the app says the result is uncertain and keeps your draft.
@@ -184,14 +189,18 @@ Each check skips when its input is missing. Create `~/.config/observatory/strict
 
 ## Known limits
 
-- **A question that opens at the wrong moment.** The "waiting" check happens just before the paste. If the
-  agent opens a question in the instant between that check and the paste, the pasted text lands in the
-  question, though the bridge doesn't press Enter on it. Claude Code also writes "waiting" to its registry
-  slightly after the dialog appears, which widens that window. Whether stray keys can pick an option in a
-  real dialog hasn't been tested.
-- **A change right before the Enter.** The last check runs just before Enter is pressed. If a question
-  opens or the pane changes in the moment between that check and the Enter, it isn't detected, and the
-  Enter goes to whatever is on screen then. Nothing checks the pane after the Enter.
+- **A question that opens at the wrong moment.** The status and screen checks happen just before the
+  paste. If the agent opens a question in the instant between those checks and the paste, the pasted
+  text lands in the question, though the bridge doesn't press Enter on it (the checks before the Enter
+  see the menu). Whether stray keys can pick an option in a real dialog hasn't been tested.
+- **A change right before the Enter.** The last checks (status, pane, screen) run just before Enter is
+  pressed. If a question opens in the few milliseconds between them and the Enter, it isn't detected,
+  and the Enter goes to whatever is on screen then. Nothing checks the pane after the Enter.
+- **The menu check depends on how Claude Code draws its screen.** It looks in the bottom 15 rows for
+  the `❯` cursor on a numbered option (`❯ 1. Yes`) with no input-box rule (a row of `─`) under it.
+  If a future Claude Code draws menus differently (another cursor glyph, unnumbered options, a rule
+  under the menu), the check can miss a menu, and only the registry status check is left. It was
+  written from Claude Code's screens as they are today; it has not been run against a live dialog.
 - **What `shell` means is inferred, not documented.** Claude Code's registry reports `shell` for some
   live sessions. On one machine with ten live sessions (each registry file checked against its
   process's start time in `/proc`), every `shell` entry had a running shell child process and no idle

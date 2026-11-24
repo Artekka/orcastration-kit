@@ -16,14 +16,16 @@
 //! `load-buffer` (text on stdin, a uniquely named buffer), `paste-buffer -p -r -d` into the pane
 //! id (bracketed paste, line feeds kept as they are, the buffer deleted), then ONE
 //! `send-keys Enter`. The bridge re-resolves the pane right before the paste and right before
-//! the Enter (see `Bridge::on_request_line`). The text never passes through a shell or through
-//! `send-keys`, so nothing in it is a key name or an expansion. Only the subcommands in
+//! the Enter (see `Bridge::on_request_line`), and reads the pane's visible text
+//! (`capture-pane -p`) at both points: a menu open there ([`crate::screen`]), or a read that
+//! fails or takes over two seconds, refuses the send. The text never passes through a shell
+//! or through `send-keys`, so nothing in it is a key name or an expansion. Only the subcommands in
 //! [`SUBCOMMANDS`] are ever run (`tests/read_only.rs` checks this file's literals).
 
 use std::collections::BTreeSet;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::liveness::LiveProc;
 
@@ -36,7 +38,12 @@ pub const SUBCOMMANDS: &[&str] = &[
     "paste-buffer",
     "delete-buffer",
     "send-keys",
+    "capture-pane",
 ];
+/// A screen read that takes longer than this fails, and the send is refused.
+const SCREEN_TIMEOUT: Duration = Duration::from_secs(2);
+/// How often a screen read checks whether tmux has finished.
+const POLL: Duration = Duration::from_millis(5);
 /// Ancestor walk limit (a loop in bad data can never spin).
 const MAX_DEPTH: usize = 64;
 
@@ -212,6 +219,50 @@ impl Tmux {
     }
 }
 
+impl Tmux {
+    /// [`Tmux::run`] for a read with no input that must not stall a send: past `limit` the
+    /// child is killed and the read fails, so the send is refused (fail closed).
+    fn run_within(mut c: Command, limit: Duration) -> Result<String, String> {
+        let mut child = c
+            .spawn()
+            .map_err(|e| format!("tmux could not start: {e}"))?;
+        let mut stdout = child.stdout.take().expect("piped in cmd");
+        // Drained on its own thread, so a large screen never fills the pipe while we wait.
+        let reader = std::thread::spawn(move || {
+            let mut out = Vec::new();
+            stdout.read_to_end(&mut out).map(|_| out)
+        });
+        let deadline = Instant::now() + limit;
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(s)) => break s,
+                Ok(None) if Instant::now() < deadline => std::thread::sleep(POLL),
+                Ok(None) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("tmux did not answer within {} ms", limit.as_millis()));
+                }
+                Err(e) => {
+                    let _ = child.kill();
+                    return Err(format!("tmux did not finish: {e}"));
+                }
+            }
+        };
+        let out = reader
+            .join()
+            .map_err(|_| "tmux's output could not be read".to_owned())?
+            .map_err(|e| format!("tmux's output could not be read: {e}"))?;
+        if status.success() {
+            return Ok(String::from_utf8_lossy(&out).into_owned());
+        }
+        let mut err = String::new();
+        if let Some(mut e) = child.stderr.take() {
+            let _ = e.read_to_string(&mut err);
+        }
+        Err(format!("tmux refused: {}", err.trim()))
+    }
+}
+
 /// `list-panes -a -F '#{pane_id} #{pane_pid}'` output → panes (bad lines skipped).
 pub fn parse_panes(out: &str) -> Vec<Pane> {
     out.lines()
@@ -270,9 +321,10 @@ impl Terminal for Tmux {
         Self::run(enter, None).map(|_| ())
     }
 
-    fn screen(&mut self, _pane: &str) -> Result<String, String> {
-        // ORCA340-674 RED stub (the fix reads the pane with capture-pane).
-        Ok(String::new())
+    fn screen(&mut self, pane: &str) -> Result<String, String> {
+        let mut capture = self.cmd("capture-pane");
+        capture.args(["-p", "-t", pane]);
+        Self::run_within(capture, SCREEN_TIMEOUT)
     }
 
     fn settle(&self) -> Duration {
