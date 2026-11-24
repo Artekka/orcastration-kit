@@ -99,15 +99,8 @@ pub fn resolve(
             ));
         }
     };
-    if me.is_waiting() {
-        let what = me
-            .waiting_for
-            .as_deref()
-            .unwrap_or("a question or a dialog");
-        return Err(format!(
-            "This agent is waiting for you in its terminal ({what}). Typing now would answer it, \
-             so answer it there first."
-        ));
+    if let Some(why) = me.send_refusal() {
+        return Err(why);
     }
     let found = panes_of(me.pid, panes, parent);
     let pane = match found.len() {

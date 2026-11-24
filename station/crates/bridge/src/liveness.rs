@@ -43,6 +43,22 @@ impl LiveProc {
     pub fn is_waiting(&self) -> bool {
         self.status.as_deref() == Some("waiting")
     }
+
+    /// Why a send must not type into this process now, or `None` when it may.
+    pub fn send_refusal(&self) -> Option<String> {
+        // ORCA340-674 RED stub: the old rule, only `waiting` refuses (the fix replaces it).
+        if !self.is_waiting() {
+            return None;
+        }
+        let what = self
+            .waiting_for
+            .as_deref()
+            .unwrap_or("a question or a dialog");
+        Some(format!(
+            "This agent is waiting for you in its terminal ({what}). Typing now would answer it, \
+             so answer it there first."
+        ))
+    }
 }
 
 #[cfg(target_os = "linux")]

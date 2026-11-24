@@ -24,6 +24,8 @@ fn proc_(pid: u32, sid: &str, name: &str, tmux: Option<&str>) -> LiveProc {
         pid,
         session_id: Some(sid.into()),
         name: Some(name.into()),
+        // A live, idle agent unless a test says otherwise: only a known status may be typed into.
+        status: Some("idle".into()),
         tmux: tmux.map(str::to_owned),
         ..Default::default()
     }
@@ -71,6 +73,29 @@ fn an_agent_waiting_on_a_question_is_refused() {
     );
     procs[1].waiting_for = None; // waiting with no detail still refuses
     assert!(tmux::resolve("sid-b", &procs, &panes, &parent).is_err());
+    // The other agent is unaffected.
+    assert!(tmux::resolve("sid-a", &procs, &panes, &parent).is_ok());
+}
+
+#[test]
+fn only_a_known_idle_busy_or_shell_status_may_be_typed_into() {
+    let (mut procs, panes, parent) = two_agents();
+    // `shell`: a shell command runs beside the open prompt (see liveness::SENDABLE).
+    for ok in ["idle", "busy", "shell"] {
+        procs[1].status = Some(ok.into());
+        assert!(
+            tmux::resolve("sid-b", &procs, &panes, &parent).is_ok(),
+            "{ok}"
+        );
+    }
+    procs[1].status = None;
+    let why = tmux::resolve("sid-b", &procs, &panes, &parent).unwrap_err();
+    assert!(why.contains("no status"), "{why}");
+    for odd in ["frobnicate", "", "IDLE", "idle "] {
+        procs[1].status = Some(odd.into());
+        let why = tmux::resolve("sid-b", &procs, &panes, &parent).unwrap_err();
+        assert!(why.contains("unknown status"), "{odd:?}: {why}");
+    }
     // The other agent is unaffected.
     assert!(tmux::resolve("sid-a", &procs, &panes, &parent).is_ok());
 }
@@ -570,4 +595,37 @@ fn a_question_opening_mid_send_stops_before_the_paste_or_the_enter() {
         "no Enter into an open question: {:?}",
         l.steps
     );
+}
+
+/// After a step, sid-a's registry status becomes `s`.
+fn status_becomes(procs: &Procs, s: Option<&'static str>) -> impl FnMut() + 'static {
+    let p = procs.clone();
+    move || p.borrow_mut()[0].status = s.map(str::to_owned)
+}
+
+#[test]
+fn a_send_to_an_agent_with_no_or_an_unknown_status_types_nothing() {
+    for status in [None, Some("frobnicate")] {
+        let (mut b, fake, procs, _) = setup();
+        procs.borrow_mut()[0].status = status.map(str::to_owned);
+        b.on_request_line(&send_line(1, "sid-a", "1")).unwrap();
+        let r = result_of(&mut b);
+        assert!(matches!(&r, SendResult::Refused { .. }), "{r:?}");
+        assert!(fake.0.borrow().steps.is_empty(), "nothing loaded or typed");
+    }
+}
+
+#[test]
+fn a_status_lost_mid_send_stops_before_the_paste_or_the_enter() {
+    let (mut b, fake, procs, _) = setup();
+    fake.after("load", status_becomes(&procs, None));
+    b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
+    assert!(matches!(result_of(&mut b), SendResult::Refused { .. }));
+    assert_eq!(fake.0.borrow().steps, ["load", "discard"]);
+
+    let (mut b, fake, procs, _) = setup();
+    fake.after("paste", status_becomes(&procs, Some("frobnicate")));
+    b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
+    assert!(matches!(result_of(&mut b), SendResult::Uncertain { .. }));
+    assert!(fake.0.borrow().enters.is_empty(), "no Enter");
 }
