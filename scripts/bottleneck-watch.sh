@@ -19,6 +19,8 @@
 # lines), BOTTLENECK_TMUX (replaces the tmux command), BOTTLENECK_FREE_GB (replaces df), BOTTLENECK_NO_FETCH=1 (skip the fetch).
 # Tmux session scanned: RECYCLE_TMUX_SESSION, else the current tmux session when $TMUX is set, else the main checkout's directory name
 # (the rule scripts/recycle-sibling.sh uses). No tmux, no server or no such session: one WARNING and no outlier.
+# Every tmux call is bounded (BOTTLENECK_TMUX_TIMEOUT seconds, default 5): a stopped or hung tmux server must not hang the poll. A
+# call that times out is one WARNING and no outlier, like a missing server.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "${BOTTLENECK_REPO:-$HERE}" || exit 1
@@ -148,31 +150,40 @@ fi
 # shellcheck source=lib-prompt-dialog.sh
 source "$HERE/lib-prompt-dialog.sh"
 scan_prompt_panes() {
-  local tmux_bin="${BOTTLENECK_TMUX:-tmux}" session
+  local tmux_bin="${BOTTLENECK_TMUX:-tmux}" session tmo="${BOTTLENECK_TMUX_TIMEOUT:-5}" bound=""
+  # `timeout` (GNU) or `gtimeout` (macOS coreutils); with neither, the calls run unbounded and the warning below says so.
+  if command -v timeout >/dev/null 2>&1; then bound=timeout; elif command -v gtimeout >/dev/null 2>&1; then bound=gtimeout; fi
+  tm() { if [ -n "$bound" ]; then "$bound" -k 1 "$tmo" "$tmux_bin" "$@"; else "$tmux_bin" "$@"; fi; }
   if ! command -v "$tmux_bin" >/dev/null 2>&1; then
     warn "tmux not found ($tmux_bin); panes were not scanned for permission prompts."
     return 0
   fi
   if [ -n "${RECYCLE_TMUX_SESSION:-}" ]; then session="$RECYCLE_TMUX_SESSION"
-  elif [ -n "${TMUX:-}" ] && session=$("$tmux_bin" display-message -p '#S' 2>/dev/null) && [ -n "$session" ]; then :
+  elif [ -n "${TMUX:-}" ] && session=$(tm display-message -p '#S' 2>/dev/null) && [ -n "$session" ]; then :
   else session=$(basename "$MAIN" | tr '.:' '--')
   fi
-  if ! "$tmux_bin" has-session -t "=$session" 2>/dev/null; then
+  local hrc=0
+  tm has-session -t "=$session" 2>/dev/null || hrc=$?
+  if [ "$hrc" = 124 ] || [ "$hrc" = 137 ]; then
+    warn "tmux did not answer within ${tmo}s (a stopped or hung server?); panes were not scanned for permission prompts."
+    return 0
+  elif [ "$hrc" != 0 ]; then
     warn "no tmux session '$session' (no server, or its socket is hidden); panes were not scanned for permission prompts."
     return 0
   fi
+  [ -n "$bound" ] || warn "no timeout command: the tmux calls below are unbounded."
   local pid wid wname screen pat
   while IFS=$'\t' read -r pid wid wname; do
     [ -n "$pid" ] || continue
     # No -S/-E: capture-pane then prints the visible screen only, which is the point (an answered prompt scrolls away).
-    screen=$("$tmux_bin" capture-pane -p -t "$pid" 2>/dev/null) || continue
+    screen=$(tm capture-pane -p -t "$pid" 2>/dev/null) || continue
     for pat in "${PROMPT_PATTERNS[@]}"; do
       if prompt_dialog "$pat" <<<"$screen"; then
         flag "window '$wname' ($wid, pane $pid) shows a permission prompt (\"$pat\"): that session cannot read a message. CHECK: tmux capture-pane -p -t $pid; answer it or tell the user. Nothing was sent."
         break
       fi
     done
-  done < <("$tmux_bin" list-panes -s -t "=$session" -F $'#{pane_id}\t#{window_id}\t#{window_name}' 2>/dev/null)
+  done < <(tm list-panes -s -t "=$session" -F $'#{pane_id}\t#{window_id}\t#{window_name}' 2>/dev/null)
 }
 scan_prompt_panes
 

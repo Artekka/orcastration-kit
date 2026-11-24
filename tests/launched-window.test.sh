@@ -63,14 +63,20 @@ conf() { printf 'team:\n  seat: Orca\n  ctx_guard: on\n%s\n' "$1" > "$REPO/docs/
 tx() { printf '{"type":"assistant","message":{"model":"claude-opus-5-5","usage":{"input_tokens":1000,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$(( $2 - 1000 ))" > "$1"; }
 guard() {  # <pid> <session id> <transcript>
   printf '{"transcript_path":"%s","session_id":"%s","hook_event_name":"PostToolUse","cwd":"%s"}' "$3" "$2" "$REPO" \
-    | env KIT_STATE_DIR="$TMP/state" LAUNCHED_WINDOW_PROC_ROOT="$PR" LAUNCHED_WINDOW_START_PID="$1" LAUNCHED_WINDOW_CONFIG_DIR="$CFG" python3 "$GD"
+    | env KIT_STATE_DIR="${GSTATE:-$TMP/state}" LAUNCHED_WINDOW_PROC_ROOT="$PR" LAUNCHED_WINDOW_START_PID="$1" LAUNCHED_WINDOW_CONFIG_DIR="$CFG" python3 "$GD"
 }
 G1="$TMP/$UUID-g.jsonl"; tx "$G1" 130000
-conf ""; empty "no declared window, launched 1m, 130K: silent (the 1M marks)" "$(guard 103 "$UUID" "$G1")"
-out="$(guard 112 "$UUID" "$G1")"; has "launched 200k, 130K: speaks (past the 120K mark)" "crossed" "$out"
-conf "  context_window: 1m"; empty "a declared 1m beats a launched 200k" "$(guard 112 "$UUID" "$G1")"
-conf ""; empty "a peer's session id is not this claude: the 1m default, silent" "$(guard 112 "$OTHER" "$G1")"
-tx "$G1" 380000; conf ""; out="$(guard 112 "${UUID}x" "$G1")"; has "a fill above 200K is never judged on the 200K marks" "350K" "$out"
+# Every guard case gets its OWN state dir: the guard rate-limits what it says (one line per ~15K of growth per session), so a case that
+# shares the dir with the one before it can be silent because that one spoke, and a "silent" assertion would prove nothing.
+gs() { GSTATE="$TMP/state-$1"; export GSTATE; }
+conf ""; gs a; empty "no declared window, launched 1m, 130K: silent (the 1M marks)" "$(guard 103 "$UUID" "$G1")"
+gs b; out="$(guard 112 "$UUID" "$G1")"; has "launched 200k, 130K: speaks (past the 120K mark)" "crossed" "$out"
+conf "  context_window: 1m"; gs c; empty "a declared 1m beats a launched 200k (fresh state: the same call with no declaration speaks)" "$(guard 112 "$UUID" "$G1")"
+conf ""; gs d; empty "a peer's session id is not this claude: the 1m default, silent" "$(guard 112 "$OTHER" "$G1")"
+# the OWNING session id ($UUID, pid 112 sits under claude 111): the launched 200k is reached, and a fill above 200K must still
+# not be judged on the 200K marks (it would say "PAST the 150K handover mark" there)
+tx "$G1" 380000; conf ""; gs e; out="$(guard 112 "$UUID" "$G1")"
+has "a fill above 200K is judged on the 1M marks even for a launched 200k" "350K" "$out"; hasnt "and never on the 200K marks" "150K" "$out"
 
 echo "launched-window: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

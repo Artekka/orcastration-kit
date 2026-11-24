@@ -6,6 +6,9 @@
 # It only ever fast-forwards. In any other state it prints ONE `main-checkout: skip (<reason>)` line, changes nothing and exits 0,
 # so a poll never fails on a sibling's work. It never stashes, never forces, never resets and never touches a file it does not
 # update: `git merge --ff-only` itself refuses when a dirty or untracked file would be overwritten, and that refusal is kept.
+# A dirty or untracked file that the incoming commits do NOT touch is no reason to wait: the checkout still moves and that file stays as
+# it is (by design: a sibling's work in progress must not stall every session's rules). One the incoming commits DO touch makes git
+# refuse, and the skip line then names the file.
 # `--no-overwrite-ignore` extends it to git-IGNORED local files (git overwrites those by default): a git-excluded settings file
 # that holds a hook must survive.
 #
@@ -52,7 +55,9 @@ fi
 
 if ! err="$(g merge --ff-only --no-overwrite-ignore -q origin/main 2>&1)"; then
   first="$(printf '%s\n' "$err" | sed -n '/[^[:space:]]/{s/^\(error\|fatal\): //;p;q}')"
-  skip "${first:-merge refused}"
+  # git lists the files it would overwrite on indented lines after that sentence; name the first few so the seat knows which one blocks.
+  files="$(printf '%s\n' "$err" | sed -n 's/^[[:space:]][[:space:]]*\([^[:space:]].*\)$/\1/p' | head -3 | paste -sd, -)"
+  skip "${first:-merge refused}${files:+: $files}"
 fi
 echo "main-checkout: ${old:0:9} → $(g rev-parse HEAD | cut -c1-9) ($(g rev-list --count "$old..HEAD") commits)"
 exit 0
