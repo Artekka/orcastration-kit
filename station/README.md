@@ -160,8 +160,10 @@ Typing is the only thing the Station does besides reading, so it is narrow on pu
 - **Only to the selected agent's own live tmux pane.** At send time the bridge finds the pane from the
   running process tree (that agent's `claude` process and the tmux pane it is in), never by name. It
   refuses when the agent isn't running, isn't in tmux, or the process or pane is ambiguous.
-- **Refused while the agent waits for an answer.** If Claude Code's session registry says the agent is
-  waiting (a question or permission dialog is open), nothing is sent and the app says why.
+- **Sent only when the agent's status is known to be safe.** Claude Code's session registry must say
+  `idle` (the prompt is open), `busy` (a turn runs; the message queues) or `shell` (a shell command
+  runs beside the open prompt). If it says `waiting` (a question or permission dialog is open), gives
+  no status, or gives any other value, nothing is sent and the app says why.
 - The text is pasted as one block (`tmux load-buffer` + a bracketed `paste-buffer`, so newlines stay
   inside the message), the pane is checked again, then Enter is pressed once. If a re-check finds that
   something changed after the paste began, the app says the result is uncertain and keeps your draft.
@@ -190,9 +192,12 @@ Each check skips when its input is missing. Create `~/.config/observatory/strict
 - **A change right before the Enter.** The last check runs just before Enter is pressed. If a question
   opens or the pane changes in the moment between that check and the Enter, it isn't detected, and the
   Enter goes to whatever is on screen then. Nothing checks the pane after the Enter.
-- **A session status the bridge doesn't know.** Claude Code's registry sometimes reports a status of
-  `shell` for live sessions. The bridge treats it as running, so sending is allowed. Where that status
-  comes from hasn't been traced.
+- **What `shell` means is inferred, not documented.** Claude Code's registry reports `shell` for some
+  live sessions. On one machine with ten live sessions (each registry file checked against its
+  process's start time in `/proc`), every `shell` entry had a running shell child process and no idle
+  entry did, so `shell` reads as "a shell command runs beside the open prompt". Sending is allowed
+  for it. If a future Claude Code uses `shell` for something else, this rule needs checking again. Any
+  status the bridge doesn't know is refused.
 - **The privacy checks are heuristics.** `real-data-check.py` doesn't yet catch timestamps rounded to the
   second or with zeroed milliseconds, epoch-millisecond numbers, or ids with changed case or dashes.
   `clean-tree.py` doesn't catch a term split across lines, a term inside base64 / `%xx` / HTML entities, or

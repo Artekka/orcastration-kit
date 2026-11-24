@@ -44,22 +44,41 @@ impl LiveProc {
         self.status.as_deref() == Some("waiting")
     }
 
-    /// Why a send must not type into this process now, or `None` when it may.
+    /// Why a send must not type into this process now, or `None` when it may. Fails closed:
+    /// only a status in [`SENDABLE`] may be typed into. `waiting`, no status (a process-list
+    /// fallback entry, or a registry file without one) and any other value refuse, because
+    /// none of them rules out a question or a permission dialog on screen, where the Enter
+    /// would answer it.
     pub fn send_refusal(&self) -> Option<String> {
-        // ORCA340-674 RED stub: the old rule, only `waiting` refuses (the fix replaces it).
-        if !self.is_waiting() {
-            return None;
+        match self.status.as_deref() {
+            Some(s) if SENDABLE.contains(&s) => None,
+            Some("waiting") => {
+                let what = self
+                    .waiting_for
+                    .as_deref()
+                    .unwrap_or("a question or a dialog");
+                Some(format!(
+                    "This agent is waiting for you in its terminal ({what}). Typing now would \
+                     answer it, so answer it there first."
+                ))
+            }
+            None => Some(NO_STATUS.to_owned()),
+            Some(other) => Some(format!(
+                "Claude Code gives an unknown status ({other:?}) for this agent, so a question \
+                 or a dialog may be open in its terminal. Check it there first."
+            )),
         }
-        let what = self
-            .waiting_for
-            .as_deref()
-            .unwrap_or("a question or a dialog");
-        Some(format!(
-            "This agent is waiting for you in its terminal ({what}). Typing now would answer it, \
-             so answer it there first."
-        ))
     }
 }
+
+/// Registry statuses a send may type into. `idle`: the prompt is open. `busy`: a turn runs and
+/// the message queues. `shell`: a shell command (a background task, a long run) runs beside
+/// the open prompt; every live `shell` entry checked had a running shell child, and a question
+/// or dialog still turns it into `waiting`. Exact, case-sensitive matches only.
+pub const SENDABLE: &[&str] = &["idle", "busy", "shell"];
+
+const NO_STATUS: &str = "Claude Code gives no status for this agent, so a question or a dialog \
+                         may be open in its terminal. Check it there first.";
 
 #[cfg(target_os = "linux")]
 #[derive(Debug, serde::Deserialize)]

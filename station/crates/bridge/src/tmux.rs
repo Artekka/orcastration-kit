@@ -3,7 +3,8 @@
 //! **Resolution** ([`resolve`]), done afresh for every send, never cached:
 //! 1. The session's live process: registry entries ([`crate::liveness::scan`], already checked
 //!    against `/proc/<pid>` start times) whose `sessionId` is the one asked for. Exactly one,
-//!    else refused.
+//!    else refused. Its registry status must be `idle`, `busy` or `shell`
+//!    ([`LiveProc::send_refusal`]); `waiting`, no status or any other value is refused.
 //! 2. Its pane: every tmux pane whose shell pid is on that process's ancestor chain (the pid
 //!    itself, its parent, … up to pid 1). Exactly one, else refused.
 //! 3. That pane may hold no OTHER live Claude Code process (a second agent in the same pane).
