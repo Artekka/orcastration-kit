@@ -94,12 +94,16 @@ def parse_window(text):
 
 
 STATED_HOW = "STATED by you with --window (from your env block, not the transcript)"
+LAUNCHED = None   # the window this session was launched with (its claude --model argument); weaker than evidence, see below
 
 
 def resolve_window(model, peak, stated):
     """(window or None, how it was known). Evidence, not a lookup table: see the module docstring."""
     if stated:
         return stated, STATED_HOW
+    # A launched 200K is overruled by a proven-larger peak (a /model switch inside the session is not in argv); a launched 1M stands.
+    if LAUNCHED and not (LAUNCHED <= SMALL_WINDOW and peak > SMALL_WINDOW):
+        return LAUNCHED, "LAUNCHED with this window (read from this session's own claude --model argument)"
     if peak > SMALL_WINDOW:
         return LARGE_WINDOW, f"PROVEN: this session already reached {peak:,}"
     if model and "haiku" in model.lower():
@@ -289,7 +293,7 @@ def claim_epoch(stamp, tz):
 
 def make_line(path, window):
     """The paste line for a transcript, or exits 2 (it never prints a guessed number)."""
-    if window is None:
+    if window is None and LAUNCHED is None:
         print(
             "--line needs --window 1m|200k (the window your OWN environment block names): "
             "the transcript cannot tell, so the line would carry a guess.",
@@ -478,8 +482,8 @@ def main():
     if window is None:
         w = launched_window.window_for_session(os.path.basename(path)[:-6])
         if w:
-            global STATED_HOW
-            window, STATED_HOW = parse_window(w), "LAUNCHED with this window (read from this session's own claude --model argument)"
+            global LAUNCHED
+            LAUNCHED = parse_window(w)
     if want_line:
         print(make_line(path, window))
         return

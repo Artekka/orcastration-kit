@@ -146,6 +146,8 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
+v0.14.0: three seat-poll tools: `bottleneck-watch.sh` (flags a merge, gate or idle main past its time budget, and a session stuck on a permission prompt), `main-checkout-sync.sh` (fast-forwards the shared checkout) and a context window read from the session's own launch (`ctx-fill.py` needs no `--window` for your own session).
+
 v0.11.0: the guarded seat merge (`seat-merge.sh`), `pending-work.sh`, the tmux entry point (`tmux-session.sh`), a hardened `gate-throttle.sh` (deploy mode, one slot per worktree, a reuse-check hook), a measured, checkable context fill (`ctx-fill.py --line`), and disk cleanup (`retro-worktrees.sh`, `docker-cache-cap.sh`, a low-disk guard).
 
 v0.10.0: the kit has one way to run, a seat plus siblings; the two-terminal practice setup is gone. The CHANGELOG says what to do if you used it.

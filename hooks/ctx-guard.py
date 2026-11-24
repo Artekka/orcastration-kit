@@ -24,6 +24,8 @@ import re
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True   # loading scripts/launched_window.py must not leave a __pycache__ in the plugin or a checkout
+
 TAIL_BYTES = 512 * 1024
 STATE_DIR = os.path.join(os.environ.get("KIT_STATE_DIR") or os.path.expanduser("~/.orchestration-kit"), "ctx-guard")
 MARKS = {

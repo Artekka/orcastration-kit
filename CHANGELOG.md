@@ -4,6 +4,18 @@ Newest first.
 
 ## Unreleased
 
+## 0.14.0 — 2026-11-24
+
+The seat's poll gets its eyes: a time-budget watcher, a checkout sync, and a context window that no longer has to be guessed.
+
+- **Added: `scripts/bottleneck-watch.sh`** (+ `lib-prompt-dialog.sh`): read-only, run it at every seat poll. Flags with `OUTLIER:` and exits 3: a seat-merge past `BUDGET_MERGE` (55 min) or one that conflicts with `origin/main`; a gate under the throttle past `BUDGET_GATE` (70), a gate whose branch is already on main or whose `origin/<branch>` moved past it, and the oldest queued gate; a zombie under a stopped parent; no merge on main for `BUDGET_NO_MERGE` (90) min; a tmux pane waiting on a permission prompt (the session cannot read a message; the line says how to look, and nothing is sent); free space under `BUDGET_FREE_GB` (20). It names what to check and never kills. Only processes whose cwd is in a worktree of this repo count. Seams for tests: `BOTTLENECK_REPO`, `BOTTLENECK_PS_FILE`, `BOTTLENECK_TMUX`, `BOTTLENECK_FREE_GB`, `BOTTLENECK_NO_FETCH`.
+- **Added: `scripts/main-checkout-sync.sh` and `scripts/sync-main-checkout.sh`**: fast-forward the shared main checkout to `origin/main` (poll, or right after a push from a worktree). Only ever `merge --ff-only --no-overwrite-ignore`; one `main-checkout:` line; exit 0 always; never stashes, resets or touches a dirty file.
+- **Added: `scripts/launched_window.py`**: the context window a session was launched with, read from its own `claude --model <tag>` argument (the environment block drops `[1m]`). The first `claude` ancestor answers; a `[1m]` tag is 1M, any other tag 200K, Haiku always 200K; the registry id must match the session being measured.
+- **Changed: `ctx-fill.py`** takes the window from the launch when you measure your own session and pass no `--window` (an explicit `--window` still wins; a proven peak above 200K overrules a launched 200K; another session's transcript still needs `--window`). **`hooks/ctx-guard.py`** does the same when `ORCHESTRATION.md` declares no `context_window:`.
+- **Changed: the orchestrate skill** lists the seat's poll (`pending-work`, `bottleneck-watch`, `main-checkout-sync`). Docs pins check it names all three and that all three install.
+- Tests: `bottleneck-watch`, `main-checkout-sync`, `launched-window`, with mutants; the bootstrap and kit-init install lists carry the new scripts.
+- Not ported (they are the project's own): the board lint inside the original sync script, the docs hold, and the main-gate and disk-sweep watches of the original bottleneck script.
+
 ## 0.11.0 — 2026-11-24
 
 The stack of tools that one project has run daily, now in the kit: tmux entry point, the seat's guarded merge, pending-work, a hardened gate-throttle with deploy mode, a measured context fill, and disk cleanup.
