@@ -70,6 +70,12 @@ main() {
   case "$mode" in normal|accept-edits|auto) ;; *) echo "sibling-shell: --mode must be one of normal|accept-edits|auto; got '$mode'" >&2; return 64 ;; esac
 
   local next="$state_dir/$name.next"
+  # Under tmux, name this window <Name> once, so `tmux list-windows` reads like the board. rename-window also turns
+  # automatic-rename off for it (otherwise tmux renames it back to "claude"). Best-effort: a tmux that is gone or a stale
+  # pane id never stops the wrapper. SIBLING_TMUX is the tmux binary (a test stand-in).
+  if [ -n "${TMUX_PANE:-}" ]; then
+    "${SIBLING_TMUX:-tmux}" rename-window -t "$TMUX_PANE" "$name" >/dev/null 2>&1 || true
+  fi
   local fast=0 rc start end elapsed claimed
   while :; do
     # EPOCHREALTIME (bash 5) when present, else whole seconds from `date`: $SECONDS only ticks in whole

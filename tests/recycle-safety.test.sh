@@ -4,6 +4,7 @@
 # never count; --dry-run lists what is live. The self-recycle path (the recycle running inside the seat's
 # own tool shell) is covered by tests/recycle-inplace.test.sh, which must stay green with this check on.
 # Run: bash tests/recycle-safety.test.sh   Linux only (SKIP elsewhere). Every `claude` is a stand-in process.
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 SUITE=recycle-safety
 . "$(dirname "$0")/inplace-harness.sh"
 FORBID=(FAKE_TERM_MODE=forbid)

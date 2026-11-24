@@ -4,7 +4,7 @@ cd "$(dirname "$0")" || exit 1
 rc=0
 for t in ./*.test.sh; do
   echo "== $t"
-  bash "$t" || rc=1
+  env -u TMUX -u TMUX_PANE bash "$t" || rc=1   # a test never reaches the caller's tmux (no-real-tmux.test.sh)
 done
 # ---- status-hud: the optional HUD's own suite (TypeScript, run by the claude CLI; skipped without it)
 if command -v claude >/dev/null 2>&1; then

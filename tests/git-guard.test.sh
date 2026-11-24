@@ -3,6 +3,7 @@
 # Part 1 feeds sample commands through the tokenizer (GIT_GUARD_CHECK_ONLY=1) under every awk
 # found (gawk, mawk, nawk, busybox). Part 2 checks the opt-in gating end to end in a temp repo.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HOOK="$ROOT/hooks/git-guard.sh"
 pass=0; fail=0

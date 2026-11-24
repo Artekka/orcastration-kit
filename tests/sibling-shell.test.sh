@@ -2,6 +2,7 @@
 # Tests for scripts/sibling-shell.sh, the respawn-loop wrapper a team terminal runs (v0.7.0).
 # Run: bash tests/sibling-shell.test.sh   Linux only (SKIP elsewhere). Nothing real is launched: every
 # `claude` is a stub on PATH (see tests/inplace-harness.sh).
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 SUITE=sibling-shell
 . "$(dirname "$0")/inplace-harness.sh"
 # shellcheck source=../scripts/lib-launch.sh

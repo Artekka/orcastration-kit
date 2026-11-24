@@ -5,6 +5,7 @@
 # gitleaks is a stub here (it records its arguments), so the test needs no network and no real gitleaks.
 # Run: bash tests/pre-push-hook.test.sh   (needs bash, git)
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INSTALL="$ROOT/.github/hooks/install-pre-push.sh"
 HOOK_SRC="$ROOT/.github/hooks/pre-push"

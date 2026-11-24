@@ -5,6 +5,7 @@
 # brief.sh must ALWAYS exit 0: the loader drops the whole skill on a non-zero exit.
 # Run: bash tests/orient-brief.test.sh      (needs bash, git, awk, python3; no network)
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; BS="$ROOT/skills/orient-brief/brief.sh"; SK="$ROOT/skills/orient-brief/SKILL.md"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com

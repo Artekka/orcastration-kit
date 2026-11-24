@@ -3,6 +3,7 @@
 # warning before they pass it (never refusing). KIT_CLAUDE_COUNT pins the host count, so the result does not
 # depend on how many real sessions this machine runs; one case checks the real counter counts by name.
 # Run: bash tests/session-cap.test.sh   Linux only (SKIP elsewhere). Every `claude` is a stand-in process.
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 SUITE=session-cap
 . "$(dirname "$0")/inplace-harness.sh"
 START="$ROOT/scripts/start-team.sh"

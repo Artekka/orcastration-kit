@@ -6,6 +6,9 @@
 # Run: bash tests/gate-throttle.test.sh   (needs bash, git, flock, timeout; skips without flock)
 # Every direct call carries a timeout, so a regression that blocks shows as a FAIL, not a hung suite.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
+# the disk guard (scripts/gate-disk-guard.sh) refuses under 20 GB free: this suite is about throttling, not disk, so it must not turn red on a full host
+export KIT_GATE_MIN_FREE_GB=0
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; GT="$ROOT/scripts/gate-throttle.sh"; QM="$ROOT/scripts/quiet-mode.sh"
 command -v flock >/dev/null 2>&1 || { echo "gate-throttle: skipped (no flock)"; exit 0; }
 command -v timeout >/dev/null 2>&1 || { echo "gate-throttle: skipped (no timeout)"; exit 0; }
@@ -14,6 +17,9 @@ PIDS=()
 cleanup() { for p in "${PIDS[@]}"; do kill "$p" 2>/dev/null; done; wait 2>/dev/null; rm -rf "$TMP"; }
 trap cleanup EXIT
 export KIT_RUNTIME_DIR="$TMP/rt" GATE_POLL=0.1 GATE_MAX_LOAD=1000000 LOG="$TMP/log"
+# These tests start several throttles from one directory on purpose; the one-slot-per-worktree rule has its own tests (gate-throttle-port).
+export GATE_ALLOW_SECOND_SLOT=1
+export KIT_DSTATE_COUNT_FILE="$TMP/dzero"; echo 0 > "$TMP/dzero"   # no /proc scan (it sleeps a second per poll when a task sits in D state)
 pass=0; fail=0
 ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $*"; }
@@ -73,7 +79,8 @@ GATE_SLOTS=1 timeout 10 bash "$GT" bash -c 'echo reuse-ok >> "$LOG"' 2>/dev/null
 grep -qx reuse-ok "$LOG" && ok || bad "a stale ticket on a reused (live) pid blocked the line"
 [ ! -e "$KIT_RUNTIME_DIR/queue/0000000000.$squat" ] && ok || bad "the stale reused-pid ticket was not deleted"
 # ...and a ticket with the RIGHT start time for that live pid still holds its place
-printf '%s\n%s\n' "$TMP/live" "$(ps -o lstart= -p "$squat" | tr -s ' ' | sed 's/^ //;s/ $//')" > "$KIT_RUNTIME_DIR/queue/0000000000.$squat"
+pstart() { if [ -r "/proc/$1/stat" ]; then sed 's/^.*) //' "/proc/$1/stat" | cut -d' ' -f20; else ps -o lstart= -p "$1" | tr -s ' ' | sed 's/^ //;s/ $//'; fi; }   # the throttle's start-time form
+printf '%s\n%s\n' "$TMP/live" "$(pstart "$squat")" > "$KIT_RUNTIME_DIR/queue/0000000000.$squat"
 GATE_SLOTS=1 timeout 2 bash "$GT" bash -c 'echo jumped >> "$LOG"' 2>/dev/null
 ! grep -qx jumped "$LOG" && ok || bad "a live waiter's ticket (right start time) was skipped"
 out="$(bash "$QM" status)"; has "quiet-mode status lists the live waiter with its dir" "pid $squat  $TMP/live" "$out"
@@ -114,7 +121,11 @@ KIT_LOADAVG_FILE="$TMP/loadavg" GATE_MAX_LOAD=4 bg A; sleep 0.6
 has "load: the waiter says why" "holding: load 99.00" "$(cat "$TMP/err")"
 mkdir -p "$TMP/train"; printf '%s\n' "$(cd "$TMP/train" && pwd -P)" > "$KIT_RUNTIME_DIR/gate-priority.txt"
 KIT_LOADAVG_FILE="$TMP/loadavg" GATE_MAX_LOAD=4 bg P "$TMP/train"; waitfor "start P" 5 && ok || bad "load: the priority slot waited on load"
-echo "1.00 1 1 1/1 1" > "$TMP/loadavg"; waitfor "start A" 5 && ok || bad "load: A did not start once load dropped"
+# While the priority gate P runs, deploy mode holds new normal gates by design (tests/gate-throttle-deploy.test.sh), so A can only
+# start once P has finished AND the load has dropped.
+echo "1.00 1 1 1/1 1" > "$TMP/loadavg"; sleep 0.8
+! grep -q "start A" "$LOG" 2>/dev/null && ok || bad "load: A started while the priority gate P (deploy mode) still ran"
+release P; waitfor "end P" 5; waitfor "start A" 5 && ok || bad "load: A did not start once P finished and load dropped"
 release A; release P; waitfor "end A"; waitfor "end P"
 
 # 8. a lock FILE left by a dead holder (e.g. after a reboot) is not a held lock

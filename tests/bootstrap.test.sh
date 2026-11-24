@@ -3,6 +3,7 @@
 # are never overwritten. HOME is sandboxed so the memory-starter step writes into the temp dir.
 # Run: bash tests/bootstrap.test.sh
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; BS="$ROOT/scripts/bootstrap.sh"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 export HOME="$TMP/home"; mkdir -p "$HOME"
@@ -22,7 +23,7 @@ echo "$out" | grep -q 'DONE' && ok || bad "dry-run plan truncated (no DONE line)
 out="$(bash "$BS" "$P" 2>&1)"; rc=$?
 [ $rc -eq 0 ] && ok || bad "first run exit $rc: $out"
 for f in docs/orchestration/AGENT_BOARD.md docs/orchestration/ORCHESTRATION.md CLAUDE.md docs/AI_CONTEXT.md \
-         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh .claude/agents/verifier.md \
+         docs/timeline/build-log.md scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/lib-waiting-tickets.sh scripts/lib-builder-worktree.sh scripts/pending-work.sh scripts/tmux-session.sh scripts/tmux/agents.tmux.conf scripts/sibling-shell.sh scripts/retro-worktrees.sh scripts/docker-cache-cap.sh scripts/gate-disk-guard.sh .claude/agents/verifier.md \
          .claude/skills/orchestrate/SKILL.md .claude/skills/falsify/SKILL.md .claude/skills/orient-brief/brief.sh \
          docs/orchestration/briefs/README.md docs/orchestration/briefs/_TEMPLATE.md \
          docs/orchestration/CLAUDE-slimness.md; do
@@ -43,6 +44,35 @@ bash "$BS" "$P" >/dev/null 2>&1
 [ "$(cat "$P/docs/orchestration/CLAUDE-slimness.md")" = "# my slimness note" ] && ok || bad "a live CLAUDE-slimness.md was overwritten"
 cp "$ROOT/templates/CLAUDE-slimness.md" "$P/docs/orchestration/CLAUDE-slimness.md"
 [ -x "$P/scripts/start-team.sh" ] && ok || bad "start-team.sh not executable"
+[ -x "$P/scripts/seat-merge.sh" ] && ok || bad "seat-merge.sh not executable"
+# seat-merge sources its two libs from its own directory, so all three must travel together
+for lib in lib-waiting-tickets.sh lib-builder-worktree.sh; do
+  grep -q "$lib" "$ROOT/scripts/seat-merge.sh" && ok || bad "seat-merge.sh no longer sources $lib (update this pin)"
+  grep -q "quiet-mode.sh .*$lib" "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install $lib"
+  bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q "^\\[bootstrap\\] CREATE scripts/$lib" && ok || bad "dry-run did not list $lib"
+done
+grep -q 'seat-merge.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install seat-merge.sh"
+# tmux-session.sh loads scripts/tmux/agents.tmux.conf from its own directory, so the two travel together
+[ -x "$P/scripts/tmux-session.sh" ] && ok || bad "tmux-session.sh not executable"
+grep -q 'tmux/agents.tmux.conf' "$ROOT/scripts/tmux-session.sh" && ok || bad "tmux-session.sh no longer loads tmux/agents.tmux.conf (update this pin)"
+bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/tmux-session.sh' && ok || bad "dry-run did not list tmux-session.sh"
+bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/tmux/agents.tmux.conf' && ok || bad "dry-run did not list tmux/agents.tmux.conf"
+cmp -s "$ROOT/scripts/tmux/agents.tmux.conf" "$P/scripts/tmux/agents.tmux.conf" && ok || bad "installed agents.tmux.conf differs from the kit's"
+grep -q 'tmux-session.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install tmux-session.sh"
+grep -q 'for f in .*tmux/agents.tmux.conf.*; do SRC="\$K/scripts/\$f"' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install scripts/tmux/agents.tmux.conf"
+grep -q 'chmod +x .*scripts/tmux-session.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not chmod tmux-session.sh"
+# sibling-shell.sh: tmux-session.sh --seat and the in-place recycle both run "$script_dir/sibling-shell.sh"
+grep -q 'sibling-shell.sh' "$ROOT/scripts/tmux-session.sh" && ok || bad "tmux-session.sh no longer runs sibling-shell.sh (update this pin)"
+grep -q 'sibling-shell.sh' "$ROOT/scripts/recycle-sibling.sh" && ok || bad "recycle-sibling.sh no longer uses sibling-shell.sh (update this pin)"
+[ -x "$P/scripts/sibling-shell.sh" ] && ok || bad "sibling-shell.sh not executable"
+bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/sibling-shell.sh' && ok || bad "dry-run did not list sibling-shell.sh"
+grep -q 'pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh; do SRC' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install sibling-shell.sh"
+grep -q 'chmod +x .*scripts/sibling-shell.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not chmod sibling-shell.sh"
+# pending-work.sh is one file (its python is inline), installed and made executable by both paths
+[ -x "$P/scripts/pending-work.sh" ] && ok || bad "pending-work.sh not executable"
+bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/pending-work.sh' && ok || bad "dry-run did not list pending-work.sh"
+grep -q 'quiet-mode.sh .*pending-work.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install pending-work.sh"
+grep -q 'chmod +x .*scripts/pending-work.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not chmod pending-work.sh"
 [ -d "$P/.git" ] && ok || bad "no git repo"
 ls "$HOME"/.claude/projects/*/memory/MEMORY.md >/dev/null 2>&1 && ok || bad "memory starter index not written"
 [ ! -e "$P/.claude/agents/architect.md" ] && ok || bad "team agents installed without --with-team-agents"

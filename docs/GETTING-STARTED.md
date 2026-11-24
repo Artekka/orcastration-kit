@@ -53,6 +53,8 @@ If you run the setup **inside tmux**, each session opens as a new tmux window (o
 after the repo — attach with `tmux attach -t <repo-name>` (the script prints the exact
 command). No tmux installed → the script prints one command per window for you to run.
 
+**Want tmux to be the way you work?** Run `bash scripts/tmux-session.sh --seat Orca --model 'opus[1m]'`. It creates the tmux session for this repo (named after the repo, or `RECYCLE_TMUX_SESSION`), opens the seat in its own window and attaches. Add `--install-command orca` once and `orca` starts or reaches the same session from any directory. Every later `start-team.sh` or `recycle-sibling.sh` window joins that session. After a reboot, run the command again; tmux does not survive one. If you also launch from outside tmux, use RECYCLE_TMUX_SESSION, not --session, to rename the session: only the variable reaches `start-team.sh` and `recycle-sibling.sh`. Full options: the header of `scripts/tmux-session.sh` and "If you use tmux" in the README.
+
 To see what your machine supports: `bash scripts/start-team.sh --terminal list`. To pick one
 yourself, ask Claude ("open the team in tmux"), set `terminal:` in the `team:` block of
 `docs/orchestration/ORCHESTRATION.md`, or pass `--terminal <backend>`.
