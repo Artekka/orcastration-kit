@@ -4,6 +4,18 @@ Newest first.
 
 ## Unreleased
 
+## 0.11.0 — 2026-11-24
+
+The stack of tools that one project has run daily, now in the kit: tmux entry point, the seat's guarded merge, pending-work, a hardened gate-throttle with deploy mode, a measured context fill, and disk cleanup.
+
+- **Changed: the GitHub repository is now `Artekka/orcastration-kit`** (was `claude-orchestration-kit`). Install with `claude plugin marketplace add Artekka/orcastration-kit`; the plugin id (`orchestration-kit@artekka-kits`), its slash commands and `~/.orchestration-kit/` do not change. GitHub redirects the old URL, so existing installs keep working. README, GETTING-STARTED, CONTRIBUTING, SECURITY, the issue-template link and the Code of Conduct contact link use the new name; the plugin manifest gains `homepage` and `repository`.
+- **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
+- **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)
+- **New: memory-aware gate slots.** (PRS 2026-10-16)
+- **New, status HUD: model badges.** (PRS 2026-10-14)
+- **New, status HUD: session state at a glance.** (PRS 2026-10-14)
+- Thanks to @MilesBrown34 for #3, #4, #10, #11 and #12.
+
 ### Disk cleanup
 
 A kit user's SSD filled (170 GB of old Docker layers, worktrees and leftovers), so the guards the originating project runs daily are in the kit (plain bash, each with a dry run; see the README section "Disk cleanup").
@@ -13,6 +25,7 @@ A kit user's SSD filled (170 GB of old Docker layers, worktrees and leftovers), 
 - **Added: `scripts/gate-disk-guard.sh`**, run by `gate-throttle.sh` before it queues: it refuses (exit 1) when free space is under `KIT_GATE_MIN_FREE_GB` / `gate_min_free_gb:` (default 20 GB, `0` = off, `KIT_GATE_DISK_PATH` picks the disk). An unreadable `df` never blocks.
 - **Changed: `bootstrap.sh` and the `kit-init` skill copy the three scripts.**
 - **Added: `tests/disk-cleanup.test.sh`** (fake `df` and `docker`; throwaway repos).
+- Thanks to Naga/Omie (@Babasher) and Miles (@MilesBrown34) for presenting the disk-cleanup issues.
 
 tmux entry point, ported from a project that has run it daily.
 

@@ -1,11 +1,13 @@
 {
   "name": "orchestration-kit",
   "displayName": "Multi-Session Orchestration Kit",
-  "version": "0.9.0",
+  "version": "0.11.0",
   "description": "Run one orchestrator session (the seat) and 2+ sibling Claude Code sessions on one repo without collisions: shared claimable board, per-session worktrees, sibling-session verification, one-at-a-time reconcile, wave-train deploys, and clean session recycling. Team mode (a seat plus siblings) is the default; Solo (two sessions + a board, you as the orchestrator) is a practice mode. Ships the skills (incl. falsify), a SessionStart hook, optional worktree-guard and git-guard hooks, an optional context-fill statusline, the verifier agent, board/overlay/status-doc/log templates, launch + context-measurement scripts (start-team, recycle-sibling, ctx-fill), and distilled cross-project lessons.",
   "author": {
     "name": "Artekka"
   },
+  "homepage": "https://github.com/Artekka/orcastration-kit",
+  "repository": "https://github.com/Artekka/orcastration-kit",
   "license": "MIT",
   "keywords": [
     "orchestration",

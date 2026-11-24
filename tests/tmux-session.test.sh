@@ -181,7 +181,7 @@ absent "T7 nothing written on refusal" "$SB/home/.local/bin/orca"
 mkdir -p "$SB/win/user" "$SB/win/local"
 cat > "$SB/bin/fake-cmd.exe" <<STUB
 #!/usr/bin/env bash
-case "\$*" in *USERPROFILE*) echo 'C:\\Users\\T' ;; *LOCALAPPDATA*) echo 'C:\\Users\\T\\AppData\\Local' ;; esac
+case "\$*" in *USERPROFILE*) echo 'C:\\Users\\u' ;; *LOCALAPPDATA*) echo 'C:\\Users\\u\\AppData\\Local' ;; esac
 STUB
 cat > "$SB/bin/fake-wslpath" <<STUB
 #!/usr/bin/env bash
@@ -194,7 +194,7 @@ touch "$SB/interop"
 WENV=(RECYCLE_WSL_INTEROP="$SB/interop" RECYCLE_CMD_EXE="$SB/bin/fake-cmd.exe" RECYCLE_WSLPATH="$SB/bin/fake-wslpath" RECYCLE_POWERSHELL="$SB/bin/fake-ps" WSL_DISTRO_NAME=TestDistro)
 run "${WENV[@]}" -- bash "$TS" --install-command orca --install-windows --session agents --seat Orca --model haiku
 eq "T7 install-windows exit 0" 0 "$RC"
-CMDF="$SB/win/Users/T/bin/orca.cmd"; FRAG="$SB/win/Users/T/AppData/Local/Microsoft/Windows Terminal/Fragments/agents/orca.json"
+CMDF="$SB/win/Users/u/bin/orca.cmd"; FRAG="$SB/win/Users/u/AppData/Local/Microsoft/Windows Terminal/Fragments/agents/orca.json"
 exists "T7 orca.cmd" "$CMDF"; exists "T7 fragment" "$FRAG"
 has "T7 cmd passes typed words through wsl.exe with the distro unquoted" "wsl.exe -d TestDistro -e bash -lc" "$(cat "$CMDF")"
 has "T7 cmd ends with %*" "%*" "$(cat "$CMDF")"

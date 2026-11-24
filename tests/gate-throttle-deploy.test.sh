@@ -8,6 +8,8 @@
 # Run: bash tests/gate-throttle-deploy.test.sh   (needs bash, flock, timeout, taskset; the mask cases need 4+ CPUs)
 set -u
 unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
+# the disk guard (scripts/gate-disk-guard.sh) refuses under 20 GB free: this suite is about throttling, not disk, so it must not turn red on a full host (ORCA324-5 r1)
+export KIT_GATE_MIN_FREE_GB=0
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; GT="$ROOT/scripts/gate-throttle.sh"; QM="$ROOT/scripts/quiet-mode.sh"
 command -v flock >/dev/null 2>&1 || { echo "gate-throttle-deploy: skipped (no flock)"; exit 0; }
 command -v timeout >/dev/null 2>&1 || { echo "gate-throttle-deploy: skipped (no timeout)"; exit 0; }

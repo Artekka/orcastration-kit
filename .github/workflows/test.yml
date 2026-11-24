@@ -1,0 +1,79 @@
+# Runs the kit's test suite and a gitleaks scan of the new commits on every push and pull request.
+# Actions are pinned by commit SHA (the tag is in the comment); gitleaks is a pinned release whose
+# checksum is verified before it runs.
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # ubuntu-latest already has what the suite needs: bash, git, awk, python3, pgrep, flock, timeout.
+      # The status HUD's TypeScript suite needs the claude CLI, which CI does not have, so run.sh skips it
+      # and says so in the log (run it locally with: claude plugin test plugins/status-hud).
+      - name: Run tests/run.sh
+        shell: bash
+        run: bash tests/run.sh
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the diff range needs the base commit
+          persist-credentials: false
+      - name: Install gitleaks (pinned, checksum verified)
+        shell: bash
+        run: |
+          set -euo pipefail
+          tgz="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$tgz" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$tgz"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          tar -xzf "$RUNNER_TEMP/$tgz" -C "$RUNNER_TEMP/gitleaks" gitleaks
+          echo "$RUNNER_TEMP/gitleaks" >> "$GITHUB_PATH"
+      # With gitleaks on PATH, the leak guard also runs its parity case through the real binary, so the guard and
+      # .gitleaks.toml are checked against each other on every push (the test job has no gitleaks and skips that case).
+      - name: Leak guard, with the gitleaks parity case
+        shell: bash
+        run: bash tests/leak-guard.test.sh
+      - name: Scan the new commits
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = pull_request ]; then
+            range="$PR_BASE..$PR_HEAD"
+          elif [ -n "$PUSH_BEFORE" ] && [ "$PUSH_BEFORE" != 0000000000000000000000000000000000000000 ] \
+               && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+            range="$PUSH_BEFORE..$SHA"
+          elif git rev-parse -q --verify refs/remotes/origin/main >/dev/null && [ "$GITHUB_REF" != refs/heads/main ]; then
+            range="$SHA --not origin/main" # a new branch, or a force push: the commits main does not have
+          else
+            range="$SHA" # no base to compare with: scan the whole history
+          fi
+          echo "scanning: $range"
+          gitleaks git . --config .gitleaks.toml --log-opts="$range" --redact --no-banner --verbose

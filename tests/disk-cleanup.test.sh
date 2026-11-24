@@ -6,6 +6,7 @@
 # disk, image or container is read or touched; HOME, git config and the runtime dir are temp; no network, no tmux.
 set -u
 unset TMUX TMUX_PANE
+unset KIT_GATE_MIN_FREE_GB   # the guard tests below pass their own value; a caller's 0 would switch the guard off under test
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RW="$ROOT/scripts/retro-worktrees.sh"; DC="$ROOT/scripts/docker-cache-cap.sh"; DG="$ROOT/scripts/gate-disk-guard.sh"; GT="$ROOT/scripts/gate-throttle.sh"
 pass=0; fail=0; SANDBOXES=()
@@ -67,6 +68,11 @@ sandbox; tree s5e307/a 0; echo y > "$TREE/y.txt"; G -C "$TREE" add y.txt; G -C "
 out="$(rw --prefix s5e307/)"
 has "an unmerged branch is kept" "is not merged into origin/main" "$out"; [ -d "$TREE" ] && ok || bad "an unmerged tree was removed"
 
+sandbox; tree s5e307/a 1
+( cd "$TREE" && exec sleep 30 ) & holder=$!; sleep 0.3
+out="$(rw --prefix s5e307/)"; kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+has "a merged, idle tree with a live process cwd inside is kept (ORCA324-5 r1)" "has its cwd inside it" "$out"; [ -d "$TREE" ] && ok || bad "a tree with a live process inside was removed"
+
 sandbox; tree s5e307/a 1; touch "$TREE/README.md"
 out="$(rw --prefix s5e307/)"
 has "a tree with a file changed in the last 30 minutes is kept" "a file changed in the last 30 min" "$out"; [ -d "$TREE" ] && ok || bad "a fresh tree was removed"
@@ -97,7 +103,7 @@ FD="$TMP/fakedocker"; CALLS="$TMP/docker.calls"
 printf '#!/usr/bin/env bash\necho "$*" >> "%s"\n[ -n "${FAKE_DOCKER_FAIL:-}" ] && exit 1\nexit 0\n' "$CALLS" > "$FD"; chmod +x "$FD"
 dc() { : > "$CALLS"; KIT_DOCKER_BIN="$FD" "$@" bash "$DC" "${ARGS[@]}" 2>&1; echo "rc=$?"; }
 ARGS=(); out="$(: > "$CALLS"; KIT_DOCKER_BIN="$FD" bash "$DC" 2>&1; echo "rc=$?")"
-has "default cap: 40GB, most recent layers kept" "builder prune --force --max-used-space 40GB" "$(cat "$CALLS")"; has "exit 0" "rc=0" "$out"
+eq "default cap: exactly one call, the build cache only, 40GB" "builder prune --force --max-used-space 40GB" "$(cat "$CALLS")"; has "exit 0" "rc=0" "$out"
 out="$(: > "$CALLS"; KIT_BUILD_CACHE_KEEP=10GB KIT_DOCKER_BIN="$FD" bash "$DC" 2>&1; echo "rc=$?")"
 has "KIT_BUILD_CACHE_KEEP overrides the cap" "--max-used-space 10GB" "$(cat "$CALLS")"
 out="$(: > "$CALLS"; FAKE_DOCKER_FAIL=1 KIT_DOCKER_BIN="$FD" bash "$DC" 2>&1; echo "rc=$?")"

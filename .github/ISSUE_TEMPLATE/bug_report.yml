@@ -1,0 +1,61 @@
+name: Bug report
+description: Something in the kit does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **A security problem goes to SECURITY.md, not here.**
+        Please remove tokens, email addresses and paths from your machine before you paste logs.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. bash scripts/start-team.sh --dry-run
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or log
+      description: The exact error text or the relevant part of the log.
+      render: text
+  - type: input
+    id: kit-version
+    attributes:
+      label: Kit version
+      description: From CHANGELOG.md or `claude plugin list`.
+      placeholder: "0.11.0"
+    validations:
+      required: true
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code version
+      placeholder: "claude --version"
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux
+        - WSL
+        - macOS
+        - Git Bash (Windows)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal backend
+      description: tmux, Windows Terminal, xterm, manual, ... (see `scripts/start-team.sh --terminal list`).

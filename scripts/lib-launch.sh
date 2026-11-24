@@ -677,9 +677,11 @@ launch_team_conf() {  # <repo>
 # pass the cap. The count is every process NAMED `claude` on this host (any repo, any account); an argv match
 # would also count test stand-ins and anything whose command line merely starts with "claude".
 # KIT_CLAUDE_COUNT overrides the count (tests only, so they do not depend on what this host runs).
+# pgrep exits 1 when nothing matches: `|| true` keeps that from failing the pipeline, since the launchers run
+# with `set -euo pipefail` and would otherwise exit silently whenever no Claude session is running yet.
 launch_cap_warn() {  # <adding>
   [ -n "${TEAM_MAX:-}" ] || return 0
-  local n; n="${KIT_CLAUDE_COUNT:-$(pgrep -x claude 2>/dev/null | wc -l | tr -d ' ')}"
+  local n; n="${KIT_CLAUDE_COUNT:-$( { pgrep -x claude 2>/dev/null || true; } | wc -l | tr -d ' ')}"
   if [ $((n + $1)) -gt "$TEAM_MAX" ]; then
     echo "warning: ${n} Claude sessions already run on this host; launching ${1} more passes max_sessions (${TEAM_MAX}). Retire one first (retro, then close it), or raise max_sessions in the team block." >&2
   fi

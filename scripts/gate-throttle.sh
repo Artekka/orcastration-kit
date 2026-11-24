@@ -3,7 +3,12 @@
 # N host-wide slots is free, so several sessions on one machine do not run N full gates at once and flake
 # on load. Usage, from inside YOUR worktree:
 #   bash scripts/gate-throttle.sh <command> [args...]        e.g. bash scripts/gate-throttle.sh npm test
+#   bash scripts/gate-throttle.sh --log <file> <command> [args...]
 # Exit code = the command's exit code.
+# --log:     once the slot is held, the command's output (stdout and stderr) goes to <file>, which opens
+#            with "SHA <full commit>" and "started <HH:MM:SS> dirty=<changed paths>" read at that moment
+#            (not while waiting: a commit made in the queue would make the log name the wrong code) and
+#            ends with "exit <code>". The slot line stays on stderr.
 #
 # Slots:     `gate_slots:` in the team block of docs/orchestration/ORCHESTRATION.md (default 2);
 #            GATE_SLOTS overrides it.
@@ -15,6 +20,9 @@
 #            took freed slots). A dead waiter's ticket is skipped and deleted.
 # Load:      the head of the line takes a normal slot only while the 1-minute load average is below
 #            GATE_MAX_LOAD (default 0.9 x CPU count). Unreadable load = admit.
+# Memory:    a normal slot beyond the first is admitted only while the system's available memory
+#            (MemAvailable in /proc/meminfo) is at least GATE_MIN_FREE_MB (default 3072). Below that, one
+#            normal slot at a time. Unreadable = admit. KIT_MEMINFO_FILE points at a stand-in (tests).
 # Quiet mode: while "$RT/quiet-mode" exists (scripts/quiet-mode.sh on), no NEW command starts; running
 #            ones finish. GATE_IGNORE_QUIET=1 is the seat's escape for a hotfix gate; while quiet
 #            mode is on it also skips the line, because the waiters ahead of it are parked.
@@ -48,13 +56,31 @@
 #            throttle has no flag of its own for this: a `--reuse-check` belongs to YOUR gate and, after the command, reaches it.
 # Needs flock(1) (util-linux; macOS: `brew install flock`). Without it, it warns and runs unthrottled.
 set -u
-[ $# -ge 1 ] || { echo "usage: gate-throttle.sh <command> [args...]" >&2; exit 64; }
-# The script has no --flags of its own. A leading --word is a typo (`--status` once was queued as a COMMAND and held a ticket),
+log=""
+if [ "${1:-}" = --log ]; then
+  [ $# -ge 3 ] && [ -n "$2" ] || { echo "usage: gate-throttle.sh [--log <file>] <command> [args...]" >&2; exit 64; }
+  log="$2"; shift 2
+  : > "$log" || { echo "gate-throttle: cannot write the log $log" >&2; exit 73; }
+fi
+[ $# -ge 1 ] || { echo "usage: gate-throttle.sh [--log <file>] <command> [args...]" >&2; exit 64; }
+# The command, logged when --log was given: commit and dirty count first, read now, exit code last.
+run() {
+  [ -z "$log" ] && { "$@"; return $?; }
+  local rc
+  {
+    echo "SHA $(git rev-parse HEAD 2>/dev/null || echo none)"
+    echo "started $(date +%H:%M:%S) dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    "$@"; rc=$?
+    echo "exit $rc"
+    return $rc
+  } > "$log" 2>&1
+}
+# The script has no other --flags of its own. A leading --word is a typo (`--status` once was queued as a COMMAND and held a ticket),
 # so refuse before anything is created.
 case "$1" in
   --?*)
     echo "gate-throttle: unknown option '$1'. This script takes a command to run in a gate slot, not options." >&2
-    echo "usage: bash scripts/gate-throttle.sh <command> [args...]" >&2
+    echo "usage: bash scripts/gate-throttle.sh [--log <file>] <command> [args...]" >&2
     exit 2
     ;;
 esac
@@ -66,7 +92,7 @@ RT="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}"
 FLOCK="${KIT_FLOCK_BIN:-flock}"
 if ! command -v "$FLOCK" >/dev/null 2>&1; then
   echo "gate-throttle: flock not found (Linux: util-linux; macOS: brew install flock); running UNTHROTTLED" >&2
-  "$@"; exit $?
+  run "$@"; exit $?
 fi
 locks_dir="$RT/locks"; qdir="$RT/queue"; rdir="$RT/running"
 mkdir -p "$locks_dir" "$qdir" "$rdir" || exit 1
@@ -466,6 +492,30 @@ if [ -n "$reuse_cmd" ]; then
   if bash -c "$reuse_cmd"' "$@"' gate-throttle-reuse-check "$@"; then exit 0; fi
 fi
 dm_stale_check
+min_free_mb="${GATE_MIN_FREE_MB:-3072}"
+case "$min_free_mb" in ''|*[!0-9]*) min_free_mb=3072 ;; esac
+mem_avail_mb() {  # available memory in MB; empty when unreadable
+  local f="${KIT_MEMINFO_FILE:-/proc/meminfo}"
+  [ -r "$f" ] || return 0
+  awk '/^MemAvailable:/ { printf "%d", $2 / 1024 }' "$f" 2>/dev/null
+}
+mem_ok() {  # 0 = a normal slot beyond the first may start
+  local m; m="$(mem_avail_mb)"
+  [ -z "$m" ] && return 0
+  [ "$m" -ge "$min_free_mb" ]
+}
+running_normal() {  # how many normal-slot commands are running now (live pid, numeric slot)
+  local f n=0 pid
+  for f in "$rdir"/*; do
+    [ -e "$f" ] || continue
+    pid="${f##*/}"
+    # line 1 only: the run entry also has a start-time line and a prio line
+    case "$(head -n 1 "$f" 2>/dev/null | cut -f1)" in ''|*[!0-9]*) continue ;; esac
+    alive "$pid" && n=$((n + 1))
+  done
+  echo "$n"
+}
+mem_told=0
 take_ticket
 trap on_exit EXIT
 trap 'on_signal 143' TERM
@@ -489,7 +539,14 @@ while :; do
   dm_told=0
   # The quiet-mode escape also skips the line: the waiters ahead are parked in quiet mode and would hold it forever.
   if am_head || { [ "${GATE_IGNORE_QUIET:-}" = 1 ] && [ -f "$RT/quiet-mode" ]; }; then
-    if load_ok; then cands="$(seq 1 "$slots")"; load_told=0
+    if load_ok; then
+      cands="$(seq 1 "$slots")"; load_told=0
+      if [ "$slots" -gt 1 ] && ! mem_ok && [ "$(running_normal)" -ge 1 ]; then
+        cands=""
+        if [ "$mem_told" = 0 ]; then
+          echo "gate-throttle: next in line, holding: $(mem_avail_mb) MB available < $min_free_mb MB (GATE_MIN_FREE_MB); one slot until memory frees" >&2; mem_told=1
+        fi
+      else mem_told=0; fi
     elif [ "$load_told" = 0 ]; then
       echo "gate-throttle: next in line, holding: load $(load_now) >= $max_load (GATE_MAX_LOAD)" >&2; load_told=1
     fi
@@ -513,7 +570,7 @@ while :; do
       # the slot after it returns. This shell's own fd 9 holds the lock until exit. Background + wait: see on_signal;
       # `<&0` keeps stdin, which a non-job-control `&` would replace with /dev/null. `wait` returns the command's own status,
       # so the exit code passes through unchanged.
-      "$@" 9>&- <&0 &
+      run "$@" 9>&- <&0 &
       child=$!
       launching=0
       [ -z "$pending_sig" ] || on_signal "$pending_sig"

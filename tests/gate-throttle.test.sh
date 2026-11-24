@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Tests for scripts/gate-throttle.sh and scripts/quiet-mode.sh: exit code, slot limit, first-come order,
 # dead tickets, quiet mode, the priority slot, load admission, stale locks, gate_slots from the team block,
-# and the no-flock fallback. Every run uses a private runtime dir and a fast poll.
+# the no-flock fallback, and --log (commit and dirty count first, read when the slot is taken; exit code
+# last). Every run uses a private runtime dir and a fast poll.
 # Run: bash tests/gate-throttle.test.sh   (needs bash, git, flock, timeout; skips without flock)
 # Every direct call carries a timeout, so a regression that blocks shows as a FAIL, not a hung suite.
 set -u
 unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
+# the disk guard (scripts/gate-disk-guard.sh) refuses under 20 GB free: this suite is about throttling, not disk, so it must not turn red on a full host (ORCA324-5 r1)
+export KIT_GATE_MIN_FREE_GB=0
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; GT="$ROOT/scripts/gate-throttle.sh"; QM="$ROOT/scripts/quiet-mode.sh"
 command -v flock >/dev/null 2>&1 || { echo "gate-throttle: skipped (no flock)"; exit 0; }
 command -v timeout >/dev/null 2>&1 || { echo "gate-throttle: skipped (no timeout)"; exit 0; }
@@ -163,6 +166,53 @@ env -u KIT_RUNTIME_DIR HOME="$H" bash "$QM" off >/dev/null
 # 10. no flock: warns and runs unthrottled
 out="$(KIT_FLOCK_BIN=/nonexistent/flock timeout 20 bash "$GT" bash -c 'echo ran' 2>&1)"
 has "no flock: still runs the command" "ran" "$out"; has "no flock: says it is unthrottled" "UNTHROTTLED" "$out"
+
+# 11. --log: commit and dirty count first, the command's output, exit code last; the slot line stays on stderr
+reset; export GATE_SLOTS=1
+L="$TMP/repo-log"; git init -q -b main "$L"
+git -C "$L" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m one
+: > "$L/untracked"
+err="$(cd "$L" && timeout 20 bash "$GT" --log "$TMP/gate.log" bash -c 'echo to-out; echo to-err >&2; exit 7' 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -eq 7 ] && ok || bad "--log: exit code not passed through (got $rc)"
+[ "$(sed -n 1p "$TMP/gate.log")" = "SHA $(git -C "$L" rev-parse HEAD)" ] && ok || bad "--log: line 1 is not the commit: $(sed -n 1p "$TMP/gate.log")"
+sed -n 2p "$TMP/gate.log" | grep -Eq '^started [0-9]{2}:[0-9]{2}:[0-9]{2} dirty=1$' && ok || bad "--log: line 2 is not 'started HH:MM:SS dirty=1': $(sed -n 2p "$TMP/gate.log")"
+has "--log: stdout in the log" "to-out" "$(cat "$TMP/gate.log")"; has "--log: stderr in the log" "to-err" "$(cat "$TMP/gate.log")"
+[ "$(tail -n 1 "$TMP/gate.log")" = "exit 7" ] && ok || bad "--log: last line is not 'exit 7': $(tail -n 1 "$TMP/gate.log")"
+has "--log: the slot line stays on stderr" "slot 1 acquired" "$err"; hasnt "--log: the slot line is not in the log" "acquired" "$(cat "$TMP/gate.log")"
+
+# 11b. --log reads the commit when the slot is taken, not while waiting: a commit made in the queue is the one logged
+reset; export GATE_SLOTS=1
+bg A; waitfor "start A" || bad "--log queue: A never started"
+(cd "$L" && exec bash "$GT" --log "$TMP/queued.log" bash -c 'echo queued-ran >> "$LOG"' 2>>"$TMP/err") & PIDS+=($!); qpid=$!
+sleep 0.4; ! grep -q queued-ran "$LOG" && ok || bad "--log queue: the logged run did not wait for the slot"
+git -C "$L" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m two
+release A; wait "$qpid"
+[ "$(sed -n 1p "$TMP/queued.log")" = "SHA $(git -C "$L" rev-parse HEAD)" ] && ok || bad "--log queue: logged $(sed -n 1p "$TMP/queued.log"), want the commit made while it waited"
+
+# 11c. --log usage and an unwritable log; no flock still writes the log
+timeout 20 bash "$GT" --log 2>/dev/null; [ $? -eq 64 ] && ok || bad "--log with no file: want exit 64"
+timeout 20 bash "$GT" --log "$TMP/x.log" 2>/dev/null; [ $? -eq 64 ] && ok || bad "--log with no command: want exit 64"
+timeout 20 bash "$GT" --log "$TMP/no/such/dir/x.log" true 2>/dev/null; [ $? -eq 73 ] && ok || bad "--log to an unwritable path: want exit 73"
+(cd "$L" && KIT_FLOCK_BIN=/nonexistent/flock timeout 20 bash "$GT" --log "$TMP/noflock.log" bash -c 'echo nf-ran' 2>/dev/null)
+[ "$(sed -n 1p "$TMP/noflock.log")" = "SHA $(git -C "$L" rev-parse HEAD)" ] && [ "$(tail -n 1 "$TMP/noflock.log")" = "exit 0" ] && ok \
+  || bad "no flock: --log did not write SHA first and exit last: $(cat "$TMP/noflock.log")"
+# 12. memory admission: the second normal slot only while MemAvailable >= GATE_MIN_FREE_MB (default 3072);
+#     below it one normal slot at a time. KIT_MEMINFO_FILE fakes /proc/meminfo; unreadable = admit.
+meminfo() { printf 'MemTotal:       16000000 kB\nMemFree:          100000 kB\nMemAvailable:   %d kB\n' "$(( $1 * 1024 ))" > "$TMP/meminfo"; }
+two_run() {  # <label> <expect: together|alone> — A holds, B queued; do they run together?
+  bg A; waitfor "start A" || bad "$1: A never started"
+  bg B; sleep 0.6
+  if [ "$2" = together ]; then [ "$(order)" = "A B " ] && ok || bad "$1: want A and B together, got '$(order)'"
+  else [ "$(order)" = "A " ] && ok || bad "$1: want only A, got '$(order)'"; fi
+}
+reset; export GATE_SLOTS=2 KIT_MEMINFO_FILE="$TMP/meminfo"; unset GATE_MIN_FREE_MB
+meminfo 1000; two_run "low memory (1000 MB)" alone
+release A; waitfor "start B" || bad "low memory: B never started after A released"; release B; waitfor "end B"
+reset; meminfo 8000; two_run "ample memory (8000 MB)" together
+reset; meminfo 3072; two_run "exactly the floor (3072 MB)" together
+reset; rm -f "$TMP/meminfo"; two_run "unreadable meminfo" together
+reset; meminfo 1000; GATE_MIN_FREE_MB=500 two_run "knob GATE_MIN_FREE_MB=500 with 1000 MB" together
+reset; unset KIT_MEMINFO_FILE
 
 echo "gate-throttle: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

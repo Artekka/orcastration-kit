@@ -229,7 +229,7 @@ before=$(git -C "$R" for-each-ref | md5sum); pw -- --json; eq "T28 refs are unch
 tb="$(awk '/^pending_work:[[:space:]]*$/{on=1;print;next} on&&/^[[:space:]]+[a-z_]+:/{print;next} on{exit}' "$ROOT/templates/ORCHESTRATION.md")"
 for k in board_path archive_path row_id_regex docs_prefixes; do has "T29 template pending_work: block carries $k" "  $k:" "$tb"; done
 has "T29 README has the script's row" 'scripts/pending-work.sh`' "$(cat "$ROOT/README.md")"
-has "T29 CHANGELOG names the script" 'scripts/pending-work.sh' "$(sed -n '/^## Unreleased/,/^## /p' "$ROOT/CHANGELOG.md")"
+has "T29 CHANGELOG names the script" 'scripts/pending-work.sh' "$(cat "$ROOT/CHANGELOG.md")"
 
 echo "pending-work: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

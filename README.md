@@ -10,7 +10,7 @@ project: three concurrent sessions, ~15 workstreams, one evening, zero collision
 ```bash
 # 1. Install into your repo (normal shell, not inside Claude; on Windows run `wsl` first)
 cd ~/projects/myapp
-claude plugin marketplace add Artekka/claude-orchestration-kit
+claude plugin marketplace add Artekka/orcastration-kit
 claude plugin install orchestration-kit@artekka-kits --scope project
 
 # 2. Set up the repo and start the team — inside Claude; tell it your test command,
@@ -80,7 +80,7 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/orient-brief` | `/orchestration-kit:orient-brief <ROW>`: the lean start for a builder: the row's brief and the live seat banner arrive already loaded, then one READY line to the seat |
 | `skills/assemble-train` · `skills/audit-train` | release trains: the seat lands approved rows one merge at a time with a dry run (`trial.sh`, `cptrial.sh`, `gsum.sh`) · a validator sweeps the finished train (`audit.sh` exits 0 when every merge is clean, 1 when a line needs explaining, 2 on a usage error) |
 | `deploy_policy: ask \| auto-when-green` | the Deploy block of `ORCHESTRATION.md`: whether the seat asks you before every deploy (default) or deploys a green, audited train on its own and tells you after |
-| `scripts/gate-throttle.sh` · `scripts/quiet-mode.sh` | run heavy commands through N machine-wide slots plus a priority slot (`gate_slots`); first come, first served, load-aware (tasks stuck in D state are not load), ONE slot per worktree (exit 3; `GATE_ALLOW_SECOND_SLOT=1` is the seat's escape), the priority list re-read on every poll, a TERM/HUP stops the command's whole process tree, and the command gets `GATE_WORKERS` (CPUs / slots, at least 2); **deploy mode**: while a priority gate runs, new normal gates wait and every other running gate's process tree is confined (taskset, reversible, nothing signaled) to the first 25% of the CPUs (`GATE_DEPLOY_OTHERS_PCT`, at least 2), each process getting its own mask back on exit, on a dead owner and at the next start; `gate_reuse_check:` / `GATE_REUSE_CHECK` asks first whether the tree already has a green record (a hit exits 0 without queueing) · quiet mode holds every new run while you use the machine (`status` also says whether deploy mode is on) |
+| `scripts/gate-throttle.sh` · `scripts/quiet-mode.sh` | run heavy commands through N machine-wide slots plus a priority slot (`gate_slots`); a second slot only while 3 GB of memory is available (`GATE_MIN_FREE_MB`); `--log <file>` writes the gate's log with the tested commit first and its exit code last; first come, first served, load-aware (tasks stuck in D state are not load), ONE slot per worktree (exit 3; `GATE_ALLOW_SECOND_SLOT=1` is the seat's escape), the priority list re-read on every poll, a TERM/HUP stops the command's whole process tree, and the command gets `GATE_WORKERS` (CPUs / slots, at least 2); **deploy mode**: while a priority gate runs, new normal gates wait and every other running gate's process tree is confined (taskset, reversible, nothing signaled) to the first 25% of the CPUs (`GATE_DEPLOY_OTHERS_PCT`, at least 2), each process getting its own mask back on exit, on a dead owner and at the next start; `gate_reuse_check:` / `GATE_REUSE_CHECK` asks first whether the tree already has a green record (a hit exits 0 without queueing) · quiet mode holds every new run while you use the machine (`status` also says whether deploy mode is on) |
 | `plugins/status-hud` | **optional** second plugin (`status-hud@artekka-kits`): a band or pane that shows every session's context fill, model and activity; `kit-init` asks (default: no), `/hud band\|pane\|off\|quiet` switches it. Host meters work on Linux and WSL only |
 | `HOW-IT-WORKS.md` · `docs/how-it-works.html` | the guide to the whole loop: one diagram, one short section per system (what it does, why it exists, which setting changes it), and how to make it your own |
 | `skills/falsify` | mutation-prove a guard/test can fail: commit GREEN first, diff-verified mutant, prediction written before the run, red observed unfiltered, byte-clean restore, re-green |
@@ -120,7 +120,7 @@ Per repo (recommended — the kit is active only in the repos you install it int
 Run from inside the repo:
 
 ```bash
-claude plugin marketplace add Artekka/claude-orchestration-kit   # or a local path
+claude plugin marketplace add Artekka/orcastration-kit   # or a local path
 claude plugin install orchestration-kit@artekka-kits --scope project   # or --scope local
 ```
 
@@ -138,7 +138,7 @@ automatically) — add to the project's `.claude/settings.json`:
 {
   "extraKnownMarketplaces": {
     "artekka-kits": {
-      "source": { "source": "github", "repo": "Artekka/claude-orchestration-kit" }
+      "source": { "source": "github", "repo": "Artekka/orcastration-kit" }
     }
   },
   "enabledPlugins": { "orchestration-kit@artekka-kits": true }
@@ -170,6 +170,8 @@ row claim, in wave trains. Full sessions retro, reply "retro complete", and are 
 Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
+
+v0.11.0: the guarded seat merge (`seat-merge.sh`), `pending-work.sh`, the tmux entry point (`tmux-session.sh`), a hardened `gate-throttle.sh` (deploy mode, one slot per worktree, a reuse-check hook), a measured, checkable context fill (`ctx-fill.py --line`), and disk cleanup (`retro-worktrees.sh`, `docker-cache-cap.sh`, a low-disk guard).
 
 v0.9.0: Team mode (a seat + siblings) is the default start; Solo is now Practice mode, where you play the orchestrator by hand with two sibling terminals to learn the loop.
 
@@ -242,3 +244,20 @@ The workflow assumes nothing beyond stock Claude Code. These user-level plugins 
 routinely present on the origin setup and complement the kit, but the kit never installs
 or requires them: `superpowers` (TDD/debugging discipline), `code-review`, a token/context
 hygiene plugin. If a skill here references one, treat it as optional.
+
+## Security
+
+Report a vulnerability privately, never in a public issue: see [SECURITY.md](SECURITY.md) for the
+supported versions, the private reporting channel and what to expect. CI scans every push and pull
+request for secrets, and `tests/leak-guard.test.sh` keeps personal paths and keys out of the repo.
+
+## Contributing
+
+Pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, `bash tests/run.sh`, the
+branch and PR flow, commit messages and the optional pre-push secret scan. Everyone follows the
+[Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Contributors
+
+- Miles Brown (@MilesBrown34): also presented the disk-cleanup issue behind `retro-worktrees.sh`, `docker-cache-cap.sh` and the low-disk guard
+- Naga/Omie (@Babasher): presented the disk-cleanup issue behind the same scripts

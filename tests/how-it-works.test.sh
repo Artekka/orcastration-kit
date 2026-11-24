@@ -43,7 +43,7 @@ MD="$ROOT/HOW-IT-WORKS.md"; HTML="$ROOT/docs/how-it-works.html"
 [ -f "$HTML" ] && ok || bad "docs/how-it-works.html missing"
 if [ -f "$MD" ] && [ -f "$HTML" ]; then
   # The brief's private list, plus machine paths and account-ish strings. Case-insensitive.
-  priv='einherjar|camelot|artekkaos|darkage|dark age|tekkaman|/home/artekka|/mnt/[a-z]/|discord|gamelabs|@gmail|@artekka|session_0|claude\.ai/code|\bart\b|pnpm gate|\bOrca\b'
+  priv='einherjar|camelot|artekkaos|darkage|dark age|tekkaman|/home/[a-z0-9._-]+/|/mnt/[a-z]/|discord|gamelabs|@gmail|@artekka|session_0|claude\.ai/code|\bart\b|pnpm gate|\bOrca\b'
   # the public marketplace id (plugin@artekka-kits) is the one allowed use of the handle
   hits="$(sed 's/@artekka-kits//g' "$MD" "$HTML" | grep -n -i -E "$priv" | head -5)"
   [ -z "$hits" ] && ok || bad "private strings in the guide: $hits"

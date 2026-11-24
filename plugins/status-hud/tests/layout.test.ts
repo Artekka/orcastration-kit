@@ -1,7 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
 import { parseConfig } from '../lib/config'
-import { chips, drawBand, drawPane, lineText, sessionRow, type Line, type View } from '../lib/layout'
+import { chips, drawBand, drawPane, lineText, modelBadge, sessionRow, spin, type Line, type View } from '../lib/layout'
 import type { Heartbeat, Snapshot } from '../types'
 
 const S = (name: string, k: number, state: Heartbeat['state'] = 'busy', account = 1): Heartbeat => ({ id: name, name, model: 'opus', account, tokens: k * 1000, window: 1_000_000, state, activity: 'doing a long thing that should truncate rather than wrap', at: 0 })
@@ -111,4 +111,38 @@ test('the pane explains the chip in one caption line; the band does not spend a 
   expect(drawBand(view(), 180, 10).map(lineText).join('\n')).not.toContain('holds NEW')
   const hidden = drawPane(view({ snap: { ...snap, quietAvail: false } }), 60).map(lineText).join('\n')
   expect(hidden).not.toContain('holds NEW')
+})
+
+test('model badge after the name: OPS yellow, SNT blue, HKU green, GEM purple, else three letters in gray', async () => {
+  expect(modelBadge('claude-opus-5-5[1m]')).toEqual(['OPS', '#e8b030'])
+  expect(modelBadge('claude-sonnet-5-5')).toEqual(['SNT', '#4cd0e0'])
+  expect(modelBadge('claude-haiku-5-5')).toEqual(['HKU', '#4fd160'])
+  expect(modelBadge('gemini-3.8-flash')).toEqual(['GEM', '#b98cf0'])
+  expect(modelBadge('claude-fable-5-1')).toEqual(['FAB', '#8a9bb0'])
+  expect(modelBadge('')).toEqual(['   ', '#8a9bb0'])
+  const row = (model: string, w: number): string => sessionRow(view(), { ...S('Orca', 100), model }, w).runs(0).map(r => r.text).join('')
+  expect(row('claude-sonnet-5-5', 70)).toMatch(/Orca +SNT/)
+  expect(row('opus', 70)).toMatch(/Orca +OPS/)
+  const badge = sessionRow(view(), { ...S('Orca', 100), model: 'opus' }, 70).runs(0).find(r => r.text.includes('OPS'))
+  expect(badge?.fg).toBe('#e8b030')
+  expect(row('opus', 28)).not.toContain('OPS')   // too narrow: the badge gives way first
+  for (const cols of [180, 120, 100]) for (const l of drawBand(view(), cols, 10)) expect(widthOf(l)).toBeLessThanOrEqual(cols)
+})
+
+test('a busy session\'s mark turns clockwise, one step per half second; shell and idle stay still', async () => {
+  expect([0, 500, 1_000, 1_500, 2_000].map(spin)).toEqual(['▘', '▝', '▗', '▖', '▘'])
+  const mark = (state: Heartbeat['state'], now: number): string => sessionRow(view({ now }), S('X', 100, state), 70).runs(0).map(r => r.text).join('')
+  expect(mark('busy', 0)).toContain('▘')
+  expect(mark('busy', 500)).toContain('▝')
+  expect(mark('busy', 500)).not.toContain('▘')
+  expect(mark('shell', 0)).toBe(mark('shell', 500))
+  expect(mark('idle', 0)).toBe(mark('idle', 500))
+})
+
+test('the band\'s key says what the state marks mean', async () => {
+  const key = lineText(drawBand(view(), 180, 10)[1] as Line)
+  expect(key).toContain('▘ busy')
+  expect(key).toContain('$ shell')
+  expect(key).toContain('○ idle')
+  for (const cols of [120, 100]) for (const l of drawBand(view(), cols, 10)) expect(widthOf(l)).toBeLessThanOrEqual(cols)
 })

@@ -119,6 +119,18 @@ export function meters(v: View, max: number): Meter[] {
   return out
 }
 
+/** Model badge: OPS opus (yellow), SNT sonnet (blue), HKU haiku (green), GEM gemini (purple), else the id's first three letters (gray). */
+export function modelBadge(model: string): [string, Col] {
+  const m = model.toLowerCase()
+  const map: Record<string, [string, Col]> = { opus: ['OPS', C.amber], sonnet: ['SNT', C.cyan], haiku: ['HKU', C.green], gemini: ['GEM', C.purple] }
+  for (const f of Object.keys(map)) if (m.includes(f)) return map[f] as [string, Col]
+  const first = m.replace(/^claude-/, '').split(/[-[ ]/)[0] ?? ''
+  return [first.slice(0, 3).toUpperCase().padEnd(3), C.steel]
+}
+
+/** A busy session's mark turns clockwise through the four corners (▘ ▝ ▗ ▖), one step per half second. */
+export const spin = (now: number): string => '▘▝▗▖'.charAt(Math.floor(now / 500) % 4)
+
 /** One session row: acct dot, name, context bar + K, state glyph, activity. Flashes red after crossing the report mark. */
 export function sessionRow(v: View, h: Heartbeat, w: number, selected = false): Scr {
   const s = new Scr(w, 1)
@@ -127,10 +139,15 @@ export function sessionRow(v: View, h: Heartbeat, w: number, selected = false): 
   const bg = flashing ? C.rD : selected ? C.gray : null
   const fg = flashing ? C.white : LV[lv]
   for (let x = 0; x < w; x++) s.put(x, 0, ' ', C.tx, bg)
-  const st = h.state === 'busy' ? ['▘', C.green] : h.state === 'shell' ? ['$', C.orange] : ['○', C.dim]
+  const st = h.state === 'busy' ? [spin(v.now), C.green] : h.state === 'shell' ? ['$', C.orange] : ['○', C.dim]
   s.put(0, 0, '●', h.account === 2 ? C.purple : C.blue, bg)
   s.put(2, 0, pad(trunc(h.name, 7), 7), flashing ? C.white : h.state === 'idle' ? C.dim : C.tx, bg, true)
   let x = 10
+  if (w >= 30) {
+    const [b, c] = modelBadge(h.model)
+    s.put(x, 0, b, flashing ? C.white : c, bg, true)
+    x += 4
+  }
   if (w >= 24) {
     const mark = Math.round((v.cfg.reportMark / h.window) * 8)
     bar(s, x, 0, 8, h.tokens / h.window, fg, mark)
@@ -190,6 +207,13 @@ export function drawBand(v: View, cols: number, maxRows: number): Line[] {
   s.put(rx + 26, 1, `${kfmt(v.cfg.amberMark)}-${kfmt(v.cfg.reportMark)}`, dim)
   s.put(rx + 37, 1, '■', C.red)
   s.put(rx + 39, 1, `≥${kfmt(v.cfg.reportMark)}`, dim)
+  // The state key: what the mark after each session's tokens means (busy turns, see spin).
+  let kx = rx + 39 + `≥${kfmt(v.cfg.reportMark)}`.length + 3
+  for (const [mark, col, text] of [['▘', C.green, 'busy'], ['$', C.orange, 'shell'], ['○', C.dim, 'idle']] as const) {
+    if (kx + mark.length + 1 + text.length > rx + area) break
+    s.put(kx, 1, mark, col)
+    kx = s.put(kx + mark.length + 1, 1, text, dim) + 2
+  }
   const cap = Math.max(0, area)
   const colW = cap >= 126 ? Math.floor((cap - 2) / 2) : cap
   const nCols = cap >= 126 ? 2 : 1
@@ -235,7 +259,7 @@ export function drawCompact(v: View, W: number): Line[] {
     const flashing = isFlashing(v.flash[h.id], v.now) && flashPhase(v.now)
     const bg = flashing ? C.rD : h.state === 'idle' ? C.gray : LVD[lv]
     const txt = ` ${trunc(h.name, 8)} ${kfmt(h.tokens)}${lv === 'red' ? '!' : ''} `
-    const g = h.state === 'busy' ? '▘' : h.state === 'shell' ? '$' : '○'
+    const g = h.state === 'busy' ? spin(v.now) : h.state === 'shell' ? '$' : '○'
     if (x + txt.length + 4 > W) break
     s.put(x, 1, ' ', C.tx, bg)
     s.put(x + 1, 1, '●', h.account === 2 ? C.purple : C.blue, bg)
