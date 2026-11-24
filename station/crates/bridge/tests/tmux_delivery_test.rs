@@ -226,6 +226,9 @@ impl Terminal for Hooked {
     fn enter(&mut self, pane: &str) -> Result<(), String> {
         self.inner.enter(pane)
     }
+    fn screen(&mut self, pane: &str) -> Result<String, String> {
+        self.inner.screen(pane)
+    }
     fn settle(&self) -> std::time::Duration {
         self.inner.settle()
     }

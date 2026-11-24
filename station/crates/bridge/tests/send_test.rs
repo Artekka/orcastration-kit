@@ -212,6 +212,11 @@ struct Log {
     steps: Vec<&'static str>,
     /// This step fails (after being recorded).
     fail_at: Option<&'static str>,
+    /// What the pane shows, and an error the screen read returns instead (if set). Reads are
+    /// counted, not recorded in `steps`, so the step lists of the other tests stay as they were.
+    screen: String,
+    screen_error: Option<String>,
+    screen_reads: usize,
 }
 
 /// Runs once, right AFTER the named step (to change the world between steps).
@@ -271,6 +276,14 @@ impl Terminal for Fake {
     fn enter(&mut self, pane: &str) -> Result<(), String> {
         self.0.borrow_mut().enters.push(pane.into());
         self.step("enter")
+    }
+    fn screen(&mut self, _pane: &str) -> Result<String, String> {
+        let mut l = self.0.borrow_mut();
+        l.screen_reads += 1;
+        match &l.screen_error {
+            Some(e) => Err(e.clone()),
+            None => Ok(l.screen.clone()),
+        }
     }
 }
 
@@ -625,6 +638,113 @@ fn a_status_lost_mid_send_stops_before_the_paste_or_the_enter() {
 
     let (mut b, fake, procs, _) = setup();
     fake.after("paste", status_becomes(&procs, Some("frobnicate")));
+    b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
+    assert!(matches!(result_of(&mut b), SendResult::Uncertain { .. }));
+    assert!(fake.0.borrow().enters.is_empty(), "no Enter");
+}
+
+/// A Claude Code permission dialog: no input box under its menu.
+const MENU: &str = "\
+  Done reading the build log.
+
+────────────────────────────────────────────────────────────
+ Bash command
+
+   rm -rf build
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don't ask again for rm commands in /work
+   3. No, and tell Claude what to do differently (esc)
+";
+
+/// What a pane shows (`Ok`), or the error its screen read returns (`Err`).
+type Shown = Result<&'static str, &'static str>;
+
+/// After a step, sid-a's pane shows `s`.
+fn screen_becomes(fake: &Fake, s: Shown) -> impl FnMut() + 'static {
+    let f = fake.clone();
+    move || {
+        let mut l = f.0.borrow_mut();
+        match s {
+            Ok(t) => l.screen = t.into(),
+            Err(e) => l.screen_error = Some(e.into()),
+        }
+    }
+}
+
+#[test]
+fn a_send_reads_the_screen_before_the_paste_and_before_the_enter() {
+    let (mut b, fake, _, _) = setup();
+    b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
+    assert!(matches!(result_of(&mut b), SendResult::Sent));
+    assert_eq!(fake.0.borrow().screen_reads, 2);
+}
+
+#[test]
+fn a_menu_on_screen_before_the_paste_types_nothing() {
+    let (mut b, fake, _, _) = setup();
+    fake.0.borrow_mut().screen = MENU.into();
+    b.on_request_line(&send_line(1, "sid-a", "1")).unwrap();
+    let r = result_of(&mut b);
+    assert!(
+        matches!(&r, SendResult::Refused { reason } if reason.contains("menu is open")),
+        "{r:?}"
+    );
+    let l = fake.0.borrow();
+    assert!(l.typed.is_empty(), "nothing typed");
+    assert!(l.enters.is_empty(), "no Enter");
+    assert_eq!(l.steps, ["load", "discard"]);
+}
+
+#[test]
+fn a_menu_that_opens_after_the_paste_gets_no_enter() {
+    let (mut b, fake, _, _) = setup();
+    fake.after("paste", screen_becomes(&fake, Ok(MENU)));
+    b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
+    assert!(matches!(result_of(&mut b), SendResult::Uncertain { .. }));
+    let l = fake.0.borrow();
+    assert!(
+        l.enters.is_empty(),
+        "no Enter into an open menu: {:?}",
+        l.steps
+    );
+}
+
+#[test]
+fn menu_text_inside_the_typed_message_is_not_a_menu() {
+    // The message itself quotes a menu; it sits in the input box, between its two rules.
+    let typed = "\
+  Done reading the build log.
+
+────────────────────────────────────────────────────────────
+❯ The dialog said:
+  ❯ 1. Yes
+    2. No
+────────────────────────────────────────────────────────────
+  ? for shortcuts
+";
+    let (mut b, fake, _, _) = setup();
+    fake.after("paste", screen_becomes(&fake, Ok(typed)));
+    b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
+    assert!(matches!(result_of(&mut b), SendResult::Sent));
+    assert_eq!(fake.0.borrow().enters, ["%1"]);
+}
+
+#[test]
+fn a_screen_that_cannot_be_read_refuses_fail_closed() {
+    let (mut b, fake, _, _) = setup();
+    fake.0.borrow_mut().screen_error = Some("tmux did not answer within 2000 ms".into());
+    b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
+    let r = result_of(&mut b);
+    assert!(
+        matches!(&r, SendResult::Refused { reason } if reason.contains("did not answer")),
+        "{r:?}"
+    );
+    assert!(fake.0.borrow().typed.is_empty());
+
+    let (mut b, fake, _, _) = setup();
+    fake.after("paste", screen_becomes(&fake, Err("no pane")));
     b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
     assert!(matches!(result_of(&mut b), SendResult::Uncertain { .. }));
     assert!(fake.0.borrow().enters.is_empty(), "no Enter");

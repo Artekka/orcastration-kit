@@ -380,8 +380,10 @@ fn literal_scanner_sees_strings() {
 }
 
 /// Every whitespace-free literal tmux.rs (outside its unit tests) may contain: the program,
-/// the five subcommands, their flags, the key `Enter`, stdin `-`, the buffer prefix. A new
-/// subcommand (`kill-server`, `run-shell`…) or another program fails here.
+/// the six subcommands, their flags, the key `Enter`, stdin `-`, the buffer prefix. A new
+/// subcommand (`kill-server`, `run-shell`…) or another program fails here. `capture-pane`
+/// was added on purpose: it only reads the pane's visible text (`-p` prints it to stdout
+/// instead of a buffer), so a send can refuse when a menu is open there.
 const TMUX_LITERALS: &[&str] = &[
     "tmux",
     "list-panes",
@@ -389,6 +391,7 @@ const TMUX_LITERALS: &[&str] = &[
     "paste-buffer",
     "delete-buffer",
     "send-keys",
+    "capture-pane",
     "-L",
     "-a",
     "-F",
@@ -428,13 +431,24 @@ fn tmux_runs_only_tmux_sends() {
     }
     // The only spaced literal that reaches tmux's argv is the pane format.
     assert!(lits.iter().any(|l| l == "#{pane_id} #{pane_pid}"));
-    for sub in ["list-panes", "load-buffer", "paste-buffer", "send-keys"] {
+    for sub in [
+        "list-panes",
+        "load-buffer",
+        "paste-buffer",
+        "send-keys",
+        "capture-pane",
+    ] {
         assert!(bare.iter().any(|l| *l == sub), "non-vacuity: {sub}");
     }
     // `send-keys` only ever presses Enter: its argv is [-t, pane, Enter].
     assert!(
         code.contains(r#"enter.args(["-t", pane, "Enter"]);"#),
         "send-keys carries only Enter"
+    );
+    // capture-pane only prints the visible pane (`-p`), never into a buffer or another pane.
+    assert!(
+        code.contains(r#"capture.args(["-p", "-t", pane]);"#),
+        "capture-pane carries only -p and the pane"
     );
     // The text goes in on stdin only (load-buffer `-`), never as an argument.
     assert!(code.contains(r#"load.args(["-b", buffer, "-"]);"#));

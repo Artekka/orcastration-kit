@@ -148,6 +148,8 @@ pub trait Terminal {
     fn paste(&mut self, pane: &str, buffer: &str) -> Result<(), String>;
     /// Press Enter once in `pane`.
     fn enter(&mut self, pane: &str) -> Result<(), String>;
+    /// The visible text of `pane`, read now.
+    fn screen(&mut self, pane: &str) -> Result<String, String>;
     /// Pause between the paste and the Enter, so the app has taken the whole paste first.
     fn settle(&self) -> Duration {
         Duration::ZERO
@@ -266,6 +268,11 @@ impl Terminal for Tmux {
         let mut enter = self.cmd("send-keys");
         enter.args(["-t", pane, "Enter"]);
         Self::run(enter, None).map(|_| ())
+    }
+
+    fn screen(&mut self, _pane: &str) -> Result<String, String> {
+        // ORCA340-674 RED stub (the fix reads the pane with capture-pane).
+        Ok(String::new())
     }
 
     fn settle(&self) -> Duration {

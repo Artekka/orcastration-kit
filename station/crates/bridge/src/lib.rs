@@ -13,5 +13,6 @@ pub mod fsro;
 pub mod gallery;
 pub mod liveness;
 pub mod run;
+pub mod screen;
 pub mod tail;
 pub mod tmux;
