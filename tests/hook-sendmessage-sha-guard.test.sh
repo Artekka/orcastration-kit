@@ -7,7 +7,7 @@ unset TMUX TMUX_PANE   # never reach the caller's real tmux (tests/no-real-tmux.
 command -v python3 >/dev/null 2>&1 && command -v git >/dev/null 2>&1 || { echo "hook-sendmessage-sha-guard: SKIP (no python3 or git)"; exit 0; }
 H="$ROOT/hooks/sendmessage-sha-guard.py"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-G() { git -c user.email=t@example.test -c user.name=T -c core.hooksPath=/dev/null "$@"; }
+G() { git -c user.email=t@example.com -c user.name=T -c core.hooksPath=/dev/null "$@"; }
 G init -q -b main "$TMP/repo"; echo hello > "$TMP/repo/a.txt"; G -C "$TMP/repo" add a.txt; G -C "$TMP/repo" commit -q -m init
 SHA="$(G -C "$TMP/repo" rev-parse HEAD)"; SHORT="${SHA:0:10}"
 TREE="$(G -C "$TMP/repo" rev-parse 'HEAD^{tree}')"; BLOB="$(G -C "$TMP/repo" rev-parse HEAD:a.txt)"

@@ -7,7 +7,7 @@ unset TMUX TMUX_PANE   # never reach the caller's real tmux (tests/no-real-tmux.
 command -v python3 >/dev/null 2>&1 && command -v git >/dev/null 2>&1 || { echo "hook-conflict-marker-guard: SKIP (no python3 or git)"; exit 0; }
 H="$ROOT/hooks/conflict-marker-guard.py"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-G() { git -c user.email=t@example.test -c user.name=T -c core.hooksPath=/dev/null "$@"; }
+G() { git -c user.email=t@example.com -c user.name=T -c core.hooksPath=/dev/null "$@"; }
 S="<<<<<<<"; M="======="; E=">>>>>>>"   # built here so this file holds no marker line at column 0
 new() { rm -rf "$TMP/r"; G init -q -b main "$TMP/r"; mkdir -p "$TMP/r/d"; echo base > "$TMP/r/u.txt"; echo base > "$TMP/r/d/m.txt"; G -C "$TMP/r" add .; G -C "$TMP/r" commit -q -m init; }
 mark() { printf 'one\n%s HEAD\nmine\n%s\ntheirs\n%s topic\n' "$S" "$M" "$E" > "$TMP/r/$1"; }

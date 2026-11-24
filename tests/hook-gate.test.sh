@@ -5,7 +5,7 @@ unset TMUX TMUX_PANE   # never reach the caller's real tmux (tests/no-real-tmux.
 . "$(dirname "$0")/lib-hook-test.sh"
 command -v python3 >/dev/null 2>&1 && command -v git >/dev/null 2>&1 || { echo "hook-gate: SKIP (no python3 or git)"; exit 0; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-G() { git -c user.email=t@example.test -c user.name=T -c core.hooksPath=/dev/null "$@"; }
+G() { git -c user.email=t@example.com -c user.name=T -c core.hooksPath=/dev/null "$@"; }
 HOOK="$ROOT/hooks/pkill-full-guard.py"
 call() {  # call <cwd> -> the hook WITHOUT the test seam, for `pkill -f x`
   printf '%s' "$(mkjson Bash command 'pkill -f x' "$1")" | env -i PATH="$PATH" HOME="$HOME" python3 -I "$HOOK" >/dev/null 2>&1; echo "rc=$?"

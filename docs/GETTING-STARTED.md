@@ -1,13 +1,8 @@
-# Getting started — a seat + siblings, with a Solo practice mode
+# Getting started — a seat + siblings
 
 For someone who today opens a terminal and runs `claude` in one repo — on **Windows (WSL),
-macOS or Linux**. Two paths, in this order:
-
-1. **Team mode (default)** — one **seat** (an orchestrator session you talk to) plans, assigns,
-   verifies and merges for two or more **siblings** (builders), each in its own window.
-   ([§3](#3-team-mode--who-does-what-the-default))
-2. **Practice mode (Solo)** — you play the orchestrator by hand with two sibling terminals, to learn how
-   siblings claim rows, build in worktrees and verify each other. ([§4](#4-practice-mode-solo-be-the-orchestrator-yourself))
+macOS or Linux**. One **seat** (an orchestrator session you talk to) plans, assigns,
+verifies and merges for two or more **siblings** (builders), each in its own window. ([§3](#3-who-does-what-the-seat-and-the-siblings))
 
 New words (seat, sibling, row, fence, gate …) are defined in [`GLOSSARY.md`](GLOSSARY.md).
 Want the big picture first? [`HOW-IT-WORKS.md`](../HOW-IT-WORKS.md) explains the whole loop in one diagram (`kit-init` offers it at the end of setup).
@@ -110,14 +105,11 @@ and asks you a few questions:
 Last, it asks **three questions** — whether to start the team now (and how many siblings),
 which permission mode the sessions should use, and whether separate worktrees per session are
 advised or enforced. The git guard (below) follows your first answer: **on** if you start a
-team, **off** in practice (Solo) mode.
+team.
 
-**Team mode (default):** answer with a team size ("Seat + 2 siblings"), approve the one command it runs,
+**Starting the team:** answer with a team size ("Seat + 2 siblings"), approve the one command it runs,
 and the windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). The setup summary
-says how they open on your machine ("Windows will open via: …"). You can close the setup session; continue at [§3](#3-team-mode--who-does-what-the-default).
-
-**Practice mode (Solo):** answer **Practice mode (Solo)** to learn the loop by hand first (nothing is started),
-pick the other two, and continue at [§4](#4-practice-mode-solo-be-the-orchestrator-yourself).
+says how they open on your machine ("Windows will open via: …"). You can close the setup session; continue at [§3](#3-who-does-what-the-seat-and-the-siblings).
 
 **Start with 1 seat + 2 siblings.** You can change the team size, names, permission mode or worktree setting at
 any time — just ask Claude to change it.
@@ -152,8 +144,8 @@ checkout at once.
 Switch any time by asking Claude ("enforce worktrees", "make worktrees advised again"), or by
 editing `worktrees:` in `docs/orchestration/ORCHESTRATION.md`. It takes effect on the next edit.
 
-**Git guard: on in team mode, off in practice (Solo) mode** (saved as `git_guard:` in the same `team:`
-block; kit-init sets it from your start answer). Four git habits that
+**Git guard: on** (saved as `git_guard:` in the same `team:`
+block; kit-init sets it when it starts the team). Four git habits that
 are harmless alone damage other sessions' work in a shared repo:
 
 | Blocked when on | Why | Claude is told to use |
@@ -167,10 +159,10 @@ It only reads Claude's Bash commands (quoted text and commit messages that merel
 are fine); you can still run anything yourself in your own terminal. Change it with "turn on the
 git guard" / "turn off the git guard", or `git_guard: on|off`.
 
-Chose Practice mode (Solo), or want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
+Want to reopen missing windows? Run `bash scripts/start-team.sh` (or ask
 Claude to). Sessions already running are skipped; `--dry-run` previews without opening anything.
 
-## 3. Team mode — who does what (the default)
+## 3. Who does what: the seat and the siblings
 
 | Seat (Orca) | Siblings (Sib1, Sib2, …) |
 |---|---|
@@ -199,43 +191,7 @@ still runs — the board file (`docs/orchestration/AGENT_BOARD.md`) is the guara
 siblings post `AVAILABLE` / status lines there and the seat reads it. It's just slower, because
 nobody gets pinged.
 
-## 4. Practice mode (Solo): be the orchestrator yourself
-
-A practice ground for learning the loop by hand. Here **you** sit in the seat's chair, by hand, with two sibling
-terminals, so you learn how siblings claim rows, build in worktrees and verify each other before you trust a seat to
-do it. The board and independent verification are most of the value; the seat automates the coordinating you do here.
-Choose **Practice mode (Solo)** in `kit-init` (it starts nothing; the git and context guards stay off), then:
-
-```bash
-# Terminal 1 = sibling Dev1 (on Windows: `wsl` first)
-cd ~/projects/myapp && claude --name Dev1 /orchestration-kit:orient
-# Terminal 2 = sibling Dev2
-cd ~/projects/myapp && claude --name Dev2 /orchestration-kit:orient
-```
-
-**Guided demo — you play the seat.** Type these yourself; each line is something a seat would do:
-
-| Step | Where | You say | What happens |
-|---|---|---|---|
-| 1. File two rows | Dev1 | "add rows to the board for: fix the login timeout; add CSV export" | Rows `Dev1-1`, `Dev1-2` appear on `docs/orchestration/AGENT_BOARD.md`, committed + pushed |
-| 2. Hand one to each | Dev1 | "claim Dev1-1 and build it in your own worktree" | Claims the row (with a file fence), works on its own branch |
-| | Dev2 | "claim Dev1-2 and build it in your own worktree" | Same, with a fence that doesn't overlap |
-| 3. Cross-verify | Dev2 (when Dev1 is done) | "verify Dev1-1 against its row — contract only, don't fix anything" | Dev2 never saw Dev1's reasoning, so it checks the work against the row, not the author's intent. Or run `/orchestration-kit:verify-feature` |
-| | Dev1 (when Dev2 is done) | "verify Dev1-2 against its row — contract only" | The mirror image: each row is checked by the session that did NOT build it |
-| 4. Merge | Dev1 (after PASS) | "/orchestration-kit:reconcile Dev1-1" | Lands the branch on main, re-runs your gate, closes the row. Do the other row the same way, one at a time |
-
-**Why the demo has a mutual pair:** with only two sessions, Dev1 and Dev2 must read each other's row. In team mode the seat avoids that (A reads B, so B does not read A: reciprocity is a bias) by using a third sibling or the verifier subagent for the other row.
-
-Rules that make this safe (the sessions already know them): each session edits in its own git
-worktree, stages explicit paths, never stashes, and verifies the *other* session's rows, never
-its own. When a session's context fills, run `/orchestration-kit:retro` in it, then relaunch it
-with `claude --name <Name> --model <model> /orchestration-kit:orient` (a bare `/clear` keeps the terminal's old model).
-
-**Ready to graduate?** Move to team mode when you are the bottleneck: relaying between windows,
-deciding who takes what. Say "turn on the git guard" (team mode's default), then
-`bash scripts/start-team.sh` opens a seat + siblings; [§3](#3-team-mode--who-does-what-the-default) covers it.
-
-## 5. What you get
+## 4. What you get
 
 | Piece | What it is |
 |---|---|
@@ -243,7 +199,7 @@ deciding who takes what. Say "turn on the git guard" (team mode's default), then
 | `/orchestration-kit:orient` | A fresh session catches up and tells the seat it's READY |
 | `/orchestration-kit:board` | Claiming, updating and archiving board rows |
 | `/orchestration-kit:orient-brief` | Lean start for a builder: the row's brief and the seat banner arrive already loaded (`/orchestration-kit:orient-brief <ROW>`) |
-| `/orchestration-kit:assemble-train` · `/orchestration-kit:audit-train` | Team mode: land approved rows onto a train branch one merge at a time with a dry run · a validator checks the finished train before it ships |
+| `/orchestration-kit:assemble-train` · `/orchestration-kit:audit-train` | Land approved rows onto a train branch one merge at a time with a dry run · a validator checks the finished train before it ships |
 | Status HUD (optional plugin) | A band above the prompt showing every session's context fill, model and activity. `kit-init` asks once (default: no); `/hud band`, `/hud pane`, `/hud off`, `/hud quiet` switch it. Host load meters work on Linux and WSL only |
 | `/orchestration-kit:falsify` | Prove a new test or guard can actually fail (mutation check) before trusting it |
 | `/orchestration-kit:reconcile` | Merging one finished worktree onto main and re-running the gate |
@@ -261,7 +217,7 @@ deciding who takes what. Say "turn on the git guard" (team mode's default), then
 
 **What the WORK/QUIET chip does and when you'll see it:** The chip is a switch for the kit's quiet mode. QUIET holds every NEW test/gate run started through `scripts/gate-throttle.sh` while you use the machine yourself; runs already going finish, and WORK lets new ones start normally. It only helps if your team runs its gate through that throttle, so the chip appears only when `scripts/quiet-mode.sh` exists in the session's directory (or quiet mode is already on). No throttle, no chip. If a press fails, the chip turns red and says `failed` for a minute, and the toast says why. `/hud help` repeats this, and `quietModeRequiresFile` changes the file it looks for (empty always shows the chip).
 
-## 6. Recycling when a session fills up
+## 5. Recycling when a session fills up
 
 Long sessions degrade as their context fills. The kit replaces them cleanly instead of `/compact`.
 
@@ -313,7 +269,7 @@ the brief + the board banner, then READY. A full orient reads a whole project to
 brief is the row. Keep `CLAUDE.md` slim too (`docs/orchestration/CLAUDE-slimness.md`): it is re-read on every
 turn of every session.
 
-## 7. Common failure modes
+## 6. Common failure modes
 
 | Symptom | Cause → fix |
 |---|---|
@@ -336,7 +292,7 @@ turn of every session.
 | Gates never start | Quiet mode is on (`bash scripts/quiet-mode.sh status`), the load is above `GATE_MAX_LOAD`, available memory is below `GATE_MIN_FREE_MB` while one gate already runs, or all `gate_slots` are busy (status lists who) |
 | The hooks do nothing | They are opt-in: the repo needs `docs/orchestration/.kit-hooks`, plus `git_guard: on` / `ctx_guard: on` / `safety_guards: on` / `worktrees: enforced` for each guard |
 
-## 8. Changing things later
+## 7. Changing things later
 
 Nothing here is fixed. Ask Claude — in the seat's window, or any Claude session in the repo —
 and it will make the change for you. For example:
@@ -358,7 +314,7 @@ and it will make the change for you. For example:
 | "add a column for reviewer to the board" | `docs/orchestration/AGENT_BOARD.md` layout |
 | "make orient also read docs/ARCHITECTURE.md" | a project-level copy of the skill in `.claude/skills/` |
 
-## 9. Advanced / customize
+## 8. Advanced / customize
 
 - **Other names, sizes or modes:** `bash scripts/start-team.sh --seat Lead --prefix Dev --siblings 3 --mode auto`,
   or set them once in the `team:` block of `docs/orchestration/ORCHESTRATION.md`.

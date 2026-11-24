@@ -22,7 +22,7 @@
 "pkill -u x --fu vitest"
 "ssh host pkill -f vitest"
 "ssh host 'pkill -f vitest'"
-"ssh -o StrictHostKeyChecking=no -p 22 user@host.example \"pkill -9 -f vitest\""
+"ssh -o StrictHostKeyChecking=no -p 22 user@example.com \"pkill -9 -f vitest\""
 "ssh -t host 'cd x && pkill --full vitest'"
 "ssh -p22 host pkill -f vitest"
 "ssh host \"x=1;pkill\" -f y"

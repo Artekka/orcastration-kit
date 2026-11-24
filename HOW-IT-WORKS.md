@@ -2,11 +2,7 @@
 
 One human, one **seat** session and a few **sibling** sessions, all in one repo. The seat plans and merges and never writes product code; siblings build and check each other's work. This page shows the loop, then each piece: what it does, why it exists (the failure it prevents) and the knob you turn to change it.
 
-**Pick your size:**
-
-- **Solo (practice):** two terminals, no seat; you play the orchestrator by hand. You get worktrees, tests first and the independent check. Start at the first diagram and the *Make it your own flavor* section.
-- **Two sessions:** one builder, one validator. Add the board and a brief per task.
-- **A team:** a seat plus siblings, trains, the throttle and the guards. Everything below applies.
+**Your setup:** a seat plus siblings, trains, the throttle and the guards. Everything below applies.
 
 ## The loop
 
@@ -149,8 +145,6 @@ Nothing in the kit is sacred. This is the order to tune things, what to drop whe
 
 | Your setup | Safe to drop | Keep |
 |---|---|---|
-| Solo practice (two terminals) | the seat, the validator seat, the throttle (`gate_slots`), `ctx_guard`, multi-account, trains | own worktree, tests first, a second session that reads the diff cold |
-| Two sessions | trains and the deploy policy, quiet mode, multi-account, the HUD | the board, one brief per task, worktrees, the READ |
 | A team | nothing is dead weight; drop the HUD and multi-account if you do not use them | everything else, because each piece prevents a failure that appears at about three sessions |
 
 ### Add your own rule, skill or hook

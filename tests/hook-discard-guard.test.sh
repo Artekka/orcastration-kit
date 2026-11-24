@@ -7,7 +7,7 @@ unset TMUX TMUX_PANE   # never reach the caller's real tmux (tests/no-real-tmux.
 command -v python3 >/dev/null 2>&1 && command -v git >/dev/null 2>&1 || { echo "hook-discard-guard: SKIP (no python3 or git)"; exit 0; }
 H="$ROOT/hooks/discard-guard.py"; C="$ROOT/tests/hook-cases"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-G() { git -c user.email=t@example.test -c user.name=T -c core.hooksPath=/dev/null "$@"; }
+G() { git -c user.email=t@example.com -c user.name=T -c core.hooksPath=/dev/null "$@"; }
 R="$TMP/repo"; mkdir -p "$R/sub" "$TMP/plain"
 G init -q -b main "$R"; for f in a.txt b.txt staged.txt sub/c.txt; do echo one > "$R/$f"; done
 G -C "$R" add a.txt b.txt staged.txt sub/c.txt; G -C "$R" commit -q -m init

@@ -88,14 +88,14 @@ blocks it) or `enforced` (the kit's PreToolUse hook blocks file edits in the mai
 `git_guard` is `off` or `on`. With `on` (and the `.kit-hooks` marker) the kit's PreToolUse Bash
 hook blocks `git stash` (except `list`/`show`), `git add -A`/`--all`/`.`/`-u` without paths,
 `git commit -a`/`--all` and `git pull --rebase`, telling Claude the safe alternative. Default:
-`off` in practice (Solo) mode; kit-init sets `on` when it starts a team (seat + siblings). A human can still
+`off` until set; kit-init sets `on` when it starts a team (seat + siblings). A human can still
 run those in their own terminal.
 `ctx_guard` is `off` or `on`. With `on` (and the `.kit-hooks` marker) the kit's context guard
 (PostToolUse + UserPromptSubmit) measures each session's fill on every tool call and prompt and,
 from the warn mark up, injects one line: approaching (300K), report now (350K), hand over now
 (400K); on a 200K window 100K/120K/150K. It repeats every ~15K of growth (8K on 200K) and on
 every prompt, so nobody has to remember to measure. Same default as `git_guard`: kit-init sets
-`on` for a team, `off` in practice (Solo) mode. `context_window` (`1m` or `200k`, default `1m`) picks the marks for
+`on` for a team. `context_window` (`1m` or `200k`, default `1m`) picks the marks for
 the guard; a session whose transcript names a Haiku model always gets the 200K marks.
 `safety_guards` is `off` or `on` (default `off`). With `on` (and the `.kit-hooks` marker) five more PreToolUse hooks
 refuse the accidents that shared checkouts keep producing, each with ONE stderr line naming the safe form: `discard-guard`
