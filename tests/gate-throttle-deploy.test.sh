@@ -59,7 +59,8 @@ prio() {  # [env...]
   until_ 10 fileset "$TMP/prio.pid" || bad "priority gate never started"
   PS="$(cat "$TMP/prio.pid" 2>/dev/null)"; STRAYS+=("$PS")
 }
-ceil_quarter() { echo $(( (NPROC * 25 + 99) / 100 )); }
+# The design floor is 2 CPUs (test 12), so on a 4-CPU runner the quarter (1) is below the floor: the cap is max(2, quarter).
+ceil_quarter() { local q=$(( (NPROC * 25 + 99) / 100 )); echo $(( q < 2 ? 2 : q )); }
 popcount() { printf '%d' "0x$1" | awk '{ n=$1; c=0; while (n>0) { c+=n%2; n=int(n/2) } print c }'; }
 
 # ── 1. confine a running normal gate, restore its exact mask; the priority gate keeps every CPU ──
