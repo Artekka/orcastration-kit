@@ -14,7 +14,24 @@ The seat's poll gets its eyes: a time-budget watcher, a checkout sync, and a con
 - **Changed: `ctx-fill.py`** takes the window from the launch when you measure your own session and pass no `--window` (an explicit `--window` still wins; a proven peak above 200K overrules a launched 200K; another session's transcript still needs `--window`). **`hooks/ctx-guard.py`** does the same when `ORCHESTRATION.md` declares no `context_window:`.
 - **Changed: the orchestrate skill** lists the seat's poll (`pending-work`, `bottleneck-watch`, `main-checkout-sync`). Docs pins check it names all three and that all three install.
 - Tests: `bottleneck-watch`, `main-checkout-sync`, `launched-window`, with mutants; the bootstrap and kit-init install lists carry the new scripts.
+- **Fixed (from the 0.13.0 READ): the conflict-marker guard** now judges `git commit <path>` (also `-i`/`--include`, `-o`/`--only`): the named paths are read from disk, and option values (`-m u.txt`, `-F u.txt`) are not paths. Its allowlist named a test file that did not exist; a test now checks every allowlist entry exists. **The leak guard's lettered row-id pattern** is now a case-sensitive `project-id` class that needs a capital first letter, so `e2e-1`, `k8s-3` and `md5sum-2` pass while `ORCA340h-231` and `S2E340hd-3` forms still fail. **The sha guard** text now says what the code does: only an 8-hex id after `session` or `job` is skipped; a longer one is checked like any sha (test added).
 - Not ported (they are the project's own): the board lint inside the original sync script, the docs hold, and the main-gate and disk-sweep watches of the original bottleneck script.
+
+## 0.13.0 — 2026-11-24
+
+Safety hooks: the accidents that shared checkouts kept producing, now refused by a hook instead of a sentence in a rules file.
+
+- **Added: five opt-in PreToolUse hooks** (python3; each fails open on anything it cannot read, and prints ONE line naming the safe form). Off until the repo has the `docs/orchestration/.kit-hooks` marker AND `safety_guards: on` in the team block of `ORCHESTRATION.md`.
+  - `hooks/discard-guard.py`: `git checkout -- <path>`, `git checkout <path>`, `git checkout -f`, `git switch -f`, `git restore <path>` and `git reset --hard` are refused while the paths they would overwrite have uncommitted edits in THAT worktree; names them. `ALLOW_DISCARD=1` overrides.
+  - `hooks/pkill-full-guard.py`: `pkill -f` / `--full` (any flag cluster, any position, inside chains, `bash -c`, `$(...)`, wrappers and `ssh`); no override, `kill <pid>` is the safe form.
+  - `hooks/prettier-dir-guard.py`: `prettier --write` (or `-w`) on `.`, a directory or a glob that matches one, behind `npx`, `pnpm exec`, `xargs`, `find -exec`.
+  - `hooks/conflict-marker-guard.py`: a `git commit` or `--continue` that would commit a conflict marker at column 0, also one an earlier command of the same chain would stage (`git add -u && git commit`). `ALLOW_CONFLICT_MARKERS=1` overrides.
+  - `hooks/sendmessage-sha-guard.py` (PreToolUse on SendMessage): a message that names a 7 to 40 hex sha git cannot resolve to any object; session refs in brackets, an 8-hex id after the word `session` or `job` (a longer id is checked like any sha), paths and color codes are skipped.
+- **Changed: the leak guard's project-word class also catches session-prefix row ids with letters after a number before the dash** (forms like a 340h or 340hd epoch, or a letter suffix on a collision id). The kit's own example ids end in digits before the dash and never match; plant and clean cases are in the suite.
+- **Added: `hooks/lib/shellscan.py`** (the shell-command scanner the git-aware hooks share: chains, heredocs, `bash -c`, `$(...)`, `cd` and `git -C` followed) and **`hooks/lib/kitgate.py`** (the opt-in switch).
+- **Added: `safety_guards: off` in the `ORCHESTRATION.md` template**, with its paragraph.
+- **Added: tests**, ported with each hook: `tests/hook-discard-guard.test.sh`, `hook-pkill-full-guard`, `hook-prettier-dir-guard`, `hook-conflict-marker-guard`, `hook-sendmessage-sha-guard` (case tables in `tests/hook-cases/`), and `tests/hook-gate.test.sh` (the opt-in switch, the hooks.json wiring).
+- Not in this release (they overlap the kit's `git-guard.sh` and `worktree-guard.sh`, or need a seam): the context-fill claim guard (needs `ctx-fill.py --check`), the test-runner guard and the CPU-burn guard.
 
 ## 0.11.0 — 2026-11-24
 

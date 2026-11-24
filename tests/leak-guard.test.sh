@@ -29,7 +29,11 @@ private-key	-----BEGIN ([A-Z0-9]+ )*PRIVATE KEY( BLOCK)?-----
 # project-word: the kit is public, so a project's name and its board row ids must not ship. The deny list is these two
 # patterns; a bracket in the name keeps this file from matching itself. Add a word by adding a line.
 project-word	einherj[a]r
-project-word	orca[0-9]+-[0-9]+
+project-word	orca[0-9]+[a-z]*-[0-9]+
+# project-id (case-SENSITIVE, unlike project-word): a session-prefix row id that starts with a capital and has letters after a
+# number before the dash (340h, 340hd, 7a, 106a). The kit's own example ids (S2E10-3, S2-1, O7-1, T9-6) end in digits before the
+# dash, and ordinary lower-case words (e2e-1, k8s-3, md5sum-2) never start with a capital, so neither matches.
+project-id	\b[A-Z][A-Za-z]{0,5}[0-9]+[A-Za-z]+([0-9]+[A-Za-z]+)?-[0-9]+[a-z]?\b
 EOF
 )"
 # home-path (READ r0-r2): home or users counts only as the FIRST directory of an absolute path. That is, at the start of a
@@ -60,7 +64,7 @@ leak_scan() {  # <dir> → "label file:line: match" per finding, nothing when cl
   while IFS=$'\t' read -r label re; do
     case "$label" in home-path) allow="$ALLOW_HOME" ;; email) allow="$ALLOW_EMAIL" ;; openai-key) allow="$ALLOW_OPENAI" ;; *) allow='' ;; esac
     # -I skips binary files; -o prints each match on its own line; -H keeps file:line: with one file
-    local gi=""; { [ "$label" = home-path ] || [ "$label" = project-word ]; } && gi=i   # a home path in any case (C:\USERS, /HOME)
+    local gi=""; { [ "$label" = home-path ] || [ "$label" = project-word ]; } && gi=i   # project-id stays case-sensitive   # a home path in any case (C:\USERS, /HOME)
     (cd "$dir" && grep -HonIE$gi -- "$re" "${files[@]}" 2>/dev/null) | while IFS= read -r hit; do
       local m="${hit#*:}"; m="${m#*:}"
       local subject="$m" icase=""
@@ -155,6 +159,14 @@ plant private-key    "-----BEGIN ""RSA PRIVATE KEY-----"
 plant project-word   "ported from the Einherj""ar project"
 plant project-word   "ported from the EINHERJ""AR project"
 plant project-word   "fixed in OR""CA322-9 r1"
+plant project-id     "row ORCA340""h-231 shipped"
+plant project-word   "row OR""CA106-1 shipped"
+plant project-id     "sibling S2E340""hd-3 built it"
+plant project-id     "sibling S5E340""h-1 built it"
+plant project-id     "collision O7""a-1 renamed"
+plant project-id     "row VE106""a-1 shipped"
+clean project-id     "ordinary words: e2e-1, k8s-3, md5sum-2, sha256sum-2, mp4a-1, h264b-2, ipv6-1"
+clean project-word   "the kit's own example ids S2E10-3, S2-1, O7-1 and T9-6; also utf8-1, x86-64, sha256-1, base64-1"
 clean project-word   "ported from the project that grew the script; ORCA is a word, row ids are not shipped"
 clean email          "Co-Authored-By: Claude <noreply""@anthropic.com> and 12345+someone""@users.noreply.github.com"
 clean email          "t""@example.com, git""@github.com:owner/repo.git, plugin@marketplace-name"

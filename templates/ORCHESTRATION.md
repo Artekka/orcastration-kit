@@ -97,6 +97,12 @@ from the warn mark up, injects one line: approaching (300K), report now (350K), 
 every prompt, so nobody has to remember to measure. Same default as `git_guard`: kit-init sets
 `on` for a team. `context_window` (`1m` or `200k`, default `1m`) picks the marks for
 the guard; a session whose transcript names a Haiku model always gets the 200K marks.
+`safety_guards` is `off` or `on` (default `off`). With `on` (and the `.kit-hooks` marker) five more PreToolUse hooks
+refuse the accidents that shared checkouts keep producing, each with ONE stderr line naming the safe form: `discard-guard`
+(`git checkout -- <path>`, `git restore`, `git reset --hard` over uncommitted edits), `pkill-full-guard` (`pkill -f`),
+`prettier-dir-guard` (`prettier --write` on a directory), `conflict-marker-guard` (a commit or `--continue` that would
+commit a conflict marker) and `sendmessage-sha-guard` (a message naming a sha git cannot resolve). They need python3 and
+fail open on anything they cannot read. A human can still run those commands in their own terminal.
 `max_sessions` (unset = no check): the most Claude sessions this machine should run, the seat and every
 verifier included. `start-team.sh` and `recycle-sibling.sh` warn (never refuse) before passing it. Each
 session holds several GB of RAM; on WSL, Windows kills the whole VM when it runs out of commit, with
@@ -122,6 +128,7 @@ team:
   worktrees:        advised
   git_guard:        off
   ctx_guard:        off
+  safety_guards:    off
   context_window:   1m
   gate_slots:       2
   max_sessions:     8
