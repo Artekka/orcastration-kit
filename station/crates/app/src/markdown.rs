@@ -1,5 +1,6 @@
 //! A small CommonMark renderer for agent replies: headings, paragraphs, bold/italic/strike,
-//! inline code, links (clickable), lists (nested, ordered), block quotes, rules, tables and
+//! inline code, links (http and https open on click; any other link is drawn struck
+//! through and says why on hover, see [`link_target`]), lists (nested, ordered), block quotes, rules, tables and
 //! fenced code blocks with syntax highlighting. Our own (rather than egui_commonmark) so every
 //! run of text gets the generous line height and the fixed text column.
 
@@ -112,7 +113,15 @@ impl Renderer<'_> {
         } else {
             FontFamily::Proportional
         };
-        let color = if self.link.is_some() {
+        // A link that will not open is drawn weak and struck through, so it reads as dead
+        // before anyone hovers it.
+        let refused = self
+            .link
+            .as_deref()
+            .is_some_and(|u| link_target(u).is_err());
+        let color = if refused {
+            self.pal.weak
+        } else if self.link.is_some() {
             self.pal.link
         } else if self.quote > 0 {
             self.pal.weak
@@ -123,7 +132,7 @@ impl Renderer<'_> {
             font_id: FontId::new(size, family),
             color,
             italics: self.italic > 0,
-            strikethrough: if self.strike > 0 {
+            strikethrough: if self.strike > 0 || refused {
                 Stroke::new(1.0, color)
             } else {
                 Stroke::NONE
@@ -425,9 +434,67 @@ impl LinkRefusal {
 
 /// The address to open for a chat link, or why it is not opened. Only `http://` and
 /// `https://` with a host open.
+///
+/// Why not leave it to the browser crate: webbrowser 1.2.7 opens any scheme, and a string that
+/// does not parse as a URL becomes a local file path. Checking here also covers a build where
+/// its `hardened` feature is off.
 pub fn link_target(url: &str) -> Result<&str, LinkRefusal> {
-    // ORCA340-674 RED stub: allows everything (the fix commit replaces it).
-    Ok(url)
+    let u = url.trim();
+    // Windows reads `\` and `/` alike in a path, so `\\host`, `//host` and `/\host` are all
+    // network paths.
+    if u.replace('\\', "/").starts_with("//") {
+        return Err(LinkRefusal::NetworkPath);
+    }
+    let Some((scheme, rest)) = u.split_once(':') else {
+        return Err(LinkRefusal::LocalPath);
+    };
+    // A one-letter "scheme" is a drive (`C:`); anything not shaped like a scheme is a path.
+    let is_scheme = scheme.len() > 1
+        && scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+        && scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'));
+    if !is_scheme {
+        return Err(LinkRefusal::LocalPath);
+    }
+    match scheme.to_ascii_lowercase().as_str() {
+        "http" | "https" => {
+            let Some(after) = rest.strip_prefix("//") else {
+                return Err(LinkRefusal::Malformed);
+            };
+            let authority = &after[..after.find(['/', '?', '#']).unwrap_or(after.len())];
+            let host = authority.rsplit('@').next().unwrap_or("");
+            let bad_char = |c: char| c.is_whitespace() || c.is_control();
+            if host.is_empty()
+                || host.starts_with(':')
+                || authority.contains('\\')
+                || u.chars().any(bad_char)
+            {
+                return Err(LinkRefusal::Malformed);
+            }
+            Ok(u)
+        }
+        "file" => Err(file_kind(rest)),
+        _ => Err(LinkRefusal::OtherScheme),
+    }
+}
+
+/// `file:` URLs: a host other than `localhost` (or extra slashes before one) is a network path.
+fn file_kind(rest: &str) -> LinkRefusal {
+    // A URL parser reads `\` as `/` in a file URL, so `file:\\host` is `file://host`.
+    let rest = rest.replace('\\', "/");
+    let Some(after) = rest.strip_prefix("//") else {
+        return LinkRefusal::FileUrl;
+    };
+    if after.starts_with("//") {
+        return LinkRefusal::NetworkPath;
+    }
+    let host = after.split('/').next().unwrap_or("");
+    if host.is_empty() || host.eq_ignore_ascii_case("localhost") {
+        LinkRefusal::FileUrl
+    } else {
+        LinkRefusal::NetworkPath
+    }
 }
 
 /// One wrapped run of text; links inside it open on click.
@@ -450,9 +517,18 @@ fn paragraph(ui: &mut Ui, mut block: Block, width: f32) {
     let Some(pos) = resp.hover_pos() else { return };
     let idx = galley.cursor_from_pos(pos - resp.rect.min).index.0;
     if let Some((_, url)) = block.links.iter().find(|(r, _)| r.contains(&idx)) {
-        ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
-        if resp.clicked() {
-            ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+        match link_target(url) {
+            Ok(target) => {
+                ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+                if resp.clicked() {
+                    ui.ctx().open_url(egui::OpenUrl::new_tab(target));
+                }
+            }
+            // Never handed to the browser; the hover text says why.
+            Err(why) => {
+                ui.ctx().set_cursor_icon(CursorIcon::NotAllowed);
+                let _ = resp.on_hover_text(why.reason());
+            }
         }
     }
 }
@@ -502,6 +578,8 @@ mod tests {
             "file:////host/share/x",
             "file://host/share/x",
             r" \\10.0.0.1\c$",
+            r"/\host\share",
+            r"file:\\host\share",
         ] {
             assert_eq!(link_target(u), Err(LinkRefusal::NetworkPath), "{u}");
         }
