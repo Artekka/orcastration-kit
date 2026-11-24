@@ -4,3 +4,9 @@
 # This branch's own r1/r2 test lines: sandbox clean cases with the fake name jdoe, red under the r3 rule (not a person).
 7d87d60f18efbf49fed3cb083553cf2ccc6165b8:tests/leak-guard.test.sh:home-path:118
 ccd8702f481bdc6f8a2f90689d63f97abb108061:tests/leak-guard.test.sh:home-path:104
+# 667b wip commit: placeholder emails in the ported hook-test fixtures (t@example.test), already replaced by example.com in the merge commit; history is not rewritten.
+06344e9ccc637ceaa7accb96afd3c4b0a5b585d3:tests/hook-cases/pkill.refuse.jsonl:email:25
+06344e9ccc637ceaa7accb96afd3c4b0a5b585d3:tests/hook-conflict-marker-guard.test.sh:email:10
+06344e9ccc637ceaa7accb96afd3c4b0a5b585d3:tests/hook-discard-guard.test.sh:email:10
+06344e9ccc637ceaa7accb96afd3c4b0a5b585d3:tests/hook-gate.test.sh:email:8
+06344e9ccc637ceaa7accb96afd3c4b0a5b585d3:tests/hook-sendmessage-sha-guard.test.sh:email:10
