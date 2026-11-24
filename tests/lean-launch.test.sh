@@ -5,6 +5,7 @@
 # `claude --name ...` part, flags included) is used ONLY for the inheritance test, where a stand-in
 # process has to be findable; everything else reads the real command line the script would run.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; RS="$ROOT/scripts/recycle-sibling.sh"; ST="$ROOT/scripts/start-team.sh"
 # A kit path with whitespace: the WSL launcher refuses such repo paths by design (wt.exe/conhost command lines),
 # and these suites pass the kit's own path through those command lines, so they would FAIL for that reason

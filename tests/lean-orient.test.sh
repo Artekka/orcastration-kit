@@ -5,6 +5,7 @@
 # something broken turns it red (a copy of the command in this file would stay green).
 # Run: bash tests/lean-orient.test.sh      (needs bash, git, awk, python3; no network)
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKILL="$ROOT/skills/orient/SKILL.md"; ORCH="$ROOT/skills/orchestrate/SKILL.md"
 GS="$ROOT/docs/GETTING-STARTED.md"; BRIEF_T="$ROOT/templates/briefs/_TEMPLATE.md"

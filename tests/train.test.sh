@@ -7,6 +7,7 @@
 # tokens in a rendered skill, so a helper that read positionals would get the invocation's args instead.
 # Run: bash tests/train.test.sh      (needs bash, git >= 2.38 for merge-tree --write-tree; no network)
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.com GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.com

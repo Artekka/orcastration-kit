@@ -3,6 +3,7 @@
 # No real Claude session is started: LAUNCH_CMD_OVERRIDE stands in for `claude --name`, and a stand-in
 # process carries CLAUDE_CONFIG_DIR exactly as a session started with `claudeN` would.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; RS="$ROOT/scripts/recycle-sibling.sh"; ST="$ROOT/scripts/start-team.sh"
 TMP="$(mktemp -d)"; pids=""
 trap 'for p in $pids; do kill "$p" 2>/dev/null; done; rm -rf "$TMP"' EXIT

@@ -28,41 +28,16 @@ Orca> filed rows, assigned A to Sib1 and B to Sib2 (disjoint file fences)
 Orca> Sib2 reads Sib1's row (contract only); B goes to a fresh verifier agent, because the seat never makes a mutual pair; both PASS; merged one at a time, gate green
 ```
 
-That's **team mode**, the default: the seat plans, assigns, routes verification and merges; the siblings build.
+That's the whole loop: the seat plans, assigns, routes verification and merges; the siblings build.
 Walkthrough, Windows/macOS/Linux notes and failure modes: **[`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md)**.
 How the whole loop fits together: **[`HOW-IT-WORKS.md`](HOW-IT-WORKS.md)**. Terms:
 [`docs/GLOSSARY.md`](docs/GLOSSARY.md).
 
-## Two modes
+## One way to run it
 
-| Mode | Who coordinates | Start with |
-|---|---|---|
-| **Team** (default) | A **seat** session plans, assigns, routes verification, merges one row at a time, deploys in trains, recycles full sessions. You talk only to the seat | the Quickstart above; reopen later with `bash scripts/start-team.sh` (opens the seat + 2 siblings) — [GETTING-STARTED §3](docs/GETTING-STARTED.md#3-team-mode--who-does-what-the-default) |
-| **Solo** (practice) | You, by hand, in the orchestrator's chair, with two sibling terminals and no seat. A practice ground for learning the loop by hand | [Practice mode](#practice-mode-solo-be-the-orchestrator-yourself) below |
-
-## Practice mode (Solo): be the orchestrator yourself
-
-Answer **Practice mode (Solo)** in `kit-init` (it starts nothing) and open two terminals yourself. You do what the seat
-would do: file rows on the board, hand one to each sibling, let each verify the *other's* row, and reconcile.
-You learn how rows are claimed with file fences, why every session builds in its own worktree, and why the verifier
-sees only the contract. Once you trust the loop, graduate to a seat: when you are the one relaying between
-windows or deciding who takes what, say "turn on the git guard" and run `bash scripts/start-team.sh`.
-
-```bash
-cd ~/projects/myapp
-claude --name Dev1 /orchestration-kit:orient    # terminal 1
-claude --name Dev2 /orchestration-kit:orient    # terminal 2
-```
-
-```text
-Dev1> add rows to the board for: <task A>; <task B>
-Dev1> claim Dev1-1 and build it in your own worktree
-Dev2> claim Dev1-2 and build it in your own worktree
-Dev2> verify Dev1-1 against its row — contract only, don't fix anything
-Dev1> /orchestration-kit:reconcile Dev1-1
-```
-
-The guided demo, step by step: [`docs/GETTING-STARTED.md`, Practice](docs/GETTING-STARTED.md#4-practice-mode-solo-be-the-orchestrator-yourself).
+A **seat** session plans, assigns, routes verification, merges one row at a time, deploys in trains and recycles full
+sessions. You talk only to the seat; the siblings build. Start with the Quickstart above; reopen the windows later with
+`bash scripts/start-team.sh` (opens the seat + 2 siblings), see [GETTING-STARTED §3](docs/GETTING-STARTED.md#3-who-does-what-the-seat-and-the-siblings).
 
 This repo is a Claude Code **plugin** and its own **marketplace** (`artekka-kits`).
 A project "depends" on the kit the way it depends on a package: install it, get the
@@ -80,7 +55,7 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/orient-brief` | `/orchestration-kit:orient-brief <ROW>`: the lean start for a builder: the row's brief and the live seat banner arrive already loaded, then one READY line to the seat |
 | `skills/assemble-train` · `skills/audit-train` | release trains: the seat lands approved rows one merge at a time with a dry run (`trial.sh`, `cptrial.sh`, `gsum.sh`) · a validator sweeps the finished train (`audit.sh` exits 0 when every merge is clean, 1 when a line needs explaining, 2 on a usage error) |
 | `deploy_policy: ask \| auto-when-green` | the Deploy block of `ORCHESTRATION.md`: whether the seat asks you before every deploy (default) or deploys a green, audited train on its own and tells you after |
-| `scripts/gate-throttle.sh` · `scripts/quiet-mode.sh` | run heavy commands through N machine-wide slots plus a priority slot (`gate_slots`); a second slot only while 3 GB of memory is available (`GATE_MIN_FREE_MB`); `--log <file>` writes the gate's log with the tested commit first and its exit code last · quiet mode holds every new run while you use the machine |
+| `scripts/gate-throttle.sh` · `scripts/quiet-mode.sh` | run heavy commands through N machine-wide slots plus a priority slot (`gate_slots`); a second slot only while 3 GB of memory is available (`GATE_MIN_FREE_MB`); `--log <file>` writes the gate's log with the tested commit first and its exit code last; first come, first served, load-aware (tasks stuck in D state are not load), ONE slot per worktree (exit 3; `GATE_ALLOW_SECOND_SLOT=1` is the seat's escape), the priority list re-read on every poll, a TERM/HUP stops the command's whole process tree, and the command gets `GATE_WORKERS` (CPUs / slots, at least 2); **deploy mode**: while a priority gate runs, new normal gates wait and every other running gate's process tree is confined (taskset, reversible, nothing signaled) to the first 25% of the CPUs (`GATE_DEPLOY_OTHERS_PCT`, at least 2), each process getting its own mask back on exit, on a dead owner and at the next start; `gate_reuse_check:` / `GATE_REUSE_CHECK` asks first whether the tree already has a green record (a hit exits 0 without queueing) · quiet mode holds every new run while you use the machine (`status` also says whether deploy mode is on) |
 | `plugins/status-hud` | **optional** second plugin (`status-hud@artekka-kits`): a band or pane that shows every session's context fill, model and activity; `kit-init` asks (default: no), `/hud band\|pane\|off\|quiet` switches it. Host meters work on Linux and WSL only |
 | `HOW-IT-WORKS.md` · `docs/how-it-works.html` | the guide to the whole loop: one diagram, one short section per system (what it does, why it exists, which setting changes it), and how to make it your own |
 | `skills/falsify` | mutation-prove a guard/test can fail: commit GREEN first, diff-verified mutant, prediction written before the run, red observed unfiltered, byte-clean restore, re-green |
@@ -88,19 +63,22 @@ workflow; upgrade it, get the newly distilled lessons.
 | `skills/retro` | session close-out; in orchestrator mode skips deploy and replies "retro complete" to the seat |
 | `skills/post-feature` · `skills/bootstrap-project` | per-feature close-out checklist · bare directory → kit-adopted project |
 | `agents/verifier.md` | the read-only verifier subagent (contract-only, four checks, structured verdict) |
-| `hooks/` | SessionStart hook: fresh sessions in a repo with a board are told to orient and send READY to the seat; silent no-op elsewhere · `worktree-guard.sh` (PreToolUse on Edit/Write/MultiEdit/NotebookEdit): with `worktrees: enforced` in ORCHESTRATION.md, blocks edits in the main checkout except `docs/orchestration/**`, the log and the status doc; no-op otherwise (the default is `advised`) · `git-guard.sh` (PreToolUse on Bash): with `git_guard: on`, blocks `git stash` (except list/show), `git add -A`/`.`/`--all`, `git commit -a`, `git pull --rebase` with the safe alternative; no-op otherwise (default `off`). Tests: `bash tests/run.sh` |
+| `hooks/` | SessionStart hook: fresh sessions in a repo with a board are told to orient and send READY to the seat; silent no-op elsewhere · `worktree-guard.sh` (PreToolUse on Edit/Write/MultiEdit/NotebookEdit): with `worktrees: enforced` in ORCHESTRATION.md, blocks edits in the main checkout except `docs/orchestration/**`, the log and the status doc; no-op otherwise (the default is `advised`) · `git-guard.sh` (PreToolUse on Bash): with `git_guard: on`, blocks `git stash` (except list/show), `git add -A`/`.`/`--all`, `git commit -a`, `git pull --rebase` with the safe alternative; no-op otherwise (default `off`) · `discard-guard.py`, `pkill-full-guard.py`, `prettier-dir-guard.py`, `conflict-marker-guard.py` (PreToolUse on Bash) and `sendmessage-sha-guard.py` (PreToolUse on SendMessage): with `safety_guards: on`, refuse a discard of uncommitted edits, `pkill -f`, `prettier --write` on a directory, a commit that would carry a conflict marker, and a message that names a sha git cannot resolve (python3; they fail open). Tests: `bash tests/run.sh` |
 | `scripts/start-team.sh` | open the seat + N siblings, each in its own window (terminal auto-detected), default names, skips any already running; `--dry-run`, `--terminal <backend>` / `--terminal list`, `--model` / `--effort` (always passed explicitly) |
 | `scripts/recycle-sibling.sh` | replace a session with a fresh `claude --name X`: **in the same tab** when it runs under `sibling-shell.sh`, else a new window first and then SIGTERM the old one (`--new-tab` forces that); `--dry-run` (prints `mode:`), `--terminal`, `--account` (keeps each session on its own Claude Code account), `--model` / `--effort` (always passed, never inherited: the lane picks the model) |
 | `scripts/sibling-shell.sh` | the respawn loop every tab the kit opens runs: starts `claude` as a child and, when `recycle-sibling.sh` leaves it a hand-off file, starts the next one in the same tab (crash-loop guard: two instant exits in a row stop it) |
+| `scripts/tmux-session.sh` | one command to start (or reach) the tmux session that holds the team: `--seat Orca --model 'opus[1m]'` opens the seat as the session's first window under `sibling-shell.sh`, then attaches; `--install-command orca` writes a launcher so a reboot costs one word (`--install-windows` adds a Windows `orca.cmd` and a Windows Terminal profile on WSL). Loads `scripts/tmux/agents.tmux.conf` (mouse, extended keys so Shift+Enter works, stable window names). No tmux installed: the seat runs in the current terminal. |
+| `scripts/seat-merge.sh` | the seat's merge path: `seat-merge.sh <branch> <READ-sha> "<message>"` merges **origin/<branch>** (never a local branch of that name) onto a fresh origin/main with `--no-ff`, runs your format check and checks on the MERGED tree, and pushes the checked sha only when all are green. Refuses a moved branch tip, a dirty tree, the shared checkout, a missing formatter, a second run in the same worktree; yields (bounded) to a waiting pusher's ticket; redoes the merge when only board/log commits landed meanwhile; removes the builder's worktree when provably idle. Config: a `seat_merge:` block in `docs/orchestration/ORCHESTRATION.md` (`format_cmd`, `install_cmd`, repeatable `check: name \| globs \| command`, `allowed_paths`) or `SEAT_MERGE_*` env vars; see the script header. Needs `scripts/lib-builder-worktree.sh` and `scripts/lib-waiting-tickets.sh` beside it; `bootstrap.sh` and kit-init copy all three. |
+| `scripts/pending-work.sh` | the seat's poll for built work that never reached main (`bash scripts/pending-work.sh [--json]`, exit 0 clean / 3 listed): rows whose board text says READ PASS / GREEN-FINAL (or your approval word) but whose branch is not on origin/main (cherry-picked and superseded branches are skipped), stalled branches, a GREEN-FINAL commit that is on no remote, and recent branches cut from a stale main. Read-only. Hooks (`pending_work:` block in ORCHESTRATION.md, or `PENDING_*` env): board and archive paths, the row-id regex, which commit prefixes are docs-only |
 | `scripts/lib-launch.sh` | the shared launcher both scripts source: detects the terminal backend — `tmux` (already inside tmux), `wsl-wt` / `wsl-conhost` (Windows + WSL), `macos-iterm` / `macos-terminal`, `gitbash-cmd`, `linux-<emulator>` (gnome-terminal, konsole, xfce4-terminal, kitty, alacritty, wezterm, foot, xterm, `$TERMINAL`, x-terminal-emulator), `tmux-detached` (SSH / headless), else `manual` (prints the commands, exits 2). Override: `--terminal` flag > `terminal:` in the team block > auto |
-| `scripts/ctx-fill.py` | measure a session's REAL context fill from its transcript; `--window 1m\|200k` picks the marks (350K/400K on 1M, 120K/150K on 200K); a Haiku transcript implies 200K |
+| `scripts/ctx-fill.py` | measure a session's REAL context fill from its transcript; `--window 1m\|200k` picks the marks (350K/400K on 1M, 120K/150K on 200K); a Haiku transcript implies 200K. `--line` prints one measured paste line for a report; `--check "<line>"` verifies it (exact fill at the claimed time, zone-aware, 30-minute limit, any account); `--host <ssh-target>` runs it on another machine (`KIT_REMOTE_REPO` names the checkout there) |
 | `scripts/statusline-ctx.sh` | optional statusline: live context fill vs the 350K/400K marks (120K/150K on a 200K window) (yellow = self-report, red = hand over); enable via `templates/settings-snippets.md` |
 | `scripts/bootstrap.sh` | the mechanical half of `bootstrap-project` (idempotent, `--dry-run`) |
 | `templates/` | `AGENT_BOARD.md` (banner/handover/READY/archive shapes), `ORCHESTRATION.md` (gate, deploy, team, validator, doc paths), `AI_CONTEXT.md` + `build-log.md` (institutional memory), `CLAUDE-section.md`, `CLAUDE-slimness.md` (keep the always-loaded file slim), `briefs/` (row brief template + README), settings snippet, optional agents + memory starter |
 | `docs/GETTING-STARTED.md` | first-timer walkthrough: install → kit-init → seat + siblings → recycling → failure modes |
 | `docs/MULTI-ACCOUNT.md` | **optional:** run one team across several Claude Code accounts — `CLAUDE_CONFIG_DIR` per account, the shared session registry that makes cross-account messaging work, `--account` on both launch scripts |
 | `docs/GLOSSARY.md` | the kit's vocabulary (seat, sibling, row, fence, gate, READ, wave train …) |
-| `tests/` | `bash tests/run.sh` — git guard (every awk found), statusline, bootstrap idempotency + dry-run, multi-account launch, model/effort launch flags, ctx-fill marks |
+| `tests/` | `bash tests/run.sh` — git guard (every awk found), statusline, bootstrap idempotency + dry-run, multi-account launch, model/effort launch flags, ctx-fill marks and `--line`/`--check`/`--host` |
 | `docs/LESSONS.md` | the distilled incident-backed lessons — the upgrade payload |
 | `docs/EXAMPLE-SESSION.md` | **a real annotated 12-hour session** — one seat, three sibling builders, two deploy trains, and the six things the seat got wrong |
 
@@ -154,7 +132,7 @@ board-format/protocol change = major bump with a migration note. After upgrading
 `/orchestration-kit:kit-init` in a project to be offered the template deltas (managed
 markers keep your customizations safe).
 
-## The team-mode workflow in one paragraph
+## The workflow in one paragraph
 
 The seat takes the board with an `ORCHESTRATOR ACTIVE` banner; siblings `/orchestration-kit:orient` and send
 READY. `git fetch origin && git rebase origin/main` → read `docs/orchestration/AGENT_BOARD.md`
@@ -167,6 +145,12 @@ row claim, in wave trains. Full sessions retro, reply "retro complete", and are 
 Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
+
+v0.13.0: five safety hooks, off until you turn them on (`safety_guards: on`): they refuse a discard of uncommitted edits, `pkill -f`, `prettier --write` on a directory, a commit that carries a conflict marker, and a message that cites a sha git cannot resolve.
+
+v0.11.0: the guarded seat merge (`seat-merge.sh`), `pending-work.sh`, the tmux entry point (`tmux-session.sh`), a hardened `gate-throttle.sh` (deploy mode, one slot per worktree, a reuse-check hook), a measured, checkable context fill (`ctx-fill.py --line`), and disk cleanup (`retro-worktrees.sh`, `docker-cache-cap.sh`, a low-disk guard).
+
+v0.10.0: the kit has one way to run, a seat plus siblings; the two-terminal practice setup is gone. The CHANGELOG says what to do if you used it.
 
 v0.9.0: Team mode (a seat + siblings) is the default start; Solo is now Practice mode, where you play the orchestrator by hand with two sibling terminals to learn the loop.
 
@@ -185,6 +169,35 @@ lean builder starts (`/orchestration-kit:orient --brief <ROW>` from a brief file
 v0.5.0: solo mode as the starting path, a git guard hook (on in team mode, off solo), the `falsify` skill, a
 context-fill statusline, MIT LICENSE, tests (`bash tests/run.sh`), a glossary, and the worked
 example session. Full history: [`CHANGELOG.md`](CHANGELOG.md).
+
+## Disk cleanup
+
+A team that builds, tests and deploys all day fills a disk: worktrees nobody removed, Docker build layers from every deploy, test containers left running. One project lost 170 GB this way. The kit now carries three small guards. Each is plain bash, and each can be dry-run.
+
+| Script | What it removes or refuses | What it always keeps |
+|---|---|---|
+| `scripts/retro-worktrees.sh --prefix <branch-prefix> [--dry-run]` (the `/retro` skill runs it as Step 4b) | worktrees of YOUR session whose branch is already on `origin/main` | an unmerged branch; a tree with uncommitted or untracked files, an unusual ignored file, a commit `origin/main` lacks, a file changed in the last 30 minutes, or a process running inside it; the worktree it runs in; every branch ref, so no commit is lost. It never uses `--force`, and an empty prefix is refused. |
+| `scripts/docker-cache-cap.sh [--dry-run]` | the OLDEST Docker build-cache layers, down to `KIT_BUILD_CACHE_KEEP` (default `40GB`) | the most recently used layers; images and containers (it prunes the build cache only). Call it after a deploy that passed its health check, never before. A failure only warns. |
+| `scripts/gate-disk-guard.sh` (`gate-throttle.sh` runs it before it queues) | nothing: it REFUSES to start a gate when free space is under the minimum | the disk as it was. The minimum is `KIT_GATE_MIN_FREE_GB`, or `gate_min_free_gb:` in the team block, default 20 GB; `0` turns it off; `KIT_GATE_DISK_PATH` picks the disk (default `/`). |
+
+Try them without changing anything: `bash scripts/retro-worktrees.sh --prefix s5e307/ --dry-run` prints `would remove N, kept M` with the reason for every tree it keeps, and `bash scripts/docker-cache-cap.sh --dry-run` prints the command it would run. `bootstrap.sh` and the `kit-init` skill copy all three scripts (and the worktree safety check that `retro-worktrees.sh` and `seat-merge.sh` share).
+
+## If you use tmux
+
+`scripts/tmux-session.sh` is the one entry point. It creates (or reaches) the tmux session that holds the team, opens the seat in its own window, and attaches:
+
+```bash
+bash scripts/tmux-session.sh --seat Orca --model 'opus[1m]' --prompt 'Orient and orchestrate'
+bash scripts/tmux-session.sh --install-command orca --seat Orca --model 'opus[1m]'   # then just: orca
+```
+
+- **One session per repo.** The name is `RECYCLE_TMUX_SESSION` if set, else the main checkout's directory name with anything outside `[A-Za-z0-9_-]` made `_` (`REPO_DIR` picks another checkout). `start-team.sh` and `recycle-sibling.sh` name their windows by the same function (`launch_tmux_session`), so every new window joins this session.
+- **Recycling stays in place.** The seat's window runs `sibling-shell.sh`, the respawn loop, so `recycle-sibling.sh` replaces the session in the same window.
+- **`--session NAME` names only this script's session.** If you also launch from outside tmux (`start-team.sh`, `recycle-sibling.sh` in another terminal), use RECYCLE_TMUX_SESSION, not --session: only the environment variable reaches those launchers.
+- **`--install-command CMD`** writes `~/.local/bin/CMD`, a launcher that attaches when the session exists and creates it otherwise. A file at that path that the script did not write is refused.
+- **WSL:** `--install-windows` adds a `CMD.cmd` and a Windows Terminal profile fragment, so a reboot costs two words.
+- tmux does not survive a reboot or a WSL VM stop; run the command again, then recycle the sessions.
+- Without tmux installed, `--seat` runs the seat directly in the current terminal.
 
 ## Recycling in place (v0.7.0)
 
@@ -225,4 +238,5 @@ branch and PR flow, commit messages and the optional pre-push secret scan. Every
 
 ## Contributors
 
-- Miles Brown (@MilesBrown34)
+- Miles Brown (@MilesBrown34): also presented the disk-cleanup issue behind `retro-worktrees.sh`, `docker-cache-cap.sh` and the low-disk guard
+- Naga/Omie (@Babasher): presented the disk-cleanup issue behind the same scripts

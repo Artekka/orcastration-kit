@@ -332,7 +332,10 @@ launch_list_backends() {
 
 # ---------------------------------------------------------------- init + command building
 
-launch_tmux_session() {  # tmux session name for tmux-detached: the repo's basename, tmux-safe
+launch_tmux_session() {  # tmux session name: RECYCLE_TMUX_SESSION if set, else the repo's basename, tmux-safe
+  # THE one name rule: scripts/tmux-session.sh asks this function too, so the entry point and every later
+  # start-team / recycle window land in the same session (a second one outside the first is the failure).
+  if [ -n "${RECYCLE_TMUX_SESSION:-}" ]; then printf '%s' "$RECYCLE_TMUX_SESSION"; return; fi
   local base; base="$(basename "${LAUNCH_REPO:-${REPO:-$PWD}}")"
   printf '%s' "$base" | tr -c 'A-Za-z0-9_-' '_'
 }
@@ -791,7 +794,10 @@ launch_open() {
     tmux-detached)
       s="$(launch_tmux_session)"
       if ! tmux has-session -t "=$s" 2>/dev/null; then
-        tmux new-session -d -s "$s" -c "$LAUNCH_REPO" || return 1
+        # The same config scripts/tmux-session.sh loads (mouse, extended keys, stable window names), when it ships.
+        local conf; conf="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/tmux/agents.tmux.conf"
+        if [ -f "$conf" ]; then tmux -f "$conf" new-session -d -s "$s" -c "$LAUNCH_REPO" || return 1
+        else tmux new-session -d -s "$s" -c "$LAUNCH_REPO" || return 1; fi
       fi ;;
   esac
   _launch_argv "$name" "$prompt"

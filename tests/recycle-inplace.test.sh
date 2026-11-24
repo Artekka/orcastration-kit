@@ -2,6 +2,7 @@
 # Tests for scripts/recycle-sibling.sh in-place mode and the wrapper-aware tab commands (v0.7.0).
 # Run: bash tests/recycle-inplace.test.sh   Linux only (SKIP elsewhere). Nothing real is launched: every
 # `claude` is a stub on PATH and the terminal is a stand-in `xterm` (tests/inplace-harness.sh).
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 SUITE=recycle-inplace
 . "$(dirname "$0")/inplace-harness.sh"
 FORBID=(FAKE_TERM_MODE=forbid)          # a terminal that must never run: it leaves a marker if called

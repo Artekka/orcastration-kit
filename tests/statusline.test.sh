@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests for scripts/statusline-ctx.sh. Run: bash tests/statusline.test.sh
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; SL="$ROOT/scripts/statusline-ctx.sh"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 pass=0; fail=0

@@ -12,6 +12,7 @@
 # (HTML); the marker counts must match, and PENDING below lists the paths those sections may name before
 # the reconcile pass. Run: bash tests/how-it-works.test.sh   (needs bash, python3; no network)
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 pass=0; fail=0
 ok()  { pass=$((pass+1)); }
@@ -42,7 +43,7 @@ MD="$ROOT/HOW-IT-WORKS.md"; HTML="$ROOT/docs/how-it-works.html"
 [ -f "$HTML" ] && ok || bad "docs/how-it-works.html missing"
 if [ -f "$MD" ] && [ -f "$HTML" ]; then
   # The brief's private list, plus machine paths and account-ish strings. Case-insensitive.
-  priv='einherjar|camelot|artekkaos|darkage|dark age|tekkaman|/home/[a-z0-9._-]+/|/mnt/[a-z]/|discord|gamelabs|@gmail|@artekka|session_0|claude\.ai/code|\bart\b|pnpm gate|\bOrca\b'
+  priv='einherj[a]r|camelot|artekkaos|darkage|dark age|tekkaman|/home/[a-z0-9._-]+/|/mnt/[a-z]/|discord|gamelabs|@gmail|@artekka|session_0|claude\.ai/code|\bart\b|pnpm gate|\bOrca\b'
   # the public marketplace id (plugin@artekka-kits) is the one allowed use of the handle
   hits="$(sed 's/@artekka-kits//g' "$MD" "$HTML" | grep -n -i -E "$priv" | head -5)"
   [ -z "$hits" ] && ok || bad "private strings in the guide: $hits"

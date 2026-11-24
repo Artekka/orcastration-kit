@@ -24,8 +24,8 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
      SRC="$K/${p%%:*}" DST="${p#*:}" put
    done
    [ -e docs/orchestration/.kit-hooks ] || { printf '%s\n' "# opt-in marker: the orchestration-kit SessionStart hook runs only in repos carrying this file. Delete it to silence the hook." > docs/orchestration/.kit-hooks && echo "CREATE docs/orchestration/.kit-hooks"; }
-   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh; do SRC="$K/scripts/$f" DST="scripts/$f" put; done
-   chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh
+   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh seat-merge.sh lib-waiting-tickets.sh lib-builder-worktree.sh pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh; do SRC="$K/scripts/$f" DST="scripts/$f" put; done
+   chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/pending-work.sh scripts/tmux-session.sh scripts/sibling-shell.sh scripts/retro-worktrees.sh scripts/docker-cache-cap.sh scripts/gate-disk-guard.sh
    ```
    If the overlay names different doc paths (ORCHESTRATION.md → Docs), use those instead.
 2. **Fill the overlay** (only if just created) — infer candidates from the repo (`package.json` scripts, `Makefile`, CI config), then ASK the human to confirm: gate command + pass-proof line, never-run commands, deploy vehicle (or "none"), validator seat (optional), locked items. Never silently guess a gate. Leave the `team:` block at its defaults unless the human wants other names.
@@ -50,7 +50,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
 
    | Q | Options (first = recommended) |
    |---|---|
-   | "Start the team now? You can change the team size, names, permission mode or worktree setting at any time — just ask Claude to change it." | **Seat + 2 siblings (Recommended)** · **Choose how many** (follow up: 1–9) · **Practice mode (Solo)** — you play the orchestrator by hand with two sibling terminals; see GETTING-STARTED Practice |
+   | "Start the team now? You can change the team size, names, permission mode or worktree setting at any time — just ask Claude to change it." | **Seat + 2 siblings (Recommended)** · **Choose how many** (follow up: 1–9) |
    | "Permission mode for the team's sessions?" | **Normal (Recommended)** — asks before risky actions (no flag) · **Auto** — `--permission-mode auto`: Claude Code's automatic permission checks decide instead of prompting · **Accept edits** — `--permission-mode acceptEdits`: file edits approved automatically, commands still ask |
    | "Separate worktrees per session? Sessions are instructed to use their own worktree either way; some workflows deliberately share one tree or file between agents, so enforcement is optional." | **Advised (Recommended)** — every session is told to use its own worktree, but nothing blocks it · **Enforced** — a hook blocks edits in the main checkout except board/log files |
 
@@ -58,9 +58,9 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    ```bash
    bash scripts/start-team.sh --siblings <N> --mode <normal|auto|accept-edits>
    ```
-   `--mode` is saved to the `team:` block (`permission_mode:`) so recycles reuse it — commit that change (explicit path). **Practice mode (Solo)** → start nothing; show the team command for later and point at GETTING-STARTED "Practice". Backend `manual` (nothing here can open windows) → say so, and instead of launching show the per-window commands from `bash scripts/start-team.sh --siblings <N> --mode <mode> --dry-run` (`by hand` lines): one terminal each, in the repo. `tmux-detached` → also tell the human `tmux attach -t <session>` (the script prints it).
+   `--mode` is saved to the `team:` block (`permission_mode:`) so recycles reuse it — commit that change (explicit path). Backend `manual` (nothing here can open windows) → say so, and instead of launching show the per-window commands from `bash scripts/start-team.sh --siblings <N> --mode <mode> --dry-run` (`by hand` lines): one terminal each, in the repo. `tmux-detached` → also tell the human `tmux attach -t <session>` (the script prints it).
    **Platform check (say it before launching, from the dry run's `backend` line):** `gitbash-cmd` or `manual` → recycling cannot happen in place (no `pgrep`): each recycle opens a new window and the human closes the old one. `wsl-*` with a space or `;`/quote in the repo path → refused by the WSL launcher; move the repo to a plain path (`~/projects/<name>`). macOS → a seat self-recycle opens a new tab (no `setsid`). Claude Code older than the tested version (`claude --version`, GETTING-STARTED §0) → `claude update` first.
-   Persist the worktree answer, and set the git guard **from the start answer — no question**: a team start (seat + 1–9 siblings) → `git_guard: on` and `ctx_guard: on`; **Practice mode (Solo)** → both `off`. Then commit that path:
+   Persist the worktree answer, and set the git guard **from the start answer — no question**: every start (seat + 1–9 siblings) → `git_guard: on` and `ctx_guard: on`. Then commit that path:
    ```bash
    C=docs/orchestration/ORCHESTRATION.md
    setkey() {  # KEY=<key> VAL=<value> setkey   (named variables: the skill loader eats dollar-digit tokens)
@@ -68,11 +68,11 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
      elif grep -q '^team:[[:space:]]*$' "$C"; then sed -i "/^team:[[:space:]]*\$/a\  $KEY:        $VAL" "$C"
      else printf '\nteam:\n  %s:        %s\n' "$KEY" "$VAL" >> "$C"; fi
    }
-   KEY=worktrees VAL=<advised|enforced> setkey; KEY=git_guard VAL=<on if a team was started, else off> setkey; KEY=ctx_guard VAL=<on if a team was started, else off> setkey
+   KEY=worktrees VAL=<advised|enforced> setkey; KEY=git_guard VAL=on setkey; KEY=ctx_guard VAL=on setkey
    git add "$C" && git commit -m "chore(orchestration): worktrees + git_guard + ctx_guard settings"
    ```
    Both take effect at once: the plugin's PreToolUse hooks read the file on every call (only in repos with `.kit-hooks`).
-8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · "Windows will open via: <backend> (change any time — just ask Claude)" (for `manual`: "Windows can't be opened automatically here — run these commands, one terminal each:" + the commands) · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · "Risky git commands (stash, add -A, commit -a, pull --rebase) are [blocked — on by default in team mode/not blocked — off in practice (Solo) mode; say "turn on the git guard" when you add more sessions] — change it any time by asking Claude." · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
+8. **End-of-setup summary** (print it): files created/skipped · gate + deploy recorded · "Windows will open via: <backend> (change any time — just ask Claude)" (for `manual`: "Windows can't be opened automatically here — run these commands, one terminal each:" + the commands) · team started (names, mode) or the command to start it · "talk to the seat window; siblings report to it" · "Each session is instructed to work in its own worktree; this is [advised/enforced] — change it any time by asking Claude." (fill in the answer) · "Risky git commands (stash, add -A, commit -a, pull --rebase) are [blocked — on, set by kit-init when it starts the team; say "turn off the git guard" to relax it] — change it any time by asking Claude." · and this line verbatim: **"You can change any of this — team size, names, permission mode, gate or deploy commands — at any time. Just ask Claude to change it."**
 9. **Status HUD (optional) — ONE `AskUserQuestion`**, after the summary: "Install the status HUD? It draws every session's context fill, model and activity (plus host load) above the seat's prompt. Change it any time — just ask Claude." → **No (Recommended)** · **Yes**. Put the answer in `HUD=` and run (it needs the `claude` CLI; it installs for the default account and every logged-in `~/.claude-acctN`, and shows the HUD only in the seat named in the `team:` block):
    ```bash
    HUD=<yes|no>

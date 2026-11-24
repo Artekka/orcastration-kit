@@ -14,11 +14,10 @@ The kit's vocabulary, in one place. Skills and lessons use these words without r
 | **Gate** | The project's trusted test command (set in `ORCHESTRATION.md`) |
 | **Pass-proof line** | The literal summary line that proves the gate passed (e.g. `Tests: 42 passed, 0 failed`). Exit code alone is not proof |
 | **Overlay** | `docs/orchestration/ORCHESTRATION.md` — the project-specific settings every skill reads first (gate, deploy, team, docs) |
-| **Solo mode** (practice) | Two or more sessions coordinated only by the board + cross-verification; you are the orchestrator, by hand. A practice ground for learning the loop before trusting a seat |
-| **Team mode** | Adds a seat that coordinates for you. The default |
+| **Team** | One seat that coordinates, plus two or more siblings that build, each in its own window. This is how the kit runs |
 | **Seat** | The orchestrator session (default name `Orca`). Talks to you; plans, assigns, verifies-by-proxy, merges, deploys. Never writes feature code |
 | **Sibling** | A builder session (default names `Sib1`, `Sib2` …). Talks to the seat, not to you |
-| **Banner** | `ORCHESTRATOR ACTIVE` block at the top of the board naming the current seat. No banner = solo (practice) mode |
+| **Banner** | `ORCHESTRATOR ACTIVE` block at the top of the board naming the current seat. No banner = no seat |
 | **Era** | One seat's tenure. When a seat is recycled, the next one starts era N+1 (in the banner) |
 | **Handover** | The note a retiring seat leaves under the banner: slots held, rows in flight, what's owed |
 | **READY** | The message a freshly oriented sibling sends the seat: fill, what it can take, which rows it has `seen:` |

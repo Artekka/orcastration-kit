@@ -88,15 +88,21 @@ blocks it) or `enforced` (the kit's PreToolUse hook blocks file edits in the mai
 `git_guard` is `off` or `on`. With `on` (and the `.kit-hooks` marker) the kit's PreToolUse Bash
 hook blocks `git stash` (except `list`/`show`), `git add -A`/`--all`/`.`/`-u` without paths,
 `git commit -a`/`--all` and `git pull --rebase`, telling Claude the safe alternative. Default:
-`off` in practice (Solo) mode; kit-init sets `on` when it starts a team (seat + siblings). A human can still
+`off` until set; kit-init sets `on` when it starts a team (seat + siblings). A human can still
 run those in their own terminal.
 `ctx_guard` is `off` or `on`. With `on` (and the `.kit-hooks` marker) the kit's context guard
 (PostToolUse + UserPromptSubmit) measures each session's fill on every tool call and prompt and,
 from the warn mark up, injects one line: approaching (300K), report now (350K), hand over now
 (400K); on a 200K window 100K/120K/150K. It repeats every ~15K of growth (8K on 200K) and on
 every prompt, so nobody has to remember to measure. Same default as `git_guard`: kit-init sets
-`on` for a team, `off` in practice (Solo) mode. `context_window` (`1m` or `200k`, default `1m`) picks the marks for
+`on` for a team. `context_window` (`1m` or `200k`, default `1m`) picks the marks for
 the guard; a session whose transcript names a Haiku model always gets the 200K marks.
+`safety_guards` is `off` or `on` (default `off`). With `on` (and the `.kit-hooks` marker) five more PreToolUse hooks
+refuse the accidents that shared checkouts keep producing, each with ONE stderr line naming the safe form: `discard-guard`
+(`git checkout -- <path>`, `git restore`, `git reset --hard` over uncommitted edits), `pkill-full-guard` (`pkill -f`),
+`prettier-dir-guard` (`prettier --write` on a directory), `conflict-marker-guard` (a commit or `--continue` that would
+commit a conflict marker) and `sendmessage-sha-guard` (a message naming a sha git cannot resolve). They need python3 and
+fail open on anything they cannot read. A human can still run those commands in their own terminal.
 `max_sessions` (unset = no check): the most Claude sessions this machine should run, the seat and every
 verifier included. `start-team.sh` and `recycle-sibling.sh` warn (never refuse) before passing it. Each
 session holds several GB of RAM; on WSL, Windows kills the whole VM when it runs out of commit, with
@@ -105,6 +111,7 @@ before the next. Lower it if the machine struggles; raise it only with RAM to sp
 `gate_slots` (default 2) is how many throttled runs (`scripts/gate-throttle.sh`) may run at once on
 this machine, plus one priority slot for the paths the seat lists in
 `~/.orchestration-kit/runtime/gate-priority.txt` (release/train gates). Lower it if gates flake under load.
+While a priority gate runs (deploy mode) new normal gates wait and the other running gates are confined to the first `GATE_DEPLOY_OTHERS_PCT` (25) percent of the CPUs, then given their own masks back. `gate_reuse_check` (optional; add it to the team block, or set `GATE_REUSE_CHECK`) is a command run as `<it> <the gate command>` before a gate queues: exit 0 means the tree already has a green record, so the gate is skipped.
 `model` / `effort` (both optional) set the default for every launch: `model` is `opus[1m]`, `sonnet[1m]`, `haiku` or a full model id (default `opus[1m]`), `effort` one of `low|medium|high|xhigh|max` (default: not passed). The launch scripts ALWAYS pass `--model` and never inherit the old session's, so a recycled session starts on the model its lane needs, not on whatever the terminal had. `--model` / `--effort` flags override the block; a bad value in the block is ignored with a warning, a bad flag exits 64. Per-lane choices: orchestrate skill, "Model per lane".
 `terminal` picks how session windows open: `auto` (detect) or one of `wsl-wt`, `wsl-conhost`,
 `tmux`, `tmux-detached`, `macos-iterm`, `macos-terminal`, `gitbash-cmd`, `linux-<emulator>`
@@ -121,6 +128,7 @@ team:
   worktrees:        advised
   git_guard:        off
   ctx_guard:        off
+  safety_guards:    off
   context_window:   1m
   gate_slots:       2
   max_sessions:     8
@@ -133,6 +141,51 @@ it the evidence a verdict rests on. Quote the path in reports so the next reader
 `questions` is how the seat asks the human: `blocking` (the prompt waits for the answer; most people
 prefer it) or `non-blocking` (for a human who steps away: text + a push notification, work that does not
 depend on the answer keeps moving).
+
+## Merge (`scripts/seat-merge.sh`)
+
+The seat merges a READ-passed branch with `bash scripts/seat-merge.sh <branch> <READ-sha> "<message>"`, from its own linked merge worktree. It merges `origin/<branch>` onto a fresh `origin/main`, runs the checks below on the MERGED tree, and pushes the checked sha only when they are all green. These keys are optional; an environment variable (`SEAT_MERGE_<KEY>`, upper case) beats the file. The block is read BEFORE the merge, from this worktree's checked-out copy of this file, so a branch that edits it takes effect on the next run.
+
+- `format_cmd`: the format check. Default: your `format:check` package script, when `package.json` has one; else none (a note says so).
+- `install_cmd`: runs once before the checks, only when at least one check applies, so a stale install cannot give a false green.
+- `check`: repeatable, `name | globs | command`. `globs` are matched against the paths the merge changes (`docs/*` a directory, `*` every merge). A red check is rerun once alone; red twice refuses. **Recommended: one `check:` line with globs `*` that runs your fast guards, so no merge reaches main without them**; add narrower lines for the slower suites a path should trigger.
+- `allowed_paths`: path prefixes (default `docs/orchestration/ docs/timeline/build-log.md docs/AI_CONTEXT.md`). When the push loses a race to commits that touch only these, the same merge is redone and pushed without re-running the checks (at most 3 times). Any other path refuses.
+- `yield_max_s` / `yield_poll_s`: the merge waits (at most `yield_max_s`, default 3600, polling every `yield_poll_s`, default 5) while another session holds a "waiting pusher" ticket, so a retrying push is not starved.
+- `idle_minutes`: the builder's worktree is removed after a merge only if nothing in it changed this recently (default 30).
+- `SEAT_MERGE_RUNTIME_DIR` (env only): where the lock and tickets live; defaults to `KIT_RUNTIME_DIR`, else `~/.orchestration-kit/runtime`.
+
+```
+seat_merge:
+  format_cmd:     <your format check, e.g. npm run format:check>
+  install_cmd:    <your install, e.g. npm ci>
+  check:          guards | * | <your fast guard command, e.g. npm run test:guards>
+  check:          full | src/* tests/* | <your slower suite for source changes>
+  allowed_paths:  docs/orchestration/ docs/timeline/build-log.md docs/AI_CONTEXT.md
+  yield_max_s:    3600
+  yield_poll_s:   5
+  idle_minutes:   30
+```
+
+Keep comments out of the block: a comment line ends it, and a trailing comment becomes part of the value.
+
+## Pending work (`scripts/pending-work.sh`)
+
+The seat's periodic poll for built work that never reached main: `bash scripts/pending-work.sh [--json]` lists, from git and the board text on origin/main, rows that passed their READ but are not merged (PASSED, NOT ON MAIN), stalled branches (IDLE), a reported GREEN-FINAL commit that is on no remote (UNPUSHED GREEN-FINAL) and recent branches cut from a stale main (BEHIND MAIN). Exit 0 = nothing pending, 3 = something listed. It is read-only. Every project-specific part is a hook; the block is read from origin/main, and an environment variable wins:
+
+- `board_path` (`PENDING_BOARD_PATH`): the live board. Default `docs/orchestration/AGENT_BOARD.md`.
+- `archive_path` (`PENDING_ARCHIVE_PATH`): the directory of dated archives (`BOARD_ARCHIVE_<YYYY-MM-DD>*`). Default `docs/orchestration/archive`.
+- `row_id_regex` (`PENDING_ROW_REGEX`): how a row id reads, a Python regex without anchors. Default `[A-Z][A-Z0-9]*\d+-\d+[a-z]?` (a prefix, a number, a dash, a number).
+- `docs_prefixes` (`PENDING_DOCS_PREFIXES`): space-separated commit-subject prefixes that do NOT count as shipping a row. Default `docs( docs:`.
+
+```
+pending_work:
+  board_path:     docs/orchestration/AGENT_BOARD.md
+  archive_path:   docs/orchestration/archive
+  row_id_regex:   [A-Z][A-Z0-9]*\d+-\d+[a-z]?
+  docs_prefixes:  docs( docs:
+```
+
+Keep comments out of the block, as for `seat_merge:`.
 
 ## Docs (institutional memory)
 

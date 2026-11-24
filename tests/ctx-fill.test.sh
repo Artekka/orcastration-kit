@@ -2,6 +2,7 @@
 # Tests for scripts/ctx-fill.py: per-window marks, --window, Haiku detection. Run: bash tests/ctx-fill.test.sh
 # Needs python3. Transcripts are synthetic .jsonl files passed by path; nothing under ~/.claude is read.
 set -u
+unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pane once renamed real windows (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; CF="$ROOT/scripts/ctx-fill.py"
 command -v python3 >/dev/null 2>&1 || { echo "ctx-fill: skipped (no python3)"; exit 0; }
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
