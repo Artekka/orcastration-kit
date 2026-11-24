@@ -4,6 +4,10 @@ Newest first.
 
 ## Unreleased
 
+## 0.10.0 — 2026-11-24
+
+- **Removed: Solo Mode (the "Practice mode (Solo)" answer).** The kit now has one way to run: a seat plus siblings. Why: nobody needs a practice mode; it started nothing, and the team start is the same loop with the coordinating done for you. What changed: kit-init's start question has no practice answer, so every start turns the git guard and the context guard on; the README, GETTING-STARTED (the practice section is gone and later sections moved up one number), the guide, the glossary and the overlay template describe one way to run; the glossary reads "no banner = no seat". No script or hook branched on the mode, so nothing else changes. **If you used Solo Mode:** nothing breaks. Your committed `docs/orchestration/ORCHESTRATION.md` keeps its values (`git_guard: off`, `ctx_guard: off` stay off until you change them). To learn the loop by hand, open two sessions yourself and use the board; to run it with a seat, run `bash scripts/start-team.sh`. What you lose is only the kit-init answer that started nothing and set both guards off.
+- **Added: a docs pin** that fails if "solo mode", "Practice mode" or the old mode table come back in the README, kit-init, the guide or the glossary, and a pin that fails if `plugin.json`, `marketplace.json` and the newest CHANGELOG heading disagree on the version.
 - **Changed: the GitHub repository is now `Artekka/orcastration-kit`** (was `claude-orchestration-kit`). Install with `claude plugin marketplace add Artekka/orcastration-kit`; the plugin id (`orchestration-kit@artekka-kits`), its slash commands and `~/.orchestration-kit/` do not change. GitHub redirects the old URL, so existing installs keep working. README, GETTING-STARTED, CONTRIBUTING, SECURITY, the issue-template link and the Code of Conduct contact link use the new name; the plugin manifest gains `homepage` and `repository`.
 - **Fixed: a team start with no Claude running exited silently.** (PRS 2026-10-17)
 - **New: `gate-throttle.sh --log <file>`.** (PRS 2026-10-15)
