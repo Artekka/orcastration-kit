@@ -41,6 +41,8 @@ jobs:
       OBSERVATORY_RUST_DIR: ${{ runner.temp }}/station-rust
       # Outside the rust dir, so env.sh respects it, and one fixed path for the cache.
       CARGO_TARGET_DIR: ${{ runner.temp }}/station-target
+      # Pinned: clippy runs with -D warnings, so an unpinned stable could turn CI red with no change in the kit. Raise it on purpose.
+      RUST_VERSION: "1.100.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,8 +51,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install stable --profile minimal --component rustfmt --component clippy --target x86_64-pc-windows-gnu
-          rustup default stable
+          rustup toolchain install "$RUST_VERSION" --profile minimal --component rustfmt --component clippy --target x86_64-pc-windows-gnu
+          rustup default "$RUST_VERSION"
           sudo apt-get update -qq
           sudo apt-get install -y -qq mesa-vulkan-drivers libvulkan1 bc
           mkdir -p "$OBSERVATORY_RUST_DIR"
@@ -70,7 +72,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo install cargo-audit --version 0.23.0 --locked
+          # The cache may hand back the binary without cargo's install records, and then `cargo install` refuses it: ask the
+          # binary itself, and install only when it is missing or not this version.
+          cargo audit --version 2>/dev/null | grep -qF '0.23.0' || cargo install cargo-audit --version 0.23.0 --locked --force
           cargo audit --file station/Cargo.lock
       - name: The Station gate (last line must be GATE PASS)
         shell: bash

@@ -100,5 +100,35 @@ case "$inj" in *"TargetPath='x''; calc; '''"*) ok ;; *) bad "8 an injected quote
 plain="$(shortcut_ps "D:\\a\\s.lnk" "D:\\a\\o.exe" "D:\\a")"
 case "$plain" in *"CreateShortcut('D:\\a\\s.lnk')"*"TargetPath='D:\\a\\o.exe'"*) ok ;; *) bad "8 a plain path changed: $plain" ;; esac
 
+# 9. a real run with stand-in cargo and a stand-in gate: the re-check after the gate looks at station/ ONLY
+cat > "$SB/bin-cargo" <<'CARGO'
+#!/bin/sh
+echo "cargo $*" >> "$STAND_LOG"
+case "$*" in *"-p observatory-app"*) mkdir -p "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/release" && echo exe > "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/release/observatory.exe" ;; esac
+exit 0
+CARGO
+mkdir -p "$SB/standins"; cp "$SB/bin-cargo" "$SB/standins/cargo"; chmod +x "$SB/standins/cargo"
+export STAND_LOG="$SB/cargo.log"
+real() {  # <gate command>: a real deploy run (stand-in cargo, test-hook gate), from a clean main checkout
+  reset_main; : > "$STAND_LOG"
+  OUT="$(cd "$SB/main/station" && PATH="$SB/standins:$PATH" DEPLOY_GATE_CMD="$1" bash scripts/deploy.sh --no-shortcut --install-root "$HOME/inst2" --bridge-dir "$HOME/bin2" 2>&1)"; RC=$?
+}
+real 'touch ../outside.txt; echo "GATE PASS (3 tests)"'
+[ "$RC" -eq 0 ] && ok || bad "9 a change OUTSIDE station/ during the gate refused the deploy (rc=$RC): $OUT"
+echo "$OUT" | grep -q 'DEPLOYED Orcastration Station 9.9.9' && ok || bad "9 no DEPLOYED line: $OUT"
+real 'touch new-file.txt; echo "GATE PASS (3 tests)"'
+[ "$RC" -ne 0 ] && ok || bad "9 a change INSIDE station/ during the gate did not refuse"
+echo "$OUT" | grep -q 'the Station folder became dirty during the gate' && ok || bad "9 the refusal does not name the Station folder: $OUT"
+real 'echo "GATE PASS (3 tests)"'
+grep -c -- 'cargo build --release --locked' "$STAND_LOG" | grep -qx 1 && ok || bad "9 the app build did not pass --locked: $(cat "$STAND_LOG")"
+[ "$(grep -c 'cargo build.*--locked' "$ROOT/station/scripts/deploy.sh")" -eq 2 ] && ok || bad "9 deploy.sh does not pass --locked on both cargo build lines"
+
+# 11. the workflow pins what must not float: the Rust version, and the cargo-audit install that survives a cache hit
+W="$ROOT/.github/workflows/test.yml"
+grep -qE '^ +RUST_VERSION: "1\.[0-9]+\.[0-9]+"' "$W" && ok || bad "11 test.yml has no pinned RUST_VERSION"
+grep -qE 'rustup (toolchain install|default) +stable' "$W" && bad "11 test.yml installs the floating 'stable'" || ok
+grep -q 'cargo install cargo-audit --version 0.23.0 --locked --force' "$W" && ok || bad "11 test.yml's cargo-audit install is not pinned and forced"
+grep -q "cargo audit --version.*grep -qF '0.23.0' ||" "$W" && ok || bad "11 the cargo-audit install is not skipped on a version match"
+
 echo "station-scripts: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

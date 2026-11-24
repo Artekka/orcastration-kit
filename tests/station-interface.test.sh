@@ -67,5 +67,15 @@ grep -q 'station-interface.sh' "$K" && ok || bad "9 kit-init does not run statio
 grep -qF '${CLAUDE_PLUGIN_ROOT}/scripts/station-interface.sh' "$K" && ok || bad "9 kit-init does not run it from the plugin root"
 grep -q 'A `cli` answer writes nothing' "$K" && ok || bad "9 kit-init does not say a CLI answer writes nothing"
 
+# 10. an empty or odd value: the message says what the line held, never "was station", and the value becomes cli
+printf 'team:\n  terminal:  auto\n  interface:\n' > "$SB/e.md"
+run cli --overlay "$SB/e.md"
+grep -qE '^[[:space:]]+interface:[[:space:]]*cli$' "$SB/e.md" && ok || bad "10 an empty interface: line was not set to cli: $(cat "$SB/e.md")"
+echo "$OUT" | grep -q 'was station' && bad "10 an empty value was reported as station: $OUT" || ok
+echo "$OUT" | grep -q 'said nothing' && ok || bad "10 the message does not say the line was empty: $OUT"
+printf 'team:\n  terminal:  auto\n  interface: Station\n' > "$SB/e.md"
+run cli --overlay "$SB/e.md"
+echo "$OUT" | grep -q 'said Station' && ok || bad "10 an odd value is not named: $OUT"
+
 echo "station-interface: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -22,7 +22,7 @@ has_line() { grep -qE '^[[:space:]]+interface:' "$OVERLAY"; }
 set_line() {  # replace the value of the existing line, or add the line under `terminal:` in the team block
   local tmp; tmp="$(mktemp)"
   if has_line; then
-    sed -E "s/^([[:space:]]+interface:[[:space:]]*)[A-Za-z]+/\1$1/" "$OVERLAY" > "$tmp"
+    sed -E "s/^([[:space:]]+interface:[[:space:]]*)[A-Za-z]*/\1$1/" "$OVERLAY" > "$tmp"
   else
     awk -v v="$1" '{print} /^[[:space:]]+terminal:/ && !done {match($0,/^[[:space:]]+/); printf "%sinterface:        %s\n", substr($0,1,RLENGTH), v; done=1}' "$OVERLAY" > "$tmp"
   fi
@@ -30,7 +30,10 @@ set_line() {  # replace the value of the existing line, or add the line under `t
 }
 
 if [ "$CHOICE" = cli ]; then
-  if has_line && ! grep -qE '^[[:space:]]+interface:[[:space:]]*cli([[:space:]]|#|$)' "$OVERLAY"; then set_line cli; echo "interface: cli (was station)"
+  cur="$(sed -nE 's/^[[:space:]]+interface:[[:space:]]*([A-Za-z]*).*/\1/p' "$OVERLAY" | head -n1)"
+  if has_line && [ "$cur" != cli ]; then
+    set_line cli
+    echo "interface: cli (the line said ${cur:-nothing}; set to cli)"
   else echo "interface: cli (the default; nothing changed)"; fi
   exit 0
 fi

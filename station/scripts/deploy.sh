@@ -170,7 +170,7 @@ fi
 
 # ---------------------------------------------------------------- 3. release builds
 step "3. release builds"
-run cargo build --release --target x86_64-pc-windows-gnu -p observatory-app
+run cargo build --release --locked --target x86_64-pc-windows-gnu -p observatory-app
 [ "$DRY" = 1 ] || [ -f "$EXE_BUILT" ] || die "built exe not found at $EXE_BUILT"
 BRIDGE_BUILT=""
 if [ -d crates/bridge ]; then
@@ -184,7 +184,7 @@ for p in m["packages"]:
 ' | sed -n '1p;2p' | paste -sd' ')"
   read -r BRIDGE_PKG BRIDGE_BIN <<<"$BRIDGE_BIN"
   [ -n "${BRIDGE_BIN:-}" ] || die "crates/bridge exists but cargo reports no binary target in it"
-  run cargo build --release -p "$BRIDGE_PKG" --bin "$BRIDGE_BIN"
+  run cargo build --release --locked -p "$BRIDGE_PKG" --bin "$BRIDGE_BIN"
   BRIDGE_BUILT="$CARGO_TARGET_DIR/release/$BRIDGE_BIN"
   [ "$DRY" = 1 ] || [ -f "$BRIDGE_BUILT" ] || die "built bridge not found at $BRIDGE_BUILT"
 else
