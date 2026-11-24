@@ -125,6 +125,22 @@ A2="$SB/home/.claude-acct$((1+1))"; A3="$SB/home/.claude-acct$((1+2))"
 eq "R7 account per launch: inherited, inherited, account 2, default" "$A3,$A3,$A2,unset" "$(cfgs)"
 absent "R7 the terminal was never called" "$SB/TERM-WAS-CALLED"
 
+# R7b. A single-account user sees no change: the old claude has no CLAUDE_CONFIG_DIR and no --account is given, so the hand-off
+#      carries an EMPTY account_dir (default account), the fresh launches run with the variable unset, and no account name or
+#      directory appears anywhere in what was written or launched. The kit never assumes a second account.
+sandbox; n=$(nameFor R7b)
+start_wrapper "$n" STUB_MODE=term-trap
+recycle "${FORBID[@]}" -- "$n" go --model haiku
+eq "R7b exit 0" 0 "$RC"; has "R7b in-place" "mode: in-place" "$OUT"
+recycle "${FORBID[@]}" -- "$n" go --model haiku
+eq "R7b second recycle exit 0" 0 "$RC"
+eq "R7b every launch ran with CLAUDE_CONFIG_DIR unset" "unset,unset,unset" "$(cfgs)"
+hasnt "R7b the output names no account directory" ".claude-acct" "$OUT$ERR"
+hasnt "R7b no launched argv names an account" ".claude-acct" "$(for f in "$SB"/stub/argv.*; do tr '\0' ' ' < "$f"; done)"
+hasnt "R7b a single-account user sees no account text at all" "account" "$OUT"
+hasnt "R7b and no default-directory text" ".claude" "$OUT"
+absent "R7b the terminal was never called" "$SB/TERM-WAS-CALLED"
+
 # R8. Seat self-recycle: a target claude that is an ANCESTOR of the running recycle is still in-place, but
 #     DETACHES first (v0.7.0 took a new tab here). Same process shape run from outside is in-place with
 #     detach: no (the control), so the ancestry walk is the only difference. R8d adds a shell layer: the

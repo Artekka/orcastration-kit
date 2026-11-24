@@ -105,7 +105,7 @@ TERM
 sbenv() {  # prints NAME=VALUE words for `env`; extra pairs may follow as arguments
   printf '%s\n' "PATH=$SB/bin:$PATH" "HOME=$SB/home" "SIBLING_STATE_DIR=$SB/state" "STUB_DIR=$SB/stub" \
     "SIBLING_MIN_RUN_SECS=0" "FAKE_TERM_DIR=$SB" "DISPLAY=:0" "RECYCLE_POLL_SECS=0.2" "RECYCLE_INPLACE_TIMEOUT=20" \
-    "FAKE_TERM_MODE=run" \
+    "FAKE_TERM_MODE=run" "MODEL_PREFLIGHT=0" "KIT_RUNTIME_DIR=$SB/runtime" \
     "WSL_DISTRO_NAME=" "WSL_INTEROP=" "TMUX=" "WT_EXE=$SB/no-such-wt.exe" "$@"
 }
 # ISOLATION (the m7 incident, 2026-10-03): lib-launch auto-detects the terminal. On a WSL box that is the
@@ -189,6 +189,23 @@ recycle() {  # <env pairs...> -- <recycle args...>
 }
 
 nameFor() { echo "Zz$1$$"; }
+
+# mk_pfbin: a stand-in CLI for the model preflight, ahead of the stub claude on PATH. `--version` answers; a `--name` launch passes
+# through to the stub; any other call is a preflight: it logs "<CLAUDE_CONFIG_DIR or default>|<args>" to $SB/pf.calls and answers
+# per PF_MODE (unknown = the unknown-model answer, ok = a real one). Use with PFENV: PATH, MODEL_PREFLIGHT=1 and the log paths.
+mk_pfbin() {
+  mkdir -p "$SB/pfbin"
+  cat > "$SB/pfbin/claude" <<'PF'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then echo "9.9.9 (Stand-in)"; exit 0; fi
+if [ "${1:-}" = --name ]; then exec "$SB_REAL_CLAUDE" "$@"; fi
+echo "${CLAUDE_CONFIG_DIR:-default}|$*" >> "$SB_PF_CALLS"
+if [ "${PF_MODE:-unknown}" = unknown ]; then echo '{"result":"There is an issue with the selected model (x).","modelUsage":{}}'
+else echo '{"result":"ok","modelUsage":{"x":{"inputTokens":1}}}'; fi
+PF
+  chmod +x "$SB/pfbin/claude"
+  PFENV=("PATH=$SB/pfbin:$SB/bin:$PATH" "MODEL_PREFLIGHT=1" "SB_PF_CALLS=$SB/pf.calls" "SB_REAL_CLAUDE=$SB/bin/claude")
+}
 
 cleanup() {
   local sb f p c

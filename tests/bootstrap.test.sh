@@ -66,8 +66,11 @@ grep -q 'sibling-shell.sh' "$ROOT/scripts/tmux-session.sh" && ok || bad "tmux-se
 grep -q 'sibling-shell.sh' "$ROOT/scripts/recycle-sibling.sh" && ok || bad "recycle-sibling.sh no longer uses sibling-shell.sh (update this pin)"
 [ -x "$P/scripts/sibling-shell.sh" ] && ok || bad "sibling-shell.sh not executable"
 bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/sibling-shell.sh' && ok || bad "dry-run did not list sibling-shell.sh"
-grep -q 'pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh bottleneck-watch.sh lib-prompt-dialog.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py; do SRC' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install sibling-shell.sh"
+grep -q 'pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh bottleneck-watch.sh lib-prompt-dialog.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py lib-model-tag.sh; do SRC' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not install sibling-shell.sh"
 grep -q 'chmod +x .*scripts/sibling-shell.sh' "$ROOT/skills/kit-init/SKILL.md" && ok || bad "kit-init does not chmod sibling-shell.sh"
+# lib-model-tag.sh is sourced from its own directory by lib-launch.sh and sibling-shell.sh: it must install with them
+[ -f "$P/scripts/lib-model-tag.sh" ] && ok || bad "lib-model-tag.sh was not installed"
+bash "$BS" "$TMP/dry3" --dry-run 2>&1 | grep -q '^\[bootstrap\] CREATE scripts/lib-model-tag.sh' && ok || bad "dry-run did not list lib-model-tag.sh"
 # bottleneck-watch.sh sources lib-prompt-dialog.sh from its own directory; sync-main-checkout.sh runs main-checkout-sync.sh from its;
 # ctx-fill.py imports launched_window.py from its: each group travels together and the scripts are executable
 for f in bottleneck-watch.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py; do

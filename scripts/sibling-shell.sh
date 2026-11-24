@@ -43,12 +43,14 @@
 # stdin/stdout, which is why it is a foreground child (a `&` job would lose the terminal's stdin).
 # Written for bash 3.2+ (macOS /bin/bash).
 set -uo pipefail
+# The shared model guard (lib-model-tag.sh, beside this script). Missing = refuse: an unchecked model is the incident.
+# shellcheck source=lib-model-tag.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib-model-tag.sh" || { echo "sibling-shell: lib-model-tag.sh is missing beside this script; refusing to launch an unchecked model" >&2; exit 64; }
 
 main() {
   local name="" model="" effort="" mode="normal" prompt="/orchestration-kit:orient" have_prompt=0
   local state_dir="${SIBLING_STATE_DIR:-$HOME/.orchestration-kit/sessions}"
   local min_run="${SIBLING_MIN_RUN_SECS:-5}"
-  local model_re='^[a-z][a-z0-9.-]*(\[1m\])?$'
 
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -65,7 +67,7 @@ main() {
     esac
   done
   [ -n "$name" ] || { echo "usage: sibling-shell.sh <Name> [--mode M] --model M [--effort E] [prompt]" >&2; return 64; }
-  [[ "$model" =~ $model_re ]] || { echo "sibling-shell: --model must look like opus[1m], sonnet[1m], haiku or a full model id; got '$model'" >&2; return 64; }
+  model_tag_check "$model" "${CLAUDE_CONFIG_DIR:-}" || { echo "sibling-shell: $MODEL_TAG_ERR" >&2; return 64; }
   case "$effort" in ''|low|medium|high|xhigh|max) ;; *) echo "sibling-shell: --effort must be one of low|medium|high|xhigh|max; got '$effort'" >&2; return 64 ;; esac
   case "$mode" in normal|accept-edits|auto) ;; *) echo "sibling-shell: --mode must be one of normal|accept-edits|auto; got '$mode'" >&2; return 64 ;; esac
 
@@ -117,7 +119,9 @@ main() {
       esac
     done < "$claimed"
     rm -f -- "$claimed"
-    [[ "$m" =~ $model_re ]] || bad="${bad:-model must be explicit and well-formed; got '$m'}"
+    # Shape and family names first (offline), then the CLI check for a full id against the account this launch will use.
+    if [ -z "$m" ]; then bad="${bad:-model must be explicit; the hand-off has none}"
+    elif ! model_tag_check "$m" "$([ "$have_a" = 1 ] && printf '%s' "$a" || printf '%s' "${CLAUDE_CONFIG_DIR:-}")"; then bad="${bad:-model refused: $MODEL_TAG_ERR}"; fi
     case "$e" in ''|low|medium|high|xhigh|max) ;; *) bad="${bad:-bad effort '$e'}" ;; esac
     case "$md" in ''|normal|accept-edits|auto) ;; *) bad="${bad:-bad mode '$md'}" ;; esac
     if [ -n "$bad" ]; then

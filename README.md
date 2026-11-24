@@ -149,6 +149,8 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 v0.16.0: the Orcastration Station (`station/`, adapted from Omar's Observatory): an optional Windows window plus a WSL bridge that watches every agent of several teams and can type to one in tmux. Built from source for now (prebuilt binaries arrive in 0.17.0); `kit-init` asks which interface you want, CLI or the Station, and CLI stays as it was; CI builds and tests it on every push.
 
+v0.15.0: recycling checks the model before it touches anything: one shared guard (`lib-model-tag.sh`) refuses a model name the CLI would only reject at the first prompt, and a recycle signals only a process that is still the session it named.
+
 v0.14.0: three seat-poll tools: `bottleneck-watch.sh` (flags a merge, gate or idle main past its time budget, and a session stuck on a permission prompt), `main-checkout-sync.sh` (fast-forwards the shared checkout; a dirty file the incoming commits do not touch never stops it, one they touch does and the skip line names it) and a context window read from the session's own launch (`ctx-fill.py` needs no `--window` for your own session).
 
 v0.13.0: five safety hooks, off until you turn them on (`safety_guards: on`): they refuse a discard of uncommitted edits, `pkill -f`, `prettier --write` on a directory, a commit that carries a conflict marker, and a message that cites a sha git cannot resolve.

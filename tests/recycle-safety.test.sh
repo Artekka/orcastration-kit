@@ -145,4 +145,122 @@ s7live; rm -f "$S7"/lstart.*
 eq "S7 a ps without lstart falls back to a pid-only match (never drops the shell)" "200 01:23 bash gate.sh --all" "$(s7)"
 rm -rf "$S7"
 
+# S8. --force-children is the same override under its documented name: the dry run says so, a real run is not refused.
+sandbox; n=$(nameFor S8)
+fake_claude "$n" shell
+recycle "${FORBID[@]}" -- --dry-run --force-children "$n"
+has "S8 dry run notes --force-children" "--force: a real run recycles anyway" "$OUT"
+recycle "${FORBID[@]}" -- --force-children "$n"
+ne "S8 --force-children does not refuse" 3 "$RC"
+hasnt "S8 no refusal text" "still has live shells" "$ERR"
+stop_fake "$n"
+
+# S9. launch_term_old signals the NAMED pids only, and only while each still is that session: a pid that is gone, or
+#     was reused by another program, is skipped with a line. A fake `ps` and `kill` pin it without a real signal.
+S9="$(mktemp -d)"
+cat > "$S9/drv.sh" <<'DRV'
+. "$LIB"
+ps() { cat "$S9/args.$4" 2>/dev/null; }          # ps -o args= -p <pid>
+kill() { echo "$*" >> "$S9/killed"; }
+launch_term_old Orca 111 222 333 444
+DRV
+echo "claude --name Orca x" > "$S9/args.111"                 # still the session
+echo "sleep 300" > "$S9/args.222"                            # the pid was reused by something else
+: > "$S9/args.333"                                           # gone: ps prints nothing
+echo "claude --name Orcastra x" > "$S9/args.444"             # another session whose name starts the same
+out9="$(LIB="$ROOT/scripts/lib-launch.sh" S9="$S9" bash "$S9/drv.sh" 2>&1)"
+eq "S9 only the pid that is still the session is signalled" "-TERM 111" "$(cat "$S9/killed" 2>/dev/null)"
+has "S9 the reused pid is named as skipped" "not signalling pid 222" "$out9"
+has "S9 the gone pid is named as skipped" "not signalling pid 333" "$out9"
+has "S9 a longer name is another session" "not signalling pid 444" "$out9"
+rm -rf "$S9"
+
+# S10. No pattern kill anywhere in the launch scripts: the hand-run instructions and the code signal a pid, never `pkill`.
+if grep -nE '(^|[^a-z_])pkill[[:space:]]' "$ROOT/scripts/recycle-sibling.sh" "$ROOT/scripts/lib-launch.sh" "$ROOT/scripts/sibling-shell.sh" "$ROOT/scripts/start-team.sh" | grep -v '^[^:]*:[0-9]*:[[:space:]]*#'; then
+  bad "S10 a launch script uses or recommends pkill"; else ok; fi
+sandbox; n=$(nameFor S10)
+recycle "${FORBID[@]}" -- --terminal manual "$n"
+rematch "S10 the manual help names the safe form" 'kill -TERM <pid>' "$OUT$ERR"
+renomatch "S10 the manual help does not suggest pkill" 'pkill' "$OUT$ERR"
+
+# S11. A model the CLI refuses leaves the old session ALONE: exit 64 before anything is touched. The stand-in CLI
+#      answers the unknown-model way (a real preflight, MODEL_PREFLIGHT back on for this case).
+sandbox; n=$(nameFor S11)
+mkdir -p "$SB/pfbin"
+cat > "$SB/pfbin/claude" <<'PF'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then echo "9.9.9 (Stand-in)"; exit 0; fi
+echo "$*" >> "$SB_PF_CALLS"
+if [ "${PF_MODE:-unknown}" = unknown ]; then echo '{"result":"There is an issue with the selected model (x).","modelUsage":{}}'
+else echo '{"result":"ok","modelUsage":{"x":{"inputTokens":1}}}'; fi
+PF
+chmod +x "$SB/pfbin/claude"
+fake_claude "$n" plain
+PFENV=("PATH=$SB/pfbin:$SB/bin:$PATH" "MODEL_PREFLIGHT=1" "SB_PF_CALLS=$SB/pf.calls")
+recycle "${FORBID[@]}" "${PFENV[@]}" -- "$n" go --model claude-opus-9-9
+eq "S11 an unknown full id exits 64" 64 "$RC"
+has "S11 says the CLI does not know it" "does not know the model 'claude-opus-9-9'" "$ERR"
+alive "$FC" && ok || bad "S11 the old claude was touched"
+eq "S11 nothing launched" 0 "$(nlaunch)"
+absent "S11 the terminal was never called" "$SB/TERM-WAS-CALLED"
+# the same id once the CLI knows it: the preflight passes and the recycle goes on (the forbidden terminal then stops it)
+recycle "${FORBID[@]}" "${PFENV[@]}" PF_MODE=ok -- "$n" go --model claude-opus-9-9
+hasnt "S11 a known id is not refused by the guard" "does not know the model" "$ERR"
+# a dry run never calls the CLI
+rm -f "$SB/pf.calls"; recycle "${FORBID[@]}" "${PFENV[@]}" -- --dry-run "$n" go --model claude-opus-9-9
+[ ! -e "$SB/pf.calls" ] && ok || bad "S11 a dry run called the CLI"
+stop_fake "$n"
+
+# S12. Offline shape refusal reaches the launcher: a family name plus a version without claude- is refused before
+#      anything else, on both recycle-sibling.sh and start-team.sh (MODEL_PREFLIGHT=0 is the harness default).
+sandbox; n=$(nameFor S12)
+recycle "${FORBID[@]}" -- --dry-run "$n" go --model 'fable-5-2[1m]'
+eq "S12 recycle refuses fable-5-2[1m]" 64 "$RC"; has "S12 names the claude- prefix" "needs the claude- prefix" "$ERR"
+run_in_sb -- bash "$ROOT/scripts/start-team.sh" --dry-run --repo "$SB/repo" --terminal linux-xterm --model opus-5-5
+eq "S12 start-team refuses opus-5-5" 64 "$RC"; has "S12 start-team names the claude- prefix" "needs the claude- prefix" "$ERR"
+
+# S13. No path signals the old session before the preflight verdict, in place too: a wrapper-run old claude, a model the CLI refuses
+#      -> exit 64, the old claude never got a SIGTERM (term-trap records one), no hand-off was written, nothing launched again.
+sandbox; n=$(nameFor S13); mk_pfbin
+start_wrapper "$n" STUB_MODE=term-trap
+OLD13="$(launch_pid 1)"
+recycle "${FORBID[@]}" "${PFENV[@]}" -- "$n" go --model claude-opus-9-9
+eq "S13 an unknown model exits 64" 64 "$RC"
+sleep 1
+alive "$OLD13" && ok || bad "S13 the old claude died"
+absent "S13 the old claude never received a SIGTERM" "$SB/stub/sigterm.$OLD13"
+absent "S13 no hand-off was written" "$SB/state/$n.next"
+eq "S13 nothing was launched again" 1 "$(nlaunch)"
+
+# S14. The preflight in start-team.sh is real (mutant: the line deleted): an unknown full id exits 64 before any window opens.
+sandbox; mk_pfbin
+run_in_sb "${PFENV[@]}" FAKE_TERM_MODE=forbid -- bash "$ROOT/scripts/start-team.sh" --repo "$SB/repo" --terminal linux-xterm --siblings 0 --model claude-opus-9-9
+eq "S14 start-team refuses an unknown full id" 64 "$RC"; has "S14 says the CLI does not know it" "does not know the model" "$ERR"
+absent "S14 no window was opened" "$SB/TERM-WAS-CALLED"
+[ -s "$SB/pf.calls" ] && ok || bad "S14 the CLI was never asked"
+
+# S15/S16. The two kill sites really use launch_term_old: a `ps` stand-in says the old pid is no longer the session (its argv reads as
+#      another program), so the recycle must NOT signal it. A plain kill -TERM at either site (mutants) would end the old claude.
+mk_ps_reuse() {  # <pid file>: ps -o args= -p <that pid> prints "sleep 300"; everything else is the real ps
+  local real; real="$(command -v ps)"; mkdir -p "$SB/psbin"
+  printf '%s\n' '#!/usr/bin/env bash' "if [ \"\${1:-}\" = -o ] && [ \"\${2:-}\" = args= ] && [ \"\${3:-}\" = -p ] && [ \"\${4:-}\" = \"\$(cat '$1' 2>/dev/null)\" ]; then echo 'sleep 300'; exit 0; fi" "exec $real \"\$@\"" > "$SB/psbin/ps"
+  chmod +x "$SB/psbin/ps"
+}
+# S15 (lib-launch.sh in-place site): the old claude runs under the wrapper
+sandbox; n=$(nameFor S15)
+start_wrapper "$n" STUB_MODE=term-trap
+OLD15="$(launch_pid 1)"; printf '%s' "$OLD15" > "$SB/ps-reuse"; mk_ps_reuse "$SB/ps-reuse"
+recycle "${FORBID[@]}" "PATH=$SB/psbin:$SB/bin:$PATH" RECYCLE_INPLACE_TIMEOUT=2 RECYCLE_CLAIMED_GRACE=1 -- "$n" go --model haiku
+has "S15 in-place: the re-check refused the pid" "not signalling pid $OLD15" "$ERR"
+sleep 1; alive "$OLD15" && ok || bad "S15 the old claude was signalled although it no longer looked like the session"
+absent "S15 no SIGTERM reached it" "$SB/stub/sigterm.$OLD15"
+# S16 (recycle-sibling.sh new-tab site): an old claude that is not under any wrapper
+sandbox; n=$(nameFor S16)
+fake_claude "$n" plain
+printf '%s' "$FC" > "$SB/ps-reuse"; mk_ps_reuse "$SB/ps-reuse"
+recycle "PATH=$SB/psbin:$SB/bin:$PATH" STUB_MODE=term-trap -- "$n" go --model haiku
+has "S16 new-tab: the re-check refused the pid" "not signalling pid $FC" "$ERR"
+alive "$FC" && ok || bad "S16 the old claude was signalled although it no longer looked like the session"
+kill -KILL "$CHILD" "$FC" 2>/dev/null   # the fresh session (a stub) is reaped by the harness cleanup
+
 finish

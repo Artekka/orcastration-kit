@@ -72,6 +72,7 @@ if ! [[ "$n" =~ ^[0-9]$ ]]; then echo "--siblings must be 0..9: '$n'" >&2; exit 
 launch_set_mode "${f_mode:-${TEAM_MODE:-normal}}"
 launch_set_account "$f_account"
 launch_resolve_model "$f_model" "$f_model_set" "$f_effort" "$f_effort_set"
+[ "$DRY" -eq 1 ] || launch_preflight_model   # an unknown full id is refused here, before any window opens
 
 names=("$seat"); prompts=("$SEAT_PROMPT")
 for i in $(seq 1 "$n"); do names+=("${prefix}${i}"); prompts+=("$SIB_PROMPT"); done
