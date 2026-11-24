@@ -393,6 +393,43 @@ impl Renderer<'_> {
     }
 }
 
+/// Why a chat link is not opened. Chat text is what agents write, and an agent can echo
+/// injected web content, so a click opens only an ordinary web page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkRefusal {
+    /// `file:` on this machine.
+    FileUrl,
+    /// A Windows network path (`\\host\share`, `//host`, `file://host/…`): opening one can send
+    /// your Windows sign-in to that host.
+    NetworkPath,
+    /// A drive path (`C:\…`), a relative path or a bare name: the browser would open a local file.
+    LocalPath,
+    /// `http:`/`https:` with no host, or with spaces or control characters in it.
+    Malformed,
+    /// Any scheme but http and https (`javascript:`, `data:`, `smb:`, `ms-settings:`, `mailto:` …).
+    OtherScheme,
+}
+
+impl LinkRefusal {
+    /// The text shown on the link when it is not opened.
+    pub fn reason(self) -> &'static str {
+        match self {
+            LinkRefusal::FileUrl => "Not opened: it is a file on this computer.",
+            LinkRefusal::NetworkPath => "Not opened: it is a network path.",
+            LinkRefusal::LocalPath => "Not opened: it is a local path, not a web address.",
+            LinkRefusal::Malformed => "Not opened: the web address is malformed.",
+            LinkRefusal::OtherScheme => "Not opened: only http and https links open.",
+        }
+    }
+}
+
+/// The address to open for a chat link, or why it is not opened. Only `http://` and
+/// `https://` with a host open.
+pub fn link_target(url: &str) -> Result<&str, LinkRefusal> {
+    // ORCA340-674 RED stub: allows everything (the fix commit replaces it).
+    Ok(url)
+}
+
 /// One wrapped run of text; links inside it open on click.
 fn paragraph(ui: &mut Ui, mut block: Block, width: f32) {
     block.job.wrap.max_width = width;
@@ -430,5 +467,104 @@ mod tests {
         b.push("é·", TextFormat::default(), None);
         b.push("link", TextFormat::default(), Some("u"));
         assert_eq!(b.links, vec![(2..6, "u".to_owned())]);
+    }
+
+    #[test]
+    fn web_links_open() {
+        for u in [
+            "https://example.com/build-log",
+            "http://example.com",
+            "HTTPS://Example.com/a?b=c#d",
+            "  https://example.com/x  ",
+            "https://user@example.com:8443/p",
+        ] {
+            assert_eq!(link_target(u), Ok(u.trim()), "{u}");
+        }
+    }
+
+    #[test]
+    fn file_urls_are_refused() {
+        for u in ["file:///etc/passwd", "FILE:///C:/Windows/win.ini", "file:/etc/hosts"] {
+            assert_eq!(link_target(u), Err(LinkRefusal::FileUrl), "{u}");
+        }
+        assert_eq!(
+            link_target("file://localhost/etc/passwd"),
+            Err(LinkRefusal::FileUrl)
+        );
+    }
+
+    #[test]
+    fn network_paths_are_refused() {
+        for u in [
+            r"\\host\share\x",
+            "//host/share/x",
+            "file://///host/share/x",
+            "file:////host/share/x",
+            "file://host/share/x",
+            r" \\10.0.0.1\c$",
+        ] {
+            assert_eq!(link_target(u), Err(LinkRefusal::NetworkPath), "{u}");
+        }
+    }
+
+    #[test]
+    fn local_paths_are_refused() {
+        for u in [
+            r"C:\Windows\System32\calc.exe",
+            "c:/Users/x/a.html",
+            "/etc/passwd",
+            "./notes.html",
+            "../up.html",
+            "report.html",
+            "www.example.com",
+            "#section",
+            "",
+        ] {
+            assert_eq!(link_target(u), Err(LinkRefusal::LocalPath), "{u:?}");
+        }
+    }
+
+    #[test]
+    fn other_schemes_are_refused() {
+        for u in [
+            "javascript:alert(1)",
+            "data:text/html,<b>x</b>",
+            "smb://host/share",
+            "ms-settings:privacy",
+            "mailto:a@example.com",
+            "ftp://example.com/x",
+            "vscode://file/etc/passwd",
+            "search-ms:query=x",
+        ] {
+            assert_eq!(link_target(u), Err(LinkRefusal::OtherScheme), "{u}");
+        }
+    }
+
+    #[test]
+    fn malformed_web_links_are_refused() {
+        for u in [
+            "https:///etc/passwd",
+            "https:",
+            r"https:\\host\x",
+            "http:example.com",
+            "https://exa mple.com/",
+            "https://example.com/\u{7}",
+            "https://?x",
+        ] {
+            assert_eq!(link_target(u), Err(LinkRefusal::Malformed), "{u:?}");
+        }
+    }
+
+    #[test]
+    fn every_refusal_has_a_reason() {
+        for r in [
+            LinkRefusal::FileUrl,
+            LinkRefusal::NetworkPath,
+            LinkRefusal::LocalPath,
+            LinkRefusal::Malformed,
+            LinkRefusal::OtherScheme,
+        ] {
+            assert!(r.reason().starts_with("Not opened: "), "{r:?}");
+        }
     }
 }
