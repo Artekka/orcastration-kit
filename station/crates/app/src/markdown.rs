@@ -560,7 +560,11 @@ mod tests {
 
     #[test]
     fn file_urls_are_refused() {
-        for u in ["file:///etc/passwd", "FILE:///C:/Windows/win.ini", "file:/etc/hosts"] {
+        for u in [
+            "file:///etc/passwd",
+            "FILE:///C:/Windows/win.ini",
+            "file:/etc/hosts",
+        ] {
             assert_eq!(link_target(u), Err(LinkRefusal::FileUrl), "{u}");
         }
         assert_eq!(

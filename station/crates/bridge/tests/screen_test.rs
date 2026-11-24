@@ -65,7 +65,10 @@ fn the_idle_input_box_allows_a_send() {
     assert!(input_box_ready(&idle_named()), "named top rule");
     assert!(input_box_ready(&idle_plain()), "plain top rule, blank rows");
     assert!(input_box_ready(&busy()), "busy");
-    assert!(input_box_ready(&queued_with_shell()), "queued text, a shell");
+    assert!(
+        input_box_ready(&queued_with_shell()),
+        "queued text, a shell"
+    );
 }
 
 #[test]

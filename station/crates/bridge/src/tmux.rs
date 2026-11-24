@@ -240,7 +240,10 @@ impl Tmux {
                 Ok(None) => {
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err(format!("tmux did not answer within {} ms", limit.as_millis()));
+                    return Err(format!(
+                        "tmux did not answer within {} ms",
+                        limit.as_millis()
+                    ));
                 }
                 Err(e) => {
                     let _ = child.kill();
