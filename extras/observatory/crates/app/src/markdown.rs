@@ -1,0 +1,434 @@
+//! A small CommonMark renderer for agent replies: headings, paragraphs, bold/italic/strike,
+//! inline code, links (clickable), lists (nested, ordered), block quotes, rules, tables and
+//! fenced code blocks with syntax highlighting. Our own (rather than egui_commonmark) so every
+//! run of text gets the generous line height and the fixed text column.
+
+use std::ops::Range;
+
+use egui::text::{LayoutJob, TextFormat};
+use egui::{Align, CursorIcon, FontFamily, FontId, Id, Label, Sense, Stroke, Ui};
+use egui_extras::syntax_highlighting::{CodeTheme, highlight};
+use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+
+use crate::style::{BODY_SIZE, LINE_HEIGHT, MONO_SIZE, Palette, bold_family};
+
+const INDENT: f32 = 20.0;
+
+#[derive(Default)]
+struct Block {
+    job: LayoutJob,
+    chars: usize,
+    links: Vec<(Range<usize>, String)>,
+}
+
+impl Block {
+    fn push(&mut self, text: &str, fmt: TextFormat, link: Option<&str>) {
+        let n = text.chars().count();
+        if let Some(url) = link {
+            self.links
+                .push((self.chars..self.chars + n, url.to_owned()));
+        }
+        self.job.append(text, 0.0, fmt);
+        self.chars += n;
+    }
+    fn is_blank(&self) -> bool {
+        self.job.text.trim().is_empty()
+    }
+}
+
+struct Renderer<'u> {
+    ui: &'u mut Ui,
+    pal: Palette,
+    width: f32,
+    id: Id,
+    n_blocks: usize,
+    cur: Block,
+    bold: u32,
+    italic: u32,
+    strike: u32,
+    link: Option<String>,
+    heading: Option<HeadingLevel>,
+    quote: u32,
+    lists: Vec<Option<u64>>,
+    marker: Option<String>,
+    code: Option<(String, String)>,
+    table: Option<Vec<(bool, Vec<Block>)>>,
+    in_head: bool,
+}
+
+/// Render `markdown` into `ui`, wrapping at `width`. `id_salt` must be unique per message.
+pub fn render(
+    ui: &mut Ui,
+    markdown: &str,
+    id_salt: impl std::hash::Hash + std::fmt::Debug,
+    pal: Palette,
+    width: f32,
+) {
+    let id = ui.scope_id().with(id_salt);
+    let mut r = Renderer {
+        ui,
+        pal,
+        width,
+        id,
+        n_blocks: 0,
+        cur: Block::default(),
+        bold: 0,
+        italic: 0,
+        strike: 0,
+        link: None,
+        heading: None,
+        quote: 0,
+        lists: vec![],
+        marker: None,
+        code: None,
+        table: None,
+        in_head: false,
+    };
+    let opts = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS;
+    for ev in Parser::new_ext(markdown, opts) {
+        r.event(ev);
+    }
+    r.flush();
+}
+
+fn heading_size(level: HeadingLevel) -> f32 {
+    match level {
+        HeadingLevel::H1 => 23.0,
+        HeadingLevel::H2 => 19.5,
+        HeadingLevel::H3 => 17.0,
+        _ => BODY_SIZE,
+    }
+}
+
+impl Renderer<'_> {
+    fn size(&self) -> f32 {
+        self.heading.map_or(BODY_SIZE, heading_size)
+    }
+
+    fn fmt(&self) -> TextFormat {
+        let size = self.size();
+        let family = if self.bold > 0 || self.heading.is_some() || self.in_head {
+            bold_family()
+        } else {
+            FontFamily::Proportional
+        };
+        let color = if self.link.is_some() {
+            self.pal.link
+        } else if self.quote > 0 {
+            self.pal.weak
+        } else {
+            self.pal.text
+        };
+        TextFormat {
+            font_id: FontId::new(size, family),
+            color,
+            italics: self.italic > 0,
+            strikethrough: if self.strike > 0 {
+                Stroke::new(1.0, color)
+            } else {
+                Stroke::NONE
+            },
+            underline: if self.link.is_some() {
+                Stroke::new(1.0, color)
+            } else {
+                Stroke::NONE
+            },
+            line_height: Some(size * LINE_HEIGHT),
+            valign: Align::Center,
+            ..Default::default()
+        }
+    }
+
+    fn text(&mut self, t: &str) {
+        if let Some((_, code)) = &mut self.code {
+            code.push_str(t);
+            return;
+        }
+        let fmt = self.fmt();
+        let link = self.link.clone();
+        self.cur.push(t, fmt, link.as_deref());
+    }
+
+    fn inline_code(&mut self, t: &str) {
+        let mut fmt = self.fmt();
+        fmt.font_id = FontId::monospace(MONO_SIZE.max(self.size() - 2.0));
+        fmt.background = self.pal.code_bg;
+        let link = self.link.clone();
+        self.cur.push(t, fmt, link.as_deref());
+    }
+
+    fn indent(&self) -> f32 {
+        self.lists.len().saturating_sub(1) as f32 * INDENT
+            + if self.lists.is_empty() { 0.0 } else { INDENT }
+            + self.quote as f32 * 14.0
+    }
+
+    fn next_id(&mut self) -> Id {
+        self.n_blocks += 1;
+        self.id.with(self.n_blocks)
+    }
+
+    /// Render the pending run of inline text as one wrapped paragraph.
+    fn flush(&mut self) {
+        let block = std::mem::take(&mut self.cur);
+        if block.is_blank() {
+            return;
+        }
+        let indent = self.indent();
+        let marker = self.marker.take();
+        let quote = self.quote > 0;
+        let (pal, width) = (self.pal, self.width);
+        let resp = self.ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            if indent > 0.0 {
+                let pad = if marker.is_some() {
+                    indent - INDENT
+                } else {
+                    indent
+                };
+                ui.add_space(pad);
+            }
+            if let Some(m) = &marker {
+                let mut job = LayoutJob::default();
+                job.append(
+                    m,
+                    0.0,
+                    TextFormat {
+                        font_id: FontId::proportional(BODY_SIZE),
+                        color: pal.weak,
+                        line_height: Some(BODY_SIZE * LINE_HEIGHT),
+                        ..Default::default()
+                    },
+                );
+                ui.add_sized([INDENT, BODY_SIZE * LINE_HEIGHT], Label::new(job));
+            }
+            paragraph(ui, block, (width - indent).max(80.0));
+        });
+        if quote {
+            let r = resp.response.rect;
+            let x = r.left() + indent - 8.0;
+            self.ui
+                .painter()
+                .vline(x, r.y_range(), Stroke::new(3.0, pal.card_stroke));
+        }
+    }
+
+    fn code_block(&mut self, lang: &str, code: &str) {
+        let indent = self.indent();
+        let (pal, width) = (self.pal, self.width);
+        self.ui.horizontal_top(|ui| {
+            ui.add_space(indent);
+            egui::Frame::new()
+                .fill(pal.code_bg)
+                .corner_radius(6.0)
+                .inner_margin(10.0)
+                .show(ui, |ui| {
+                    let inner = (width - indent - 20.0).max(80.0);
+                    ui.set_width(inner);
+                    ui.vertical(|ui| {
+                        if !lang.is_empty() {
+                            ui.label(egui::RichText::new(lang).small().color(pal.weak));
+                        }
+                        let theme = CodeTheme::from_style(ui.style());
+                        let mut job =
+                            highlight(ui.ctx(), ui.style(), &theme, code.trim_end(), lang);
+                        job.wrap.max_width = inner;
+                        ui.add(Label::new(job));
+                    });
+                });
+        });
+    }
+
+    fn render_table(&mut self, rows: Vec<(bool, Vec<Block>)>) {
+        let id = self.next_id();
+        let (pal, width) = (self.pal, self.width);
+        // A cell wraps only past 60% of the column, so short tables stay on one line per row.
+        let cell_w = (width * 0.6).max(60.0);
+        // A table wider than the column scrolls sideways inside its frame instead of running
+        // past the pane's right edge; a narrow one shrinks to fit and looks unchanged.
+        egui::Frame::new()
+            .stroke(Stroke::new(1.0, pal.card_stroke))
+            .corner_radius(6.0)
+            .inner_margin(8.0)
+            .show(self.ui, |ui| {
+                egui::ScrollArea::horizontal()
+                    .id_salt(("table-scroll", id))
+                    .max_width((width - 18.0).max(0.0))
+                    .auto_shrink([true, true])
+                    .show(ui, |ui| {
+                        egui::Grid::new(id)
+                            .striped(true)
+                            .spacing([16.0, 4.0])
+                            .show(ui, |ui| {
+                                for (_head, cells) in rows {
+                                    for cell in cells {
+                                        paragraph(ui, cell, cell_w);
+                                    }
+                                    ui.end_row();
+                                }
+                            });
+                    });
+            });
+    }
+
+    fn event(&mut self, ev: Event<'_>) {
+        match ev {
+            Event::Start(tag) => self.start(tag),
+            Event::End(tag) => self.end(tag),
+            Event::Text(t) => self.text(&t),
+            Event::Code(t) => self.inline_code(&t),
+            Event::Html(t) | Event::InlineHtml(t) => self.text(&t),
+            Event::SoftBreak => self.text(" "),
+            Event::HardBreak => self.text("\n"),
+            Event::Rule => {
+                self.flush();
+                self.ui.separator();
+            }
+            Event::TaskListMarker(done) => self.text(if done { "☑ " } else { "☐ " }),
+            _ => {}
+        }
+    }
+
+    fn start(&mut self, tag: Tag<'_>) {
+        match tag {
+            Tag::Paragraph => {}
+            Tag::Heading { level, .. } => {
+                self.flush();
+                self.ui.add_space(6.0);
+                self.heading = Some(level);
+            }
+            Tag::BlockQuote(_) => {
+                self.flush();
+                self.quote += 1;
+            }
+            Tag::CodeBlock(kind) => {
+                self.flush();
+                let lang = match kind {
+                    CodeBlockKind::Fenced(l) => {
+                        l.split_whitespace().next().unwrap_or("").to_owned()
+                    }
+                    CodeBlockKind::Indented => String::new(),
+                };
+                self.code = Some((lang, String::new()));
+            }
+            Tag::List(start) => {
+                self.flush();
+                self.lists.push(start);
+            }
+            Tag::Item => {
+                self.flush();
+                let m = match self.lists.last_mut() {
+                    Some(Some(n)) => {
+                        let m = format!("{n}.");
+                        *n += 1;
+                        m
+                    }
+                    _ => "•".to_owned(),
+                };
+                self.marker = Some(m);
+            }
+            Tag::Emphasis => self.italic += 1,
+            Tag::Strong => self.bold += 1,
+            Tag::Strikethrough => self.strike += 1,
+            Tag::Link { dest_url, .. } => self.link = Some(dest_url.into_string()),
+            Tag::Table(_) => {
+                self.flush();
+                self.table = Some(vec![]);
+            }
+            Tag::TableHead => {
+                self.in_head = true;
+                if let Some(t) = &mut self.table {
+                    t.push((true, vec![]));
+                }
+            }
+            Tag::TableRow => {
+                if let Some(t) = &mut self.table {
+                    t.push((false, vec![]));
+                }
+            }
+            Tag::TableCell => self.cur = Block::default(),
+            _ => {}
+        }
+    }
+
+    fn end(&mut self, tag: TagEnd) {
+        match tag {
+            TagEnd::Paragraph => self.flush(),
+            TagEnd::Heading(_) => {
+                self.flush();
+                self.heading = None;
+            }
+            TagEnd::BlockQuote(_) => {
+                self.flush();
+                self.quote = self.quote.saturating_sub(1);
+            }
+            TagEnd::CodeBlock => {
+                if let Some((lang, code)) = self.code.take() {
+                    self.code_block(&lang, &code);
+                }
+            }
+            TagEnd::List(_) => {
+                self.flush();
+                self.lists.pop();
+            }
+            TagEnd::Item => self.flush(),
+            TagEnd::Emphasis => self.italic = self.italic.saturating_sub(1),
+            TagEnd::Strong => self.bold = self.bold.saturating_sub(1),
+            TagEnd::Strikethrough => self.strike = self.strike.saturating_sub(1),
+            TagEnd::Link => self.link = None,
+            TagEnd::TableHead => self.in_head = false,
+            TagEnd::TableCell => {
+                let cell = std::mem::take(&mut self.cur);
+                if let Some(row) = self.table.as_mut().and_then(|t| t.last_mut()) {
+                    row.1.push(cell);
+                }
+            }
+            TagEnd::Table => {
+                if let Some(rows) = self.table.take() {
+                    self.render_table(rows);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// One wrapped run of text; links inside it open on click.
+fn paragraph(ui: &mut Ui, mut block: Block, width: f32) {
+    block.job.wrap.max_width = width;
+    let galley = ui.painter().layout_job(block.job);
+    let sense = if block.links.is_empty() {
+        Sense::hover()
+    } else {
+        Sense::click()
+    };
+    let resp = ui.add(
+        Label::new(galley.clone())
+            .sense(sense)
+            .selectable(block.links.is_empty()),
+    );
+    if block.links.is_empty() {
+        return;
+    }
+    let Some(pos) = resp.hover_pos() else { return };
+    let idx = galley.cursor_from_pos(pos - resp.rect.min).index.0;
+    if let Some((_, url)) = block.links.iter().find(|(r, _)| r.contains(&idx)) {
+        ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+        if resp.clicked() {
+            ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn link_ranges_count_chars_not_bytes() {
+        let mut b = Block::default();
+        b.push("é·", TextFormat::default(), None);
+        b.push("link", TextFormat::default(), Some("u"));
+        assert_eq!(b.links, vec![(2..6, "u".to_owned())]);
+    }
+}

@@ -1,0 +1,4 @@
+# kittest writes these next to a failing reference
+*.new.png
+*.diff.png
+*.old.png
