@@ -301,6 +301,8 @@ fn setup() -> (Bridge<Vec<u8>>, Fake, Procs, Edges) {
     ));
     let fake = Fake::default();
     fake.0.borrow_mut().panes = panes;
+    // The agent's pane shows Claude Code's idle input box unless a test says otherwise.
+    fake.0.borrow_mut().screen = idle_box();
     let p = procs.clone();
     let e = edges.clone();
     let b = Bridge::new(cfg(0), c, Vec::new())
@@ -688,7 +690,7 @@ fn a_menu_on_screen_before_the_paste_types_nothing() {
     b.on_request_line(&send_line(1, "sid-a", "1")).unwrap();
     let r = result_of(&mut b);
     assert!(
-        matches!(&r, SendResult::Refused { reason } if reason.contains("menu is open")),
+        matches!(&r, SendResult::Refused { reason } if reason.contains("input box")),
         "{r:?}"
     );
     let l = fake.0.borrow();
@@ -748,4 +750,22 @@ fn a_screen_that_cannot_be_read_refuses_fail_closed() {
     b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
     assert!(matches!(result_of(&mut b), SendResult::Uncertain { .. }));
     assert!(fake.0.borrow().enters.is_empty(), "no Enter");
+}
+
+/// Claude Code's idle input box: a rule, the prompt row, a rule, a hint row.
+fn idle_box() -> String {
+    format!("{r}\n❯\u{a0}\n{r}\n  ? for shortcuts\n", r = "─".repeat(80))
+}
+
+#[test]
+fn a_screen_without_the_input_box_types_nothing() {
+    let (mut b, fake, _, _) = setup();
+    fake.0.borrow_mut().screen = "u@host:~$\n".into();
+    b.on_request_line(&send_line(1, "sid-a", "x")).unwrap();
+    let r = result_of(&mut b);
+    assert!(
+        matches!(&r, SendResult::Refused { reason } if reason.contains("input box")),
+        "{r:?}"
+    );
+    assert!(fake.0.borrow().typed.is_empty(), "nothing typed");
 }

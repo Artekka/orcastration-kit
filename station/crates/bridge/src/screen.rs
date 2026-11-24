@@ -13,6 +13,13 @@
 //! the ruled input box). If that drawing changes, the check can miss a menu; the registry
 //! status check still runs (README, Known limits).
 
+/// Whether the idle input box is seen at the bottom of `screen`: the only screen a send may
+/// type into.
+pub fn input_box_ready(screen: &str) -> bool {
+    // RED stub: the old deny rule (the fix replaces it).
+    !menu_open(screen)
+}
+
 /// Rows at the bottom of the pane that are searched. Menus sit at the bottom of the screen.
 pub const BOTTOM_ROWS: usize = 15;
 
