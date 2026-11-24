@@ -1,4 +1,4 @@
-# Observatory's own Rust toolchain. Source before any cargo command:  . scripts/env.sh
+# Orcastration Station's own Rust toolchain. Source before any cargo command:  . scripts/env.sh
 # Toolchain root: $OBSERVATORY_RUST_DIR, default ~/observatory-rust (written <rust dir> below). It holds
 # rustup, cargo and the per-tree target dirs; keep it apart from any other project's toolchain.
 #
@@ -7,7 +7,9 @@
 # tree's build silently runs THAT tree's binaries (repro: main's 12-test fixtures_test ran a sibling's
 # 14-test binary). The dir is derived from the git toplevel of the CURRENT directory (any subdir works;
 # outside a repo, the tree this file lives in):
-#   <rust dir>/targets/<tree basename>-<first 8 hex of sha256(toplevel path)>
+#   <rust dir>/targets/station-<tree basename>-<first 8 hex of sha256(toplevel path)>
+# (the station- prefix names this project in a shared rust dir; the toplevel is the whole kit checkout, whose
+# folder name says nothing about Station)
 #
 # Override: a CARGO_TARGET_DIR the caller already set is RESPECTED (it survives scripts/gate.sh, which
 # sources this file, and gate-throttle) when it lies OUTSIDE <rust dir>; it is normalized
@@ -19,7 +21,7 @@
 # The resolved dir is created (mkdir -p), so callers may write into it before cargo runs.
 #
 # Disk: each tree pays one full build (~2.7 GB debug for the workspace on 2026-11-23).
-# Cleanup after removing a worktree:  ls <rust dir>/targets  then  rm -rf <rust dir>/targets/<name>-<hash>
+# Cleanup after removing a worktree:  ls <rust dir>/targets  then  rm -rf <rust dir>/targets/station-<name>-<hash>
 _obs_rust=${OBSERVATORY_RUST_DIR:-$HOME/observatory-rust}
 export RUSTUP_HOME=$_obs_rust/rustup
 export CARGO_HOME=$_obs_rust/cargo
@@ -28,7 +30,7 @@ export PATH=$CARGO_HOME/bin:$PATH
 _obs_tree=$(git rev-parse --show-toplevel 2>/dev/null) ||
   _obs_tree=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 _obs_base=$(realpath -m -- "$_obs_rust")
-_obs_own=$(realpath -m -- "$_obs_base/targets/$(basename "$_obs_tree")-$(printf %s "$_obs_tree" | sha256sum | cut -c1-8)")
+_obs_own=$(realpath -m -- "$_obs_base/targets/station-$(basename "$_obs_tree")-$(printf %s "$_obs_tree" | sha256sum | cut -c1-8)")
 _obs_why=
 if [ -z "${CARGO_TARGET_DIR:-}" ]; then
   CARGO_TARGET_DIR=$_obs_own

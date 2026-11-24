@@ -27,7 +27,7 @@ td() { (cd "$1" && unset CARGO_TARGET_DIR && . "$(git rev-parse --show-toplevel)
 cleanup() {
   for t in "$WA" "$WB"; do
     [ -d "$t" ] || continue
-    d=$(td "$t" 2>/dev/null); case "$d" in "$OR/targets/te-"?-????????) rm -rf "$d" ;; esac
+    d=$(td "$t" 2>/dev/null); case "$d" in "$OR/targets/station-te-"?-????????) rm -rf "$d" ;; esac
     git -C "$ROOT" worktree remove --force "$t" 2>/dev/null
   done
   rm -rf "$BASE"
@@ -57,7 +57,7 @@ chk "T4 tree b again" "$(fixtures "$B")" "$nb"
 ta=$(td "$A"); tb=$(td "$B")
 chk "T1 subdir == root" "$(td "$A/crates/core")" "$ta"
 [ "$ta" != "$tb" ] && ok "T1 trees differ" || bad "T1 trees share $ta"
-case "$ta" in "$OR/targets/te-a-"????????) ok "T1 name shape" ;; *) bad "T1 name shape $ta" ;; esac
+case "$ta" in "$OR/targets/station-te-a-"????????) ok "T1 name shape" ;; *) bad "T1 name shape $ta" ;; esac
 [ -d "$ta" ] && ok "T1 dir exists after sourcing" || bad "T1 $ta not created"
 nd=$(cd "$A" && CARGO_TARGET_DIR=$CUSTOM/new bash -c '. scripts/env.sh && [ -d "$CARGO_TARGET_DIR" ] && echo yes')
 chk "T1 an override dir is created too" "$nd" "yes"

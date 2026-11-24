@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Observatory gate: clean tree (private denylist, if any), real data (local Claude logs, if any), fmt,
+# Orcastration Station gate: clean tree (private denylist, if any), real data (local Claude logs, if any), fmt,
 # clippy, tests, Windows cross-build check. Last line is the pass proof:
 #   GATE PASS (<N> tests)
 # Usage: bash scripts/gate.sh [--release]   (--release also builds the release .exe)

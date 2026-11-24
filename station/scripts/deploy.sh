@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Observatory deploy: slow gate -> release builds -> install -> sha256 proof -> VERSION.txt -> shortcut.
+# Orcastration Station deploy: slow gate -> release builds -> install -> sha256 proof -> VERSION.txt -> shortcut.
 #
 # Usage: bash scripts/deploy.sh [--dry-run] [--allow-unlanded] [--install-root DIR]
 #                                [--bridge-dir DIR] [--shortcut-dir DIR | --no-shortcut]
 #
 #   --dry-run          print every step (and whether the guards would refuse); build and copy nothing.
 #   --allow-unlanded   deploy a commit that is not on origin/main (the seat's own smoke tests only).
-#   --install-root     where observatory.exe + VERSION.txt go (a WSL path, e.g. /mnt/c/Apps/Observatory).
+#   --install-root     where observatory.exe + VERSION.txt go (a WSL path, e.g. /mnt/c/Apps/OrcastrationStation).
 #                      No built-in default: the flag, else $OBSERVATORY_INSTALL_ROOT, else `install_root=<dir>`
 #                      in $OBSERVATORY_DEPLOY_CONF (default ~/.config/observatory/deploy.conf). None set = refused.
 #   --bridge-dir       where the WSL bridge binary goes         (default ~/.local/share/observatory/bin)
-#   --shortcut-dir     where Observatory.lnk goes (default: the Windows Desktop when the install root came
+#   --shortcut-dir     where 'Orcastration Station.lnk' goes (default: the Windows Desktop when the install root came
 #                      from the env or the config file, else the install root itself, so test runs that
 #                      pass --install-root never touch the real Desktop)
 #
@@ -18,7 +18,7 @@
 #   <install root>/observatory.exe, <install root>/VERSION.txt
 #   ~/.local/share/observatory/bin/observatory-bridge   (only once crates/bridge exists)
 #
-# Writes nothing else except cargo's target dir. Refuses to deploy a dirty tree or a commit that is not
+# Writes nothing else except cargo's target dir. Refuses to deploy a dirty Station folder or a commit that is not
 # on origin/main (unless --allow-unlanded), and refuses unless the slow gate's LAST line is
 # `GATE PASS (<N> tests)` AND the gate exited 0, and refuses if the tree or HEAD changed while the gate
 # ran. Installs copy to `<name>.new`, check the copy succeeded and its sha256 equals the build, and only
@@ -42,7 +42,7 @@ die() { echo "DEPLOY REFUSED: $*" >&2; exit 1; }
 # recheck <phase>: what the gate passed must be what gets built and installed: same commit, still clean.
 recheck() {
   [ "$(git rev-parse HEAD)" = "$HEAD_AT_START" ] || die "HEAD moved during $1 ($SHA -> $(git rev-parse --short HEAD)); the gate result does not cover it"
-  [ -z "$(git status --porcelain)" ] || die "the tree became dirty during $1; the gate result does not cover it"
+  [ -z "$(git status --porcelain -- .)" ] || die "the Station folder became dirty during $1; the gate result does not cover it"
   echo "ok: after $1 the tree is still clean and HEAD is still $SHA"
 }
 step() { echo; echo "== $*"; }
@@ -82,17 +82,21 @@ SHA="$(git rev-parse --short HEAD)"
 HEAD_AT_START="$(git rev-parse HEAD)"
 VERSION="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -n1)"
 EXE_BUILT="$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/release/observatory.exe"
-echo "deploy: observatory $VERSION ($SHA) from $REPO$([ "$DRY" = 1 ] && echo '  [DRY RUN]')"
+echo "deploy: Orcastration Station $VERSION ($SHA) from $REPO$([ "$DRY" = 1 ] && echo '  [DRY RUN]')"
 
 # ---------------------------------------------------------------- 1. only landed, clean code ships
 step "1. tree is clean and on origin/main"
 refusals=()
-if [ -n "$(git status --porcelain)" ]; then
-  refusals+=("the tree is dirty (git status --porcelain is not empty)")
+# Scoped to this folder (the kit's other files are not what ships): a dirty file elsewhere in the repo does not refuse.
+if [ -n "$(git status --porcelain -- .)" ]; then
+  refusals+=("the Station folder is dirty (git status --porcelain -- . is not empty)")
 fi
 # No fetch here: siblings share FETCH_HEAD. A stale origin/main can only refuse, never wrongly admit.
 LANDED=1
-if ! git merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
+# Landed = HEAD is on origin/main, or this folder's tree is byte-identical to origin/main's (a commit elsewhere in
+# the kit that is not pushed yet does not change what ships). A folder that differs from main's is never landed.
+if ! git merge-base --is-ancestor HEAD origin/main 2>/dev/null \
+   && ! { t_head="$(git rev-parse -q --verify 'HEAD:./' 2>/dev/null)" && [ -n "$t_head" ] && [ "$t_head" = "$(git rev-parse -q --verify 'origin/main:./' 2>/dev/null)" ]; }; then
   LANDED=0
   if [ "$ALLOW_UNLANDED" = 1 ]; then
     echo "note: $SHA is not on origin/main; deploying anyway (--allow-unlanded)"
@@ -216,7 +220,7 @@ install_one() {
   echo "+ mv -f $new $dir/$name"
   if ! mv -f "$new" "$dir/$name"; then
     rm -f "$new"
-    die "could not replace $dir/$name (is Observatory running? close it and deploy again). The old copy is untouched."
+    die "could not replace $dir/$name (is Orcastration Station running? close it and deploy again). The old copy is untouched."
   fi
 }
 step "4. install"
@@ -236,7 +240,7 @@ verify() {
   echo "$a  $(basename "$2")" >> "$VERSION_TMP"
 }
 VERSION_TMP="$CARGO_TARGET_DIR/deploy-VERSION-$SHA.txt"
-[ "$DRY" = 1 ] || printf 'observatory %s (%s)\ndeployed %s\n\n' "$VERSION" "$SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$VERSION_TMP"
+[ "$DRY" = 1 ] || printf 'Orcastration Station %s (%s)\ndeployed %s\n\n' "$VERSION" "$SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$VERSION_TMP"
 verify "$EXE_BUILT" "$INSTALL_ROOT/observatory.exe"
 [ -n "$BRIDGE_BUILT" ] && verify "$BRIDGE_BUILT" "$BRIDGE_DIR/observatory-bridge"
 run cp -f "$VERSION_TMP" "$INSTALL_ROOT/VERSION.txt"
@@ -255,15 +259,15 @@ else
       SHORTCUT_DIR="$INSTALL_ROOT"
     fi
   fi
-  lnk_win="$(wslpath -w "$SHORTCUT_DIR")\\Observatory.lnk"
+  lnk_win="$(wslpath -w "$SHORTCUT_DIR")\\Orcastration Station.lnk"
   exe_win="$(wslpath -w "$INSTALL_ROOT")\\observatory.exe"
   dir_win="$(wslpath -w "$INSTALL_ROOT")"
   # One fixed file name: re-running rewrites the same .lnk, never a second one.
   ps="\$s=(New-Object -ComObject WScript.Shell).CreateShortcut('$lnk_win');"
   ps+="if(\$s.TargetPath -eq '$exe_win'){'shortcut already points at $exe_win'}else{"
-  ps+="\$s.TargetPath='$exe_win';\$s.WorkingDirectory='$dir_win';\$s.Description='Observatory';\$s.Save();'shortcut written: $lnk_win'}"
+  ps+="\$s.TargetPath='$exe_win';\$s.WorkingDirectory='$dir_win';\$s.Description='Orcastration Station';\$s.Save();'shortcut written: $lnk_win'}"
   if [ "$DRY" = 1 ]; then
-    echo "[dry-run] powershell.exe: Observatory.lnk in $SHORTCUT_DIR -> $exe_win (rewritten only if it points elsewhere)"
+    echo "[dry-run] powershell.exe: Orcastration Station.lnk in $SHORTCUT_DIR -> $exe_win (rewritten only if it points elsewhere)"
   else
     powershell.exe -NoProfile -Command "$ps" | tr -d '\r' || die "shortcut creation failed"
   fi
@@ -274,5 +278,5 @@ if [ "$DRY" = 1 ]; then
   echo "DRY RUN DONE: nothing was built or copied"
   [ "$WOULD_REFUSE" = 0 ] || { echo "(exit 3: a real run would be REFUSED; see the refusal above)"; exit 3; }
 else
-  echo "DEPLOYED observatory $VERSION ($SHA) -> $INSTALL_ROOT"
+  echo "DEPLOYED Orcastration Station $VERSION ($SHA) -> $INSTALL_ROOT"
 fi
