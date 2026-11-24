@@ -48,6 +48,7 @@ out="$(run)"; has "mid merge: skip" "skip (MERGE_HEAD in progress)" "$out"; rm -
 
 fresh; upstream b.txt upstream-body; echo mine > "$TMP/s/b.txt"
 out="$(run)"; has "a dirty untracked path that would be overwritten: skip" "skip (" "$out"; has "exit 0" "rc=0" "$out"
+has "the skip line names the file that blocks" "b.txt" "$(printf '%s\n' "$out" | grep 'skip (')"
 eq "the local file is untouched" "mine" "$(cat "$TMP/s/b.txt")"; hasnt "no merge happened" "main-checkout: " "$(printf '%s\n' "$out" | grep -v skip | grep -v rc=)"
 
 fresh; upstream .local ignored-upstream; echo precious > "$TMP/s/.local"
@@ -66,6 +67,18 @@ fresh; out="$(cd "$TMP" && env MAIN_SYNC_REPO="$TMP/nope" bash "$SCRIPT" 2>&1; e
 fresh; echo edited >> "$TMP/s/a.txt"; upstream b.txt one
 out="$(run)"; has "a non-colliding tracked edit still fast-forwards" "main-checkout:" "$out"; has "the edit survives" "edited" "$(cat "$TMP/s/a.txt")"
 eq "no stash was created" "" "$(G -C "$TMP/s" stash list)"
+
+# dirty files and the incoming commits (by design): a dirty TRACKED file that the incoming commits touch blocks the move and is named;
+# a dirty file they do not touch (tracked or untracked) does not block it, and it stays exactly as it was.
+fresh; echo mine >> "$TMP/s/a.txt"; upstream a.txt incoming-a
+out="$(run)"; has "a dirty tracked file the incoming commits touch: skip" "skip (" "$out"; has "and the skip line names it" "a.txt" "$(printf '%s\n' "$out" | grep 'skip (')"
+eq "no move when the dirty file is touched" "$(G -C "$TMP/s" rev-parse HEAD)" "$(G -C "$TMP/s" rev-parse refs/heads/main)"
+[ "$(G -C "$TMP/s" rev-parse HEAD)" != "$(G -C "$TMP/s" rev-parse origin/main)" ] && ok || bad "the checkout moved over a dirty file the commits touch"
+eq "the dirty file is untouched" "$(printf 'seed\nmine')" "$(cat "$TMP/s/a.txt")"
+fresh; echo mine >> "$TMP/s/a.txt"; echo wip > "$TMP/s/wip.txt"; upstream b.txt one
+out="$(run)"; has "an unrelated dirty tracked file and an untracked one: the checkout still moves" "main-checkout: " "$out"; hasnt "and it is not a skip" "skip (" "$out"
+eq "the checkout moved to origin/main" "$(G -C "$TMP/s" rev-parse origin/main)" "$(G -C "$TMP/s" rev-parse HEAD)"
+eq "the unrelated dirty file stays as it was" "$(printf 'seed\nmine')" "$(cat "$TMP/s/a.txt")"; eq "the untracked file stays" "wip" "$(cat "$TMP/s/wip.txt")"
 
 # the wrapper: from a linked worktree it moves the MAIN checkout, prints one line, always exits 0
 fresh; upstream b.txt one; G -C "$TMP/s" worktree add -q -b wt "$TMP/wt" 2>/dev/null

@@ -146,7 +146,7 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
-v0.14.0: three seat-poll tools: `bottleneck-watch.sh` (flags a merge, gate or idle main past its time budget, and a session stuck on a permission prompt), `main-checkout-sync.sh` (fast-forwards the shared checkout) and a context window read from the session's own launch (`ctx-fill.py` needs no `--window` for your own session).
+v0.14.0: three seat-poll tools: `bottleneck-watch.sh` (flags a merge, gate or idle main past its time budget, and a session stuck on a permission prompt), `main-checkout-sync.sh` (fast-forwards the shared checkout; a dirty file the incoming commits do not touch never stops it, one they touch does and the skip line names it) and a context window read from the session's own launch (`ctx-fill.py` needs no `--window` for your own session).
 
 v0.13.0: five safety hooks, off until you turn them on (`safety_guards: on`): they refuse a discard of uncommitted edits, `pkill -f`, `prettier --write` on a directory, a commit that carries a conflict marker, and a message that cites a sha git cannot resolve.
 

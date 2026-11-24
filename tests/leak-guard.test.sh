@@ -34,6 +34,9 @@ project-word	orca[0-9]+[a-z]*-[0-9]+
 # number before the dash (340h, 340hd, 7a, 106a). The kit's own example ids (S2E10-3, S2-1, O7-1, T9-6) end in digits before the
 # dash, and ordinary lower-case words (e2e-1, k8s-3, md5sum-2) never start with a capital, so neither matches.
 project-id	\b[A-Z][A-Za-z]{0,5}[0-9]+[A-Za-z]+([0-9]+[A-Za-z]+)?-[0-9]+[a-z]?\b
+# project-id, lower-case form (the id as a branch or file name: letters, digits, letters, digits, letters, dash, digits). It needs TWO
+# digit groups with letters between and after them, which no ordinary word has (e2e-1, k8s-3, md5sum-2, utf8-1, x86-64, sha256-1, base64-1).
+project-id	\b[a-z]{1,5}[0-9]+[a-z]+[0-9]+[a-z]+-[0-9]+[a-z]?\b
 EOF
 )"
 # home-path (READ r0-r2): home or users counts only as the FIRST directory of an absolute path. That is, at the start of a
@@ -64,7 +67,7 @@ leak_scan() {  # <dir> → "label file:line: match" per finding, nothing when cl
   while IFS=$'\t' read -r label re; do
     case "$label" in home-path) allow="$ALLOW_HOME" ;; email) allow="$ALLOW_EMAIL" ;; openai-key) allow="$ALLOW_OPENAI" ;; *) allow='' ;; esac
     # -I skips binary files; -o prints each match on its own line; -H keeps file:line: with one file
-    local gi=""; { [ "$label" = home-path ] || [ "$label" = project-word ]; } && gi=i   # project-id stays case-sensitive   # a home path in any case (C:\USERS, /HOME)
+    local gi=""; { [ "$label" = home-path ] || [ "$label" = project-word ]; } && gi=i   # a home path or a project word in any case (C:\USERS, /HOME); project-id stays case-sensitive (its lower-case form is its own pattern)
     (cd "$dir" && grep -HonIE$gi -- "$re" "${files[@]}" 2>/dev/null) | while IFS= read -r hit; do
       local m="${hit#*:}"; m="${m#*:}"
       local subject="$m" icase=""
@@ -74,6 +77,9 @@ leak_scan() {  # <dir> → "label file:line: match" per finding, nothing when cl
         subject="$(printf '%s' "$m" | sed -E 's/.*([\\/]|%2[Ff]|%5[Cc])//')"   # the user name: the allow-list is about who
         icase=i
       fi
+      # A row id always has a letter outside a-f (a session tag is s, h, m ... ); a hit made only of hex digits, hex letters and dashes is a
+      # UUID, sha or digest fragment (a1b2cdef-1234 inside an id of 8-4-4-4-12), never an id: skip it.
+      if [ "$label" = project-id ] && ! printf '%s' "$m" | grep -q '[G-Zg-z]'; then continue; fi
       if [ -n "$allow" ] && printf '%s\n' "$subject" | grep -q${icase}E -- "$allow"; then continue; fi
       echo "$label ${hit%%:*}:$(printf '%s' "${hit#*:}" | cut -d: -f1): $m"
     done
@@ -165,6 +171,14 @@ plant project-id     "sibling S2E340""hd-3 built it"
 plant project-id     "sibling S5E340""h-1 built it"
 plant project-id     "collision O7""a-1 renamed"
 plant project-id     "row VE106""a-1 shipped"
+plant project-id     "branch s1e340""h-670 landed"
+plant project-id     "branch s7me340""h-1 landed"
+plant project-id     "file s6e340""hd-252 notes"
+clean project-id     "a lower-case UUID 3e340a1b-5c6d-4e7f-8a9b-0c1d2e3f4a5b and one with letter-led blocks a1b2cdef-1234-4abc-9def-123456789abc"
+clean project-id     "an upper-case UUID A1B2CDEF-1234-4ABC-9DEF-123456789ABC and 3E340A1B-5C6D-4E7F-8A9B-0C1D2E3F4A5B"
+clean project-id     "a 40-hex sha 3e340a1b5c6d4e7f8a9b0c1d2e3f4a5b6c7d8e9f and a 64-hex digest 3e340a1b5c6d4e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f"
+clean project-id     "hex fragments next to a dash: deadbeef12-34, a1b2c3d4e5-6, cafe1234ab-5, ABCDEF12-345"
+clean project-id     "lower-case look-alikes: e2e-1, k8s-3, md5sum-2, utf8-1, x86-64, sha256-1, base64-1, ec2-3, s3-2"
 clean project-id     "ordinary words: e2e-1, k8s-3, md5sum-2, sha256sum-2, mp4a-1, h264b-2, ipv6-1"
 clean project-word   "the kit's own example ids S2E10-3, S2-1, O7-1 and T9-6; also utf8-1, x86-64, sha256-1, base64-1"
 clean project-word   "ported from the project that grew the script; ORCA is a word, row ids are not shipped"
