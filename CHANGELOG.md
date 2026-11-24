@@ -4,6 +4,17 @@ Newest first.
 
 ## Unreleased
 
+## 0.15.0 — 2026-11-24
+
+Recycling and launching check the model first, and a recycle signals only the process it named.
+
+- **Added: `scripts/lib-model-tag.sh`**, the one model guard every launcher shares (`lib-launch.sh`, so `start-team.sh` and `recycle-sibling.sh`, and `sibling-shell.sh`). Shape first (lowercase letters, digits, `.`, `-`, optional `[1m]`); a family name plus a version without the `claude-` prefix (`opus-5-5`) is refused with the valid forms named; the bare aliases (`opus`, `sonnet`, `haiku`, `fable`, with or without `[1m]`) skip the CLI; any other full id is asked of the CLI once (`MODEL_PREFLIGHT=0` skips it) and a PASS is cached per model, CLI version and account under `$KIT_RUNTIME_DIR/model-preflight`. Only a definitive "unknown model" answer refuses (exit 64); a timeout, a login problem or garbled output launches with one warning, so an offline host can still recycle. The check runs before anything is signalled, in `recycle-sibling.sh` and `start-team.sh` (a dry run skips the CLI call) and again in `sibling-shell.sh` on every hand-off, against the account that launch will use.
+- **Changed: a recycle SIGTERMs only the pid it resolved, and only while that pid is still the session.** Each pid's command line is re-read right before the signal; a pid that is gone, or was reused by another program, is skipped with one line. The by-hand instructions print `kill -TERM <pid>` and how to find the pid, never a pattern kill.
+- **Changed: `--force-children`** is accepted as another name for `--force` (recycle although the old session still has live shells); the refusal without it, and its exit code 3, are unchanged.
+- Unchanged on purpose: one account stays the default. The account is carried only through the old session's `CLAUDE_CONFIG_DIR`, a hand-off for the default account has an empty `account_dir`, and no account name is assumed anywhere.
+- Tests: new `model-tag` suite; the recycle and wrapper suites gain the guard, the pid re-check, the alias, the default-account case and a check that the wrapper's launch arguments read back as the right context window; each with mutants. The bootstrap and kit-init install lists carry `lib-model-tag.sh`.
+- Not ported (they are the project's own, or still to come): the remote recycle on another host, the MCP lane flags, the token-audit trial, and the sprite-lane marker. The sibling's launch log and the tmux corpse-window cleanup are not in this batch.
+
 ## 0.14.0 — 2026-11-24
 
 The seat's poll gets its eyes: a time-budget watcher, a checkout sync, and a context window that no longer has to be guessed.

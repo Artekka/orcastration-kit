@@ -121,4 +121,47 @@ stage_handoff 1 "$(handoff 'opus[1m]' '' '' again)"
 WRAPPER_UNDER_TEST="$SB/sibling-shell-copy.sh"; WENV=(STUB_REWRITE="$SB/sibling-shell-copy.sh"); W "$n" --model 'opus[1m]'; WENV=(); unset WRAPPER_UNDER_TEST
 eq "W9 two launches" 2 "$(nlaunch)"; hasnt "W9 the rewritten text never ran" HIJACKED "$OUT$ERR"; eq "W9 exit 0" 0 "$RC"
 
+# 10. The shared model guard at the wrapper: a family name plus a version needs the claude- prefix (refused offline, nothing
+#     launched); a full id with the prefix launches.
+sandbox; n=$(nameFor W10); W "$n" --model 'fable-5-2[1m]'
+eq "W10 fable-5-2[1m] exits 64" 64 "$RC"; has "W10 names the claude- prefix" "needs the claude- prefix" "$ERR"; eq "W10 nothing launched" 0 "$(nlaunch)"
+sandbox; n=$(nameFor W10b); W "$n" --model claude-opus-5-5
+eq "W10b a claude- full id launches" 0 "$RC"; eq "W10b one launch" 1 "$(nlaunch)"
+
+# 11. The same guard on a HAND-OFF: a model without the prefix is refused, only the first launch ran.
+sandbox; n=$(nameFor W11); stage_handoff 1 "$(handoff 'opus-5-5' '' '' x)"$'\n'
+W "$n" --model 'opus[1m]'
+ne "W11 non-zero" 0 "$RC"; eq "W11 only the first launch" 1 "$(nlaunch)"; has "W11 says why" "model refused" "$ERR"
+
+# 12. The CLI half on a hand-off: a full id the CLI does not know is refused before the launch (a real preflight, MODEL_PREFLIGHT back on,
+#     a stand-in CLI that answers the unknown-model way); a known one launches; an alias never calls the CLI.
+sandbox; n=$(nameFor W12); mkdir -p "$SB/pfbin"
+cat > "$SB/pfbin/claude" <<'PF'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then echo "9.9.9 (Stand-in)"; exit 0; fi
+if [ "${1:-}" = --name ]; then exec "$SB_REAL_CLAUDE" "$@"; fi
+echo "$*" >> "$SB_PF_CALLS"
+if [ "${PF_MODE:-unknown}" = unknown ]; then echo '{"result":"There is an issue with the selected model (x).","modelUsage":{}}'
+else echo '{"result":"ok","modelUsage":{"x":{"inputTokens":1}}}'; fi
+PF
+chmod +x "$SB/pfbin/claude"
+PFW=("PATH=$SB/pfbin:$SB/bin:$PATH" MODEL_PREFLIGHT=1 "SB_PF_CALLS=$SB/pf.calls" "SB_REAL_CLAUDE=$SB/bin/claude")
+stage_handoff 1 "$(handoff 'claude-opus-9-9' '' '' x)"$'\n'
+WENV=("${PFW[@]}"); W "$n" --model 'opus[1m]'; WENV=()
+ne "W12 an unknown full id on a hand-off: non-zero" 0 "$RC"; eq "W12 only the first launch ran" 1 "$(nlaunch)"; has "W12 says the CLI does not know it" "does not know the model" "$ERR"
+eq "W12 the alias launch never called the CLI (one preflight call, for the hand-off)" 1 "$(wc -l < "$SB/pf.calls" | tr -d ' ')"
+
+# 13. What the wrapper puts in claude's argv is exactly what scripts/launched_window.py reads: a [1m] tag is a 1M window, any other tag 200K.
+#     The recorded argv of a launch becomes a fake process (claude + that argv) under a fake /proc.
+sandbox; n=$(nameFor W13); W "$n" --model 'sonnet[1m]' go
+fakep="$SB/fakeproc"; mkdir -p "$fakep/501" "$fakep/500"
+printf '500 (bash) S 1 0 0 0\n' > "$fakep/500/stat"; : > "$fakep/500/cmdline"
+printf '501 (claude) S 500 0 0 0\n' > "$fakep/501/stat"; { printf 'claude\0'; cat "$SB/stub/argv.1"; } > "$fakep/501/cmdline"
+eq "W13 the wrapper's argv reads as a 1M window" 1m "$(python3 "$ROOT/scripts/launched_window.py" --proc-root "$fakep" --pid 501 | python3 -c 'import json,sys; print(json.load(sys.stdin)["window"])')"
+sandbox; n=$(nameFor W13b); W "$n" --model claude-sonnet-5-5 go
+fakep="$SB/fakeproc"; mkdir -p "$fakep/501" "$fakep/500"
+printf '500 (bash) S 1 0 0 0\n' > "$fakep/500/stat"; : > "$fakep/500/cmdline"
+printf '501 (claude) S 500 0 0 0\n' > "$fakep/501/stat"; { printf 'claude\0'; cat "$SB/stub/argv.1"; } > "$fakep/501/cmdline"
+eq "W13b a tag without [1m] reads as a 200K window" 200k "$(python3 "$ROOT/scripts/launched_window.py" --proc-root "$fakep" --pid 501 | python3 -c 'import json,sys; print(json.load(sys.stdin)["window"])')"
+
 finish
