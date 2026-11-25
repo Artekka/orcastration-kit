@@ -4,6 +4,11 @@ Newest first.
 
 ## Unreleased
 
+## 0.16.3 — 2026-11-25
+
+- **Changed: the README title reads "Orcastration Kit"**, as the repo and the logo do. The plugin id stays `orchestration-kit` (install command, slash-command prefix, runtime folder); a note under the title says so.
+- **Added: the README banner** (`assets/orcastration-kit-banner.jpg`).
+
 ## 0.16.2 — 2026-11-25
 
 - **Added: the Orcastration Kit logo** (`assets/orcastration-kit-logo.png`), shown at the top of the README. No script, skill or hook changed.

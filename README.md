@@ -1,6 +1,10 @@
 <p align="center"><img src="assets/orcastration-kit-logo.png" alt="Orcastration Kit logo: an orca leaping from a wave beside a gear" width="520"></p>
 
-# orchestration-kit
+# Orcastration Kit
+
+<p align="center"><img src="assets/orcastration-kit-banner.jpg" alt="An orca developer at a desk directing four agents on a screen under the Orcastration Kit logo" width="820"></p>
+
+> The product is **Orcastration Kit**. Its plugin id is `orchestration-kit`, so the install command and the `/orchestration-kit:` commands below use that spelling on purpose.
 
 Run **several Claude Code sessions on one repo at the same time** without file collisions,
 lost work, or confabulated green: a shared claimable board, one git worktree per session,
@@ -148,6 +152,8 @@ row claim, in wave trains. Full sessions retro, reply "retro complete", and are 
 Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
+
+v0.16.3: the title reads Orcastration Kit and the README carries the banner; the plugin id is unchanged.
 
 v0.16.2: the Orcastration Kit logo at the top of this README.
 
