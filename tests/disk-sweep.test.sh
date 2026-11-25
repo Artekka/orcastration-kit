@@ -173,6 +173,63 @@ out="$(ds -- --apply)"; has "a skip-worktree tree is listed as needing a decisio
 sandbox; old="$SB/home/.orcastration-kit/disk-sweep/saved/x/old-20260101"; mkdir -p "$old"; echo p > "$old/changes.patch"; age "$SB/home/.orcastration-kit/disk-sweep/saved/x" 31
 out="$(ds -- --apply)"; gone "a saved bundle older than 30 days is removed" "$old"
 
+# ── E2. r1: a dirty tree gets every keep rule a clean tree gets; failed saves; the read-back; operations in progress ───────────
+savedir() { echo "$SB/home/.orcastration-kit/disk-sweep/saved"; }
+nsaves() { find "$(savedir)" -mindepth 2 -maxdepth 2 -type d 2>/dev/null | wc -l | tr -d ' '; }
+dirty15() { tree s1/a 1; a="$TREE"; echo changed >> "$a/README.md"; echo new > "$a/new.txt"; age "$a" 15; }
+# F1: a live process whose cwd is inside keeps a dirty idle tree (no save, no removal)
+sandbox; dirty15
+( cd "$a" && exec sleep 60 ) & HOLDERS+=($!); h=$!; sleep 0.3
+out="$(ds -- --apply)"; kill "$h" 2>/dev/null; wait "$h" 2>/dev/null
+there "r1 F1: a dirty idle tree with a live process inside stays" "$a/new.txt"; eq "r1 F1: ... and is not saved" 0 "$(nsaves)"
+# F1: a compose project that uses the tree keeps a dirty idle tree
+FDC="$TMP/fakedocker-compose"
+printf '#!/usr/bin/env bash\ncase "$1" in ps) echo "${FAKE_COMPOSE_DIR:-}" ;; *) exit 0 ;; esac\n' > "$FDC"; chmod +x "$FDC"
+sandbox; dirty15
+out="$(ds KIT_SWEEP_DOCKER="$FDC" FAKE_COMPOSE_DIR="$a" -- --apply)"
+has "r1 F1: a compose project's tree is named" "compose" "$out"; there "r1 F1: a dirty tree a compose project uses stays" "$a/new.txt"; eq "r1 F1: ... and is not saved" 0 "$(nsaves)"
+# F1: processes cannot be checked → a dirty idle tree stays
+sandbox; dirty15
+out="$(ds KIT_SWEEP_PROC_CHECK=none -- --apply)"
+there "r1 F1: with no process check a dirty idle tree stays" "$a/new.txt"; eq "r1 F1: ... and is not saved" 0 "$(nsaves)"
+# F2: docker installed, daemon stopped: nothing that needs the compose check is removed, clean or dirty
+FDX="$TMP/fakedocker-down"; printf '#!/usr/bin/env bash\necho "Cannot connect to the Docker daemon" >&2; exit 1\n' > "$FDX"; chmod +x "$FDX"
+sandbox; dirty15; tree s1/b 1; b="$TREE"
+out="$(ds KIT_SWEEP_DOCKER="$FDX" -- --apply)"
+there "r1 F2: daemon stopped: the dirty idle tree stays" "$a/new.txt"; eq "r1 F2: daemon stopped: nothing is saved" 0 "$(nsaves)"
+there "r1 F2: daemon stopped: the clean merged tree stays" "$b"; has "r1 F2: the report says docker did not answer" "docker did not answer" "$out"
+# F2: a hung docker cannot hold the sweep: each call has a timeout
+FDH="$TMP/fakedocker-hang"; printf '#!/usr/bin/env bash\nexec sleep 20\n' > "$FDH"; chmod +x "$FDH"
+sandbox; tree s1/a 1; t0=$(date +%s)
+out="$(ds KIT_SWEEP_DOCKER="$FDH" KIT_SWEEP_DOCKER_TIMEOUT=2 -- --apply)"; t1=$(date +%s)
+[ $((t1 - t0)) -lt 15 ] && ok || bad "r1 F2: a hung docker held the sweep for $((t1 - t0)) s"
+has "r1 F2: a hung docker counts as not answering" "docker did not answer" "$out"
+# F3: a save that fails leaves no partial folder, is remembered, and is not retried while the tree is unchanged
+sandbox; dirty15; echo secret > "$a/locked.txt"; chmod 000 "$a/locked.txt"; age "$a" 15
+out="$(ds -- --apply)"; has "r1 F3: a failed save is listed for a decision" "needs a decision" "$out"; there "r1 F3: the tree whose save failed stays" "$a/new.txt"
+eq "r1 F3: the failed save left no partial folder" 0 "$(nsaves)"
+out="$(ds -- --apply)"; has "r1 F3: an unchanged tree whose save failed is not retried" "not retried" "$out"; eq "r1 F3: no folder after the second run" 0 "$(nsaves)"
+chmod 600 "$a/locked.txt"
+# F3: a save that would leave too little free space is not made
+sandbox; dirty15
+out="$(ds FAKE_FREE_GB=3 -- --apply)"; has "r1 F3: a save is refused on a nearly full disk" "free space" "$out"; there "r1 F3: ... and the tree stays" "$a/new.txt"; eq "r1 F3: ... and nothing is saved" 0 "$(nsaves)"
+# the read-back: a tar that lacks a file, or a patch that does not apply, keeps the tree (KIT_SWEEP_SAVE_HOOK alters the save
+# after it is written and before it is read back, as a short write or a corrupt file would)
+TH="$TMP/hook-tar"; printf '#!/usr/bin/env bash\ncd "$1" && tar -cf files.tar --files-from /dev/null\n' > "$TH"; chmod +x "$TH"
+sandbox; dirty15
+out="$(ds KIT_SWEEP_SAVE_HOOK="$TH" -- --apply)"; has "r1 read-back: a tar that lacks a file fails the save" "save failed" "$out"; there "r1 read-back: the tree stays when the tar lacks a file" "$a/new.txt"
+PH="$TMP/hook-patch"; printf '#!/usr/bin/env bash\nsed -i "s/^-hi$/-not the line in HEAD/" "$1/changes.patch"\n' > "$PH"; chmod +x "$PH"
+sandbox; tree s1/a 1; a="$TREE"; printf 'bye\n' > "$a/README.md"; echo new > "$a/new.txt"; age "$a" 15
+out="$(ds KIT_SWEEP_SAVE_HOOK="$PH" -- --apply)"; has "r1 read-back: a patch that does not apply fails the save" "save failed" "$out"; there "r1 read-back: the tree stays when the patch does not apply" "$a/new.txt"
+# operations in progress and dirty submodules keep the tree (their state is not in a patch)
+sandbox; dirty15; gd="$(git -C "$a" rev-parse --absolute-git-dir)"; git -C "$a" rev-parse HEAD > "$gd/MERGE_HEAD"; age "$a" 15
+out="$(ds -- --apply)"; has "r1: a merge in progress keeps the tree" "in progress" "$out"; there "r1: the mid-merge tree stays" "$a/new.txt"
+sandbox; git init -q -b main "$SB/sub"; echo s > "$SB/sub/s.txt"; G -C "$SB/sub" add s.txt; G -C "$SB/sub" commit -q -m s
+G -C "$SB/work" -c protocol.file.allow=always submodule add -q "$SB/sub" sub; G -C "$SB/work" commit -q -m sub; G -C "$SB/work" push -q origin main; G -C "$SB/work" fetch -q origin
+G -C "$SB/work" worktree add -q -b s1/a "$SB/s1-a" origin/main; a="$SB/s1-a"; G -C "$a" -c protocol.file.allow=always submodule update -q --init
+echo inner >> "$a/sub/s.txt"; echo new > "$a/new.txt"; age "$a" 15
+out="$(ds -- --apply)"; has "r1: a dirty submodule keeps the tree" "submodule" "$out"; there "r1: the tree with a dirty submodule stays" "$a/sub/s.txt"
+
 # ── F. rebuildable bulk inside idle trees ───────────────────────────────────────────────────────────────────────────────────────
 mknm() {  # mknm DIR: a node_modules of 20 real files
   mkdir -p "$1/node_modules/p"; local i; for i in $(seq 1 20); do echo "$i" > "$1/node_modules/p/f$i.js"; done
@@ -266,10 +323,14 @@ KH() { echo "$SB/home/.orcastration-kit"; }
 STAMP() { echo "$(KH)/disk-sweep/last/$(basename "$SB/work")-$(printf '%s' "$SB/work" | cksum | awk '{print $1 % 100000}')"; }
 dw() { (cd "$SB/work" && env HOME="$SB/home" KIT_SWEEP_TMP="$SB/tmp" KIT_SWEEP_DOCKER="$NODOCKER" KIT_SWEEP_DF="$FDF" KIT_SWEEP_REPORT_DIR="$SB/reports" "$@" bash "$DW" --repo "$SB/work" 2>&1; echo "rc=$?"); }
 sandbox; tree s1/a 1; a="$TREE"
-out="$(dw)"; has "the first run on a machine is a dry run" "first run on this machine: dry run" "$out"; there "the first run removed nothing" "$a"
+out="$(dw)"; has "the first run on a project is a dry run" "first run for this project: dry run" "$out"; there "the first run removed nothing" "$a"
 there "the first run left a report for the next session start" "$(KH)/disk-sweep/unseen-report"
 there "the stamp is written (one per project)" "$(STAMP)"
 out="$(dw)"; gone "the second run applies" "$a"
+# r1: the first run is a dry run per PROJECT: a second project on the same machine gets its own dry run first
+P2="$SB/work2"; git clone -q "$SB/origin.git" "$P2" 2>/dev/null; G -C "$P2" worktree add -q -b s2/b "$SB/s2-b" origin/main; age "$SB/s2-b" 3
+out="$(cd "$P2" && env HOME="$SB/home" KIT_SWEEP_TMP="$SB/tmp" KIT_SWEEP_DOCKER="$NODOCKER" KIT_SWEEP_DF="$FDF" KIT_SWEEP_REPORT_DIR="$SB/reports2" bash "$DW" --repo "$P2" 2>&1)"
+has "r1: a second project's first run is a dry run too" "first run for this project: dry run" "$out"; there "r1: ... and removed nothing" "$SB/s2-b"
 # a fake sweep: records its args and its nice value, sleeps, exits with $FAKE_RC
 FS="$TMP/fakesweep"
 cat > "$FS" <<'FSW'
