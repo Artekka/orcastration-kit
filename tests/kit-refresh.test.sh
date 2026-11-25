@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Tests for scripts/kit-refresh.sh: kit-init's refresh of a project's script copies made on 0.16 (before the 0.17.0 id
 # rename). A STALE copy (differs from the kit's and still names the 0.16 command prefix or the 0.16 folder) is replaced
-# only when the project's git tracks it with no uncommitted change, so `git diff` shows the refresh and
-# `git checkout -- <file>` undoes it. Untracked or edited-but-uncommitted copies are left, each with its reason.
+# only when its content is a known kit 0.16 version of that script (never a project-edited copy), it is a regular file
+# inside the project (no symlink, scripts/ not outside the root), and the project's git tracks it with no uncommitted
+# change. Everything else is LEFT with its reason (exit 3).
+# The known 0.16 versions are the git blobs at the v0.16.* tags, embedded in kit-refresh.sh. Test copies here are
+# synthetic, so their hashes are passed through the test seam KIT_REFRESH_TEST_KNOWN ("<file> <blob>" lines); case 6
+# also refreshes the REAL tagged copies with no seam when the tags are present.
 # Run: bash tests/kit-refresh.test.sh   (temp git repos; nothing outside the temp dir is touched)
 set -u
 unset TMUX TMUX_PANE   # never reach the caller's real tmux (tests/no-real-tmux.test.sh)
@@ -29,8 +33,11 @@ proj() {  # <name>: a git project with every listed script as a committed 0.16 c
   local f; for f in $WRITERS $LAUNCH; do old016 "$f" > "$P/scripts/$f"; chmod +x "$P/scripts/$f"; done
   cp "$ROOT/scripts/lib-builder-worktree.sh" "$P/scripts/"   # a lib that is already current stays as it is
   git -C "$P" add -A && git -C "$P" commit -qm adopt
+  KNOWN="$TMP/$1.known"; : > "$KNOWN"
+  for f in $WRITERS $LAUNCH; do echo "$f $(git -C "$P" hash-object "scripts/$f")" >> "$KNOWN"; done
 }
-rf() { OUT="$(cd "$P" && bash "$RF" "$@" 2>&1)"; RC=$?; }
+rf() { OUT="$(cd "$P" && KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" "$@" 2>&1)"; RC=$?; }
+rf_noseam() { OUT="$(cd "$P" && env -u KIT_REFRESH_TEST_KNOWN bash "$RF" "$@" 2>&1)"; RC=$?; }
 
 # 1. Dry run (no --apply): lists each stale copy, changes nothing.
 proj dry; before="$(cd "$P" && git status --porcelain; md5sum scripts/*)"
@@ -52,6 +59,9 @@ for f in gate-throttle.sh quiet-mode.sh seat-merge.sh start-team.sh recycle-sibl
 done
 cmp -s "$P/scripts/lib-kit-home.sh" "$ROOT/scripts/lib-kit-home.sh" && ok || bad "2: lib-kit-home.sh was not created"
 has "2 reports the created lib" "CREATE  scripts/lib-kit-home.sh" "$OUT"
+# the review line names every created library and says how to remove it (untracked: delete, not git checkout)
+has "2 review line names the created lib" "scripts/lib-kit-home.sh" "$(printf '%s\n' "$OUT" | grep -F 'new untracked')"
+has "2 review line: remove by deleting" "delete" "$(printf '%s\n' "$OUT" | grep -F 'new untracked')"
 for f in $WRITERS; do grep -qF "$OLDN" "$P/scripts/$f" && bad "2: scripts/$f still names the 0.16 folder" || ok; done
 eq "2 the current lib is untouched" "" "$(cd "$P" && git status --porcelain scripts/lib-builder-worktree.sh)"
 # the refreshed writer runs: quiet-mode on/off under a fake HOME lands in the new folder
@@ -59,12 +69,15 @@ HOME="$TMP/apply-home" bash -c 'unset KIT_RUNTIME_DIR; mkdir -p "$HOME"; bash "$
 [ -f "$TMP/apply-home/.orcastration-kit/runtime/quiet-mode" ] && ok || bad "2: the refreshed quiet-mode.sh did not write under the new folder"
 rf --apply; eq "2 second apply exit" 0 "$RC"; has "2 second apply: nothing stale" "nothing to refresh" "$OUT"
 
-# 3. Unsafe copies are left, with the reason: uncommitted edits, untracked, outside a git repo.
+# 3. Unsafe copies are left, with the reason: edited by the project, uncommitted changes, untracked, outside a git repo.
 proj unsafe; echo "# a local edit" >> "$P/scripts/quiet-mode.sh"
 git -C "$P" rm -q --cached scripts/seat-merge.sh
+cp "$P/scripts/start-team.sh" "$TMP/st.keep"; echo "# edit" >> "$P/scripts/start-team.sh"; git -C "$P" commit -qam edit; cp "$TMP/st.keep" "$P/scripts/start-team.sh"
 rf --apply
 eq "3 apply exit 3 (something left)" 3 "$RC"
-has "3 dirty copy left" "LEFT   scripts/quiet-mode.sh (uncommitted changes" "$OUT"
+has "3 edited copy left" "LEFT   scripts/quiet-mode.sh (edited by the project" "$OUT"
+has "3 edited: the manual step" "diff -u scripts/quiet-mode.sh" "$OUT"
+has "3 known content but uncommitted change left" "LEFT   scripts/start-team.sh (uncommitted changes" "$OUT"
 has "3 untracked copy left" "LEFT   scripts/seat-merge.sh (not tracked by git" "$OUT"
 grep -q "a local edit" "$P/scripts/quiet-mode.sh" && ok || bad "3: the uncommitted edit was overwritten"
 cmp -s "$P/scripts/seat-merge.sh" "$ROOT/scripts/seat-merge.sh" && bad "3: the untracked copy was overwritten" || ok
@@ -77,6 +90,49 @@ proj edit17; cp "$ROOT/scripts/gate-throttle.sh" "$P/scripts/gate-throttle.sh"; 
 git -C "$P" commit -qam tweak; rf --apply
 has "4 reported as differing" "DIFFERS scripts/gate-throttle.sh" "$OUT"
 grep -q "project tweak" "$P/scripts/gate-throttle.sh" && ok || bad "4: a 0.17 project edit was overwritten"
+
+# 5. Links and paths outside the project are never written through (no link following at all).
+proj links; OUTSIDE="$TMP/outside"; mkdir -p "$OUTSIDE"
+mv "$P/scripts/gate-throttle.sh" "$OUTSIDE/gate-throttle.sh"; ln -s "$OUTSIDE/gate-throttle.sh" "$P/scripts/gate-throttle.sh"
+cp "$P/scripts/quiet-mode.sh" "$P/qm-real.sh"; rm "$P/scripts/quiet-mode.sh"; ln -s ../qm-real.sh "$P/scripts/quiet-mode.sh"
+git -C "$P" add -A && git -C "$P" commit -qm links
+echo "gate-throttle.sh $(git hash-object "$OUTSIDE/gate-throttle.sh")" >> "$KNOWN"
+before_out="$(md5sum "$OUTSIDE/gate-throttle.sh")"; before_in="$(md5sum "$P/qm-real.sh")"
+rf --apply
+eq "5 apply exit 3" 3 "$RC"
+has "5 link to outside left" "LEFT   scripts/gate-throttle.sh (a symlink" "$OUT"
+has "5 link inside left" "LEFT   scripts/quiet-mode.sh (a symlink" "$OUT"
+eq "5 the outside file is untouched" "$before_out" "$(md5sum "$OUTSIDE/gate-throttle.sh")"
+eq "5 the inside target is untouched" "$before_in" "$(md5sum "$P/qm-real.sh")"
+[ -L "$P/scripts/gate-throttle.sh" ] && [ -L "$P/scripts/quiet-mode.sh" ] && ok || bad "5: a link was replaced"
+# scripts/ itself is a link to a folder outside the project: nothing is written there
+proj outdir; mv "$P/scripts" "$TMP/outdir-scripts"; ln -s "$TMP/outdir-scripts" "$P/scripts"
+before="$(md5sum "$TMP"/outdir-scripts/*)"
+rf --apply
+eq "5 outside scripts/ exit 3" 3 "$RC"
+has "5 outside scripts/ refused" "outside the project" "$OUT"
+eq "5 outside scripts/ untouched" "$before" "$(md5sum "$TMP"/outdir-scripts/*)"
+
+# 6. The embedded list of known 0.16 versions equals the v0.16.* tags (skipped loudly without tags), and the real
+#    tagged copies refresh with no test seam.
+if [ -n "$(git -C "$ROOT" tag -l 'v0.16.*' 2>/dev/null)" ]; then
+  gen="$(cd "$ROOT" && bash "$RF" --print-known 2>&1)"
+  emb="$(sed -n '/^# BEGIN known-0.16/,/^# END known-0.16/p' "$RF" | sed '1d;$d' | sed 's/^# //')"
+  [ -n "$gen" ] && [ "$gen" = "$emb" ] && ok || bad "6 the embedded known list differs from the tags; regenerate with: bash scripts/kit-refresh.sh --print-known"
+  tag="$(git -C "$ROOT" tag -l 'v0.16.*' | sort -V | tail -n1)"
+  P="$TMP/real"; mkdir -p "$P/scripts"; git -C "$P" init -q; git -C "$P" config user.email t@t; git -C "$P" config user.name t
+  for f in $WRITERS $LAUNCH; do git -C "$ROOT" show "$tag:scripts/$f" > "$P/scripts/$f"; done
+  git -C "$P" add -A && git -C "$P" commit -qm adopt
+  rf_noseam --apply
+  eq "6 real $tag copies: exit" 0 "$RC"
+  for f in $WRITERS $LAUNCH; do cmp -s "$P/scripts/$f" "$ROOT/scripts/$f" && ok || bad "6: the real $tag copy of $f was not refreshed"; done
+else
+  echo "SKIP 6: no v0.16.* tags in this checkout (CI's shallow clone): the known-list check and the real-copy case did not run"
+fi
+# without the seam, a synthetic copy is not a known version: LEFT as edited
+proj noseam; rf_noseam --apply
+eq "6 unknown content exit 3" 3 "$RC"
+has "6 unknown content left as edited" "LEFT   scripts/gate-throttle.sh (edited by the project" "$OUT"
 
 echo "kit-refresh: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
