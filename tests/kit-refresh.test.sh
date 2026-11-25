@@ -248,6 +248,8 @@ nottmp "13d" "$P"
 #   g) CDPATH from the caller's shell is ignored: `cd scripts` must enter the project's scripts/, never the scripts/ of a
 #      folder named in CDPATH (a false refusal, or with a weaker folder check, writes into that other folder)
 CD="$TMP/cdpath other"; mkdir -p "$CD/scripts"; for f in $WRITERS $LAUNCH; do old016 "$f" > "$CD/scripts/$f"; done
+# a git repo with the same committed 0.16 copies, so a run steered there could write (the case the test must catch)
+git -C "$CD" init -q; git -C "$CD" config user.email t@t; git -C "$CD" config user.name t; git -C "$CD" add -A && git -C "$CD" commit -qm adopt
 before_cd="$(md5sum "$CD"/scripts/*)"; before_ls="$(ls -A "$CD/scripts")"
 proj cdp; OUT="$(cd "$P" && CDPATH="$CD" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
 eq "13g CDPATH exit 0" 0 "$RC"
