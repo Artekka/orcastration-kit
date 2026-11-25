@@ -74,20 +74,51 @@ if command -v claude >/dev/null 2>&1; then
 else
   echo "SKIP claude plugin validate: the claude CLI is not on PATH (the JSON-shape pin above still runs)"
 fi
-# the sweep: every other line naming the 0.16 id fails
-stray="$(cd "$ROOT" && grep -rnIF --exclude-dir=.git --exclude-dir=target --exclude-dir=node_modules -- "$OLD" . | awk -v old="$OLD" '
+# the sweep: every other line naming the 0.16 id fails. stray_lines <tree root> prints each stray line as path:line:text,
+# so the probes below can run it on a small temp tree (a stray line in a doc must turn it red).
+stray_lines() {
+  local root="$1" st up
+  st="$(cd "$root" && grep -rnIF --exclude-dir=.git --exclude-dir=target --exclude-dir=node_modules -- "$OLD" . | awk -v old="$OLD" '
   { split($0, a, ":"); f=a[1]; sub(/^\.\//, "", f); line=$0; sub(/^[^:]*:[^:]*:/, "", line) }
   f == "CHANGELOG.md" && line !~ /^# / { next }
   f == "station/crates/core/tests/fixtures/synthetic_session.jsonl" || f == "station/crates/core/tests/fixtures/README.md" || f == "station/crates/core/tests/fixtures_test.rs" { next }
   f == ".claude-plugin/marketplace.json" && line ~ /^ *"[a-z-]+": "orcastration-kit"/ { next }
   index(line, "0.16") { next }
   { sub(/^\.\//, ""); print }')"
-up="$(awk '/^## Upgrading from 0\.16/{on=1;next} on && /^## /{on=0} on' "$ROOT/README.md")"
-stray="$(printf '%s\n' "$stray" | while IFS= read -r l; do
-  [ -z "$l" ] && continue
-  case "$l" in README.md:*) t="${l#README.md:}"; t="${t#*:}"; printf '%s\n' "$up" | grep -qxF -- "$t" && continue;; esac
-  printf '%s\n' "$l"; done)"
+  up="$(awk '/^## Upgrading from 0\.16/{on=1;next} on && /^## /{on=0} on' "$root/README.md" 2>/dev/null)"
+  printf '%s\n' "$st" | while IFS= read -r l; do
+    [ -z "$l" ] && continue
+    case "$l" in README.md:*) t="${l#README.md:}"; t="${t#*:}"; printf '%s\n' "$up" | grep -qxF -- "$t" && continue;; esac
+    printf '%s\n' "$l"; done
+}
+stray="$(stray_lines "$ROOT")"
 [ -z "$stray" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL the 0.16 id outside history/upgrade lines ($(printf '%s\n' "$stray" | wc -l) lines):"; printf '%s\n' "$stray" | cut -c1-160 | head -20; }
+# Probes (0.17.0 READ): the allowlist is the named places only. A line that merely mentions "0.16" is no pass.
+PT="$(mktemp -d)"; trap 'rm -rf "$PT"' EXIT
+PROBE="Run /$OLD:orient after 0.16."
+probe_tree() {  # a temp tree holding the real copies of every file with allowed 0.16-id lines
+  local f
+  rm -rf "$PT/t"; mkdir -p "$PT/t"
+  for f in README.md CHANGELOG.md .claude-plugin/marketplace.json skills/kit-init/SKILL.md scripts/lib-kit-home.sh hooks/ctx-guard.py docs/GETTING-STARTED.md; do
+    mkdir -p "$PT/t/$(dirname "$f")"; cp "$ROOT/$f" "$PT/t/$f"
+  done
+}
+probe_tree; out="$(stray_lines "$PT/t")"
+[ -z "$out" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL probe control: the copied files alone are not clean: $(printf '%s' "$out" | head -3)"; }
+for f in docs/GETTING-STARTED.md README.md skills/kit-init/SKILL.md scripts/lib-kit-home.sh hooks/ctx-guard.py CHANGELOG.md; do
+  probe_tree
+  case "$f" in CHANGELOG.md) printf '# %s\n' "$PROBE" >> "$PT/t/$f";; *) printf '%s\n' "$PROBE" >> "$PT/t/$f";; esac
+  out="$(stray_lines "$PT/t")"
+  case "$out" in *"$f:"*"$PROBE"*) pass=$((pass+1));; *) fail=$((fail+1)); echo "FAIL probe: '$PROBE' appended to $f is not a stray line";; esac
+done
+# README: the renames map migrates USER settings only (Claude Code's marketplace schema: "migrates user settings to the
+# new name"); project and local settings get the manual step. Never claim the CLI rewrites them.
+pin "README upgrade: renames migrates user settings" README.md "migrates the \`enabledPlugins\` key in your user settings"
+pin "README upgrade: project and local settings by hand" README.md "Project and local settings (\`.claude/settings.json\`, \`.claude/settings.local.json\`) may keep the old key"
+grep -qF "user, project and local settings" "$ROOT/README.md" && { fail=$((fail+1)); echo "FAIL README still says the CLI rewrites user, project and local settings"; } || pass=$((pass+1))
+# kit-init step 4 names BOTH 0.16 markers, the opening and the closing one
+pin "kit-init: the 0.16 opening marker" skills/kit-init/SKILL.md "opening \`<!-- $OLD vX -->\`"
+pin "kit-init: the 0.16 closing marker" skills/kit-init/SKILL.md "closing \`<!-- /$OLD -->\`"
 # Version: plugin.json, marketplace.json and the newest CHANGELOG heading must agree (0.10.0 shipped as one number).
 pv="$(grep -m1 '"version"' "$ROOT/.claude-plugin/plugin.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/')"
 # The orcastration-kit entry BY NAME: the status-hud entry (or any other) can never satisfy this pin.

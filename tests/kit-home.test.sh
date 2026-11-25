@@ -98,5 +98,79 @@ else
   echo "SKIP F: python3 not on PATH"
 fi
 
+# G. A dangling link at the new name (its target is gone): kit_home heals it, says so in one line, and the callers work.
+#    The heal re-applies the normal rule: the 0.16 folder exists -> link to it again; else a real new folder.
+fresh G; ln -s ".gone-folder" "$H/.orcastration-kit"; kh; rc=$?
+eq "G path" "$H/.orcastration-kit" "$OUT"
+[ -d "$H/.orcastration-kit" ] && [ ! -L "$H/.orcastration-kit" ] && ok || bad "G: the dangling link was not replaced by a real folder"
+eq "G one line" 1 "$(printf '%s\n' "$ERR" | grep -c .)"
+case "$ERR" in *"missing folder"*) ok;; *) bad "G: the line does not say the link led to a missing folder: $ERR";; esac
+kh; eq "G second call silent" "" "$ERR"
+fresh G2; mkdir -p "$H/$OLDN/sessions"; echo keep > "$H/$OLDN/sessions/Sib1.next"; ln -s ".moved-away" "$H/.orcastration-kit"; kh
+[ -L "$H/.orcastration-kit" ] && [ "$(cd "$H/.orcastration-kit" 2>/dev/null && pwd -P)" = "$(cd "$H/$OLDN" && pwd -P)" ] && ok || bad "G2: with the 0.16 folder present the heal must link to it again"
+eq "G2 data via the new path" keep "$(cat "$H/.orcastration-kit/sessions/Sib1.next" 2>/dev/null)"
+eq "G2 one line" 1 "$(printf '%s\n' "$ERR" | grep -c .)"
+# the caller from the READ: quiet-mode.sh on must really turn quiet mode on through a healed link
+fresh G3; ln -s ".gone-folder" "$H/.orcastration-kit"
+out="$(HOME="$H" bash -c 'unset KIT_RUNTIME_DIR; bash "$1/scripts/quiet-mode.sh" on' _ "$ROOT" 2>&1)"; rc=$?
+eq "G3 quiet-mode on exit" 0 "$rc"
+[ -f "$H/.orcastration-kit/runtime/quiet-mode" ] && ok || bad "G3: quiet-mode on through a dangling link left no flag: $out"
+case "$out" in *"quiet mode: ON"*) ok;; *) bad "G3: quiet-mode on does not report ON: $out";; esac
+# python twin
+if command -v python3 >/dev/null 2>&1; then
+  fresh G4; ln -s ".gone-folder" "$H/.orcastration-kit"; KSD=""; out="$(pyhome)"
+  eq "G4 ctx-guard state dir" "$H/.orcastration-kit/ctx-guard" "$out"
+  [ -d "$H/.orcastration-kit" ] && [ ! -L "$H/.orcastration-kit" ] && ok || bad "G4: ctx-guard.py did not heal the dangling link"
+  fresh G5; mkdir -p "$H/$OLDN"; ln -s ".moved-away" "$H/.orcastration-kit"; KSD=""; out="$(pyhome)"
+  [ -L "$H/.orcastration-kit" ] && [ "$(cd "$H/.orcastration-kit" 2>/dev/null && pwd -P)" = "$(cd "$H/$OLDN" && pwd -P)" ] && ok || bad "G5: ctx-guard.py did not re-link to the 0.16 folder"
+fi
+
+# H. The new name is something kit_home must never remove (a regular file, a link to a file): kit_home fails non-zero,
+#    leaves it alone, and every caller exits non-zero instead of running on a path that cannot hold state.
+fresh H; echo mine > "$H/.orcastration-kit"; kh; rc=$?
+[ "$rc" -ne 0 ] && ok || bad "H: kit_home returned 0 for a regular file at the new name"
+eq "H the file is untouched" mine "$(cat "$H/.orcastration-kit" 2>/dev/null)"
+case "$ERR" in *orcastration-kit*) ok;; *) bad "H: kit_home said nothing: $ERR";; esac
+fresh H1; echo f > "$H/target-file"; ln -s target-file "$H/.orcastration-kit"; kh; rc=$?
+[ "$rc" -ne 0 ] && ok || bad "H1: kit_home returned 0 for a link to a file"
+[ -L "$H/.orcastration-kit" ] && [ "$(cat "$H/target-file")" = f ] && ok || bad "H1: a live link (to a file) was removed or changed"
+# every caller, with no env override, must exit non-zero (and run nothing)
+STUB="$TMP/stubbin"; mkdir -p "$STUB"
+printf '#!/usr/bin/env bash\nif [ "${1:-}" = --version ]; then echo "9.9.9 (Stand-in)"; exit 0; fi\necho run >> "%s/stub-ran"\necho %s\n' "$TMP" "'{\"result\":\"ok\",\"modelUsage\":{\"x\":{\"inputTokens\":1}}}'" > "$STUB/claude"; chmod +x "$STUB/claude"
+callers() {  # runs each caller under the fake HOME with every override unset; prints "<name> <rc>" lines
+  local u='unset KIT_RUNTIME_DIR SIBLING_STATE_DIR KIT_STATE_DIR SEAT_MERGE_RUNTIME_DIR'
+  rm -f "$TMP/stub-ran" "$TMP/gt-ran"
+  ( cd "$TMP" && HOME="$H" KIT_GATE_MIN_FREE_GB=0 bash -c "$u; bash \"\$1/scripts/gate-throttle.sh\" touch \"\$2/gt-ran\"" _ "$ROOT" "$TMP" >/dev/null 2>&1 ); echo "gate-throttle $?"
+  HOME="$H" bash -c "$u; bash \"\$1/scripts/quiet-mode.sh\" on" _ "$ROOT" >/dev/null 2>&1; echo "quiet-mode $?"
+  HOME="$H" bash -c "$u; bash \"\$1/scripts/seat-merge.sh\" b 0000000 m" _ "$ROOT" >"$TMP/sm-out" 2>&1; echo "seat-merge $?"
+  HOME="$H" PATH="$STUB:$PATH" MODEL_PREFLIGHT_TIMEOUT=2 MODEL_PREFLIGHT_KILL_AFTER=1 bash -c "$u; . \"\$1/scripts/lib-model-tag.sh\" && model_tag_check claude-opus-5-5 ''" _ "$ROOT" >/dev/null 2>&1; echo "lib-model-tag $?"
+  HOME="$H" bash -c "$u; . \"\$1/scripts/lib-launch.sh\" && launch_state_dir >/dev/null" _ "$ROOT" >/dev/null 2>&1; echo "lib-launch $?"
+  HOME="$H" bash -c "$u; . \"\$1/scripts/lib-launch.sh\" && launch_write_handoff Sib1 hi" _ "$ROOT" >/dev/null 2>&1; echo "lib-launch-handoff $?"
+  HOME="$H" PATH="$STUB:$PATH" bash -c "$u; bash \"\$1/scripts/sibling-shell.sh\" Sib1 --model opus hi" _ "$ROOT" >/dev/null 2>&1 </dev/null; echo "sibling-shell $?"
+}
+fresh H2; echo mine > "$H/.orcastration-kit"; res="$(callers)"
+for c in gate-throttle quiet-mode seat-merge lib-model-tag lib-launch lib-launch-handoff sibling-shell; do
+  r="$(printf '%s\n' "$res" | awk -v c="$c" '$1==c{print $2}')"
+  [ -n "$r" ] && [ "$r" -ne 0 ] && ok || bad "H2: $c exited $r with an unresolvable kit home"
+done
+[ ! -e "$TMP/gt-ran" ] && ok || bad "H2: gate-throttle ran its command with an unresolvable kit home"
+[ ! -e "$TMP/stub-ran" ] && ok || bad "H2: a claude ran (sibling-shell or the model preflight) with an unresolvable kit home"
+grep -q 'orcastration-kit:' "$TMP/sm-out" && ok || bad "H2: seat-merge did not stop on the kit home: $(head -c 200 "$TMP/sm-out")"
+eq "H2 the file is untouched" mine "$(cat "$H/.orcastration-kit" 2>/dev/null)"
+# and the same callers all work through a healed dangling link (positive control for H2's harness)
+fresh H3; ln -s ".gone-folder" "$H/.orcastration-kit"; res="$(callers)"
+for c in gate-throttle quiet-mode lib-model-tag lib-launch lib-launch-handoff; do
+  r="$(printf '%s\n' "$res" | awk -v c="$c" '$1==c{print $2}')"
+  eq "H3 $c works through a healed link" 0 "$r"
+done
+[ -e "$TMP/gt-ran" ] && ok || bad "H3: gate-throttle did not run its command"
+if command -v python3 >/dev/null 2>&1; then
+  fresh H4; echo mine > "$H/.orcastration-kit"
+  env -u KIT_STATE_DIR HOME="$H" python3 "$ROOT/hooks/ctx-guard.py" </dev/null >/dev/null 2>"$TMP/py-err"; rc=$?
+  [ "$rc" -ne 0 ] && ok || bad "H4: ctx-guard.py exited 0 with an unresolvable kit home"
+  grep -q 'orcastration-kit' "$TMP/py-err" && ok || bad "H4: ctx-guard.py said nothing: $(head -c 200 "$TMP/py-err")"
+  eq "H4 the file is untouched" mine "$(cat "$H/.orcastration-kit" 2>/dev/null)"
+fi
+
 echo "kit-home: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
