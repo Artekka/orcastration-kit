@@ -18,10 +18,14 @@ Newest first.
 - **Changed: `kit-init` and `bootstrap.sh`** recognize a CLAUDE.md section carrying the 0.16 marker and write the new one;
   kit-init names both 0.16 markers, the opening and the closing one.
 - **Fixed: a dangling `~/.orcastration-kit` link** (its target moved or deleted) is healed by the scripts and the context guard:
-  the link is removed, then it links to the 0.16 folder again if that exists, else a new empty folder is made, with one line.
+  the link is removed, the 0.16 folder is made again if it is gone, and the new name links to it, with one line (never a
+  second real folder: an old 0.16 copy of a script re-creates the 0.16 folder, and two folders would be two throttle slot sets).
   Anything else there that is not a folder (a file, a link to a file) is left alone, and every script that keeps state
   (gate-throttle, quiet-mode, seat-merge, the launch libraries, sibling-shell, the context guard) stops with a non-zero exit.
-  Before, `quiet-mode.sh on` printed a mkdir error and exited 0 with quiet mode still off.
+  Before, `quiet-mode.sh on` printed a mkdir error and exited 0 with quiet mode still off. `recycle-sibling.sh` and
+  `start-team.sh` check the state folder first (a dry run too, with no change on disk), so a broken one opens no tab.
+  Known limit: two scripts healing the same link at the same instant can remove each other's fresh link once; the next
+  call links it again and no file is lost.
 - **Fixed: the docs check's sweep for the 0.16 id** allows it only in the named places (history, the upgrade sections, the
   renames map, the recorded Station fixture, kit-init's upgrade lines, the state-folder code). A line that merely mentions
   "0.16" no longer passes.

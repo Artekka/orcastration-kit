@@ -485,6 +485,9 @@ _launch_print_argv() { printf '%q' "${LAUNCH_ARGV[0]}"; printf ' %q' "${LAUNCH_A
 # (model, effort, mode, account, prompt), SIGTERMs only the old claude, and the wrapper starts the fresh
 # one in the SAME tab. Anything else (no old process, an old one started by hand, --new-tab, a timeout)
 # opens a new tab that runs the wrapper, so a hand-started session moves over at its next recycle.
+# launch_require_kit_home: before a launcher touches anything (a dry run too), the state folder must be usable; no change on
+# disk. An explicit SIBLING_STATE_DIR does not need the kit home.
+launch_require_kit_home() { [ -n "${SIBLING_STATE_DIR:-}" ] && return 0; kit_home_check; }
 launch_state_dir() {   # kit_home: lib-kit-home.sh, via lib-model-tag.sh; returns 1 when the kit home cannot be a folder
   local h
   if [ -n "${SIBLING_STATE_DIR:-}" ]; then printf '%s' "$SIBLING_STATE_DIR"; return 0; fi
@@ -640,7 +643,8 @@ launch_wait_inplace() {
 launch_recycle_inplace() {
   local name="$1" prompt="$2" old="$3" wpid="$4" next revoked
   local t="${RECYCLE_INPLACE_TIMEOUT:-60}" g="${RECYCLE_CLAIMED_GRACE:-30}"
-  next="$(launch_state_dir)" || { echo "cannot resolve the hand-off folder; using a new tab" >&2; return 1; }
+  # 2 = stop: a new tab could not write its hand-off either, and the old session must keep running
+  next="$(launch_state_dir)" || { echo "cannot resolve the hand-off folder; nothing was launched or stopped" >&2; return 2; }
   next="$next/$name.next"; revoked="$next.revoked.$$"
   launch_write_handoff "$name" "$prompt" || { echo "cannot write the hand-off file in $(launch_state_dir); using a new tab" >&2; return 1; }
   # SIGTERM the old claude ONLY: signalling the wrapper would end the very loop that starts the next one.

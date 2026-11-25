@@ -146,6 +146,7 @@ fi
 
 # The CLI half of the model guard (a full id the CLI does not know), once the account is final and BEFORE the old
 # session is touched: a refused model must leave the old claude running. A dry run skips it (it would call the CLI).
+launch_require_kit_home || exit 1   # a broken state folder stops here, before any tab, signal or hand-off (a dry run too)
 [ "$DRY" -eq 1 ] || launch_preflight_model
 
 # Live work under the old session (see launch_live_shells). The detached copy of a self-recycle skips it:

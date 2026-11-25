@@ -32,7 +32,8 @@ def _kit_home():
 
     When only the 0.16 folder (~/.orchestration-kit, before the 0.17.0 id rename) exists, the new name becomes a
     relative symlink to it in one step, so 0.16 copies of the scripts and this hook keep sharing one folder.
-    A dangling link at the new name is removed and the rule runs again. Anything else there that is not a folder
+    A dangling link at the new name is removed, the 0.16 folder is made again if it is gone, and the new name links
+    to it (never a second real folder: an old 0.16 script re-creates the 0.16 folder on its own). Anything else there that is not a folder
     is left alone and the hook exits 1 (one line on stderr), never running on a path that cannot hold state."""
     home = os.path.expanduser("~")
     new, oldname = os.path.join(home, ".orcastration-kit"), ".orchestration-kit"  # the 0.16 folder name
@@ -45,14 +46,14 @@ def _kit_home():
         except OSError:
             pass
         try:
-            if os.path.isdir(old):
-                os.symlink(oldname, new)
-            else:
-                os.makedirs(new, exist_ok=True)
+            os.makedirs(old, exist_ok=True)  # gone (or never there): made again, so both names stay one folder
+        except OSError:
+            pass
+        try:
+            os.symlink(oldname, new)
         except OSError:
             pass  # a racing twin healed it first: the check below decides
-        sys.stderr.write("orcastration-kit: ~/.orcastration-kit was a link to a missing folder (%s); %s\n" % (
-            gone, "it links to the 0.16 folder ~/%s again" % oldname if os.path.isdir(old) else "replaced it with a new empty folder"))
+        sys.stderr.write("orcastration-kit: ~/.orcastration-kit was a link to a missing folder (%s); it links to the 0.16 folder ~/%s again\n" % (gone, oldname))
     elif os.path.lexists(new):
         if os.path.isdir(old) and os.path.isdir(new) and not os.path.exists(os.path.join(new, ".kit-home-both-warned")) \
                 and os.path.realpath(new) != os.path.realpath(old):
