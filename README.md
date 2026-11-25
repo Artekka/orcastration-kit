@@ -255,7 +255,7 @@ space is under the floor (`KIT_SWEEP_FLOOR_GB`, or `disk_sweep_floor_gb:` in the
 priority, one sweep per machine at a time, and never makes a session start wait. A running gate does not stop it: its keep
 rules protect anything in use.
 
-- **The first run on a machine is a dry run.** The next session start shows its report. From the second run it removes.
+- **The first run for each project is a dry run.** The next session start shows its report. From the second run it removes.
 - **Turn it off:** `bash <kit>/scripts/disk-sweep.sh --off` (on again: `--on`; `--status` shows which).
 - **Run it by hand:** `bash <kit>/scripts/disk-sweep.sh [--repo DIR]` is a dry run; add `--apply` to remove, `--urgent` for
   shorter ages (automatic at 85% used).
@@ -265,11 +265,15 @@ rules protect anything in use.
 | a worktree merged into origin's default branch, clean, untouched 2 days (urgent: 1) | the main checkout and the tree it runs in; a locked tree (`git worktree lock`); a tree an open board line names; a tree a running process uses (its folder, an open file, a command line); a tree a Docker compose project uses; a file changed inside the age; a file git ignores that is not build output (a `.env`, for example) |
 | an unmerged worktree, clean, untouched 14 days, when origin has the SAME tip (the branch stays) | a tip origin lacks or that differs from origin's |
 | a detached worktree on a commit no remote has, untouched 14 days, after `refs/kit-sweep-keep/<folder>` is written and read back | |
-| a worktree with unsaved work, untouched 14 days, AFTER its work is saved and read back (`changes.patch`, `files.tar`, `info.txt` with the undo steps, under `~/.orcastration-kit/disk-sweep/saved/`; removed after 30 days) | a tree with a hidden edit (skip-worktree, assume-unchanged) or whose save fails: listed under "needs a decision" |
+| a worktree with unsaved work, untouched 14 days, AFTER its work is saved and read back (`changes.patch`, `files.tar`, `info.txt` with the undo steps, under `~/.orcastration-kit/disk-sweep/saved/`; removed after 30 days) | a tree with a hidden edit (skip-worktree, assume-unchanged), a rebase or merge in progress, or work inside a submodule; a tree whose save fails or would leave under 5 GB free (`KIT_SWEEP_SAVE_MIN_FREE_GB`): listed under "needs a decision"; a failed save is removed and not retried until the tree changes |
 | ignored `node_modules` copied by npm or yarn, and ignored build output found by content (`index.html` + `assets/`), inside idle worktrees | pnpm's hard-linked `node_modules`; tracked folders |
 | `playwright-artifacts-*`, `playwright_chromiumdev_profile-*`, `.org.chromium.Chromium.*` in the temp folder, untouched 6 h | anything a process holds |
 | Docker build cache over max(20 GB, 1.5 x the largest image), at most 40% of free space; the freed number is Docker's own | images, volumes, containers (never `docker system prune`) |
 | with `KIT_SWEEP_SCRATCH` set: `node_modules`, build output and browser profiles inside a scratch folder untouched 7 days (a line goes to `PURGED.txt` first) | a folder holding `.keep`; git checkouts |
+
+**Known limits of a save:** partial staging is flattened (the patch is taken against HEAD, so staged and unstaged edits come back
+as one unstaged change). Work inside a submodule and a rebase or merge in progress are not saved: such a tree is kept instead.
+With Docker installed but not answering (the daemon stopped, or a call hung past 30 s), no worktree is removed or saved.
 
 **Where the report goes:** `~/.orcastration-kit/disk-sweep/reports/<repo>-<id>/<date>-<time>.txt` (`-dry-run.txt` for a dry
 run; `KIT_SWEEP_REPORT_DIR` overrides it). Its first lines: free space before and after, freed per class, kept per reason, what

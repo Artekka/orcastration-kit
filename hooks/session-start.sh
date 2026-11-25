@@ -39,7 +39,8 @@ if [ -n "$root" ] && [ -f "$root/scripts/lib-disk-sweep-launch.sh" ] && [ -f "$r
       fi
     fi
     disk_sweep_launch_if_due "$top" >/dev/null 2>&1; rc=$?
-    if [ "$rc" = 0 ] && [ ! -e "$kh/disk-sweep.first-run-done" ]; then
+    main="$(disk_sweep_main "$top" 2>/dev/null)"
+    if [ "$rc" = 0 ] && [ ! -e "$(disk_sweep_first_marker "$kh" "${main:-$top}")" ]; then
       m="${m:+$m }Disk sweep is on: a background dry run started now (nothing is removed on the first run; its report shows at your next session start). After that it runs at most once a day at low priority. Turn it off: $off"
     fi
     printf '%s' "$m"

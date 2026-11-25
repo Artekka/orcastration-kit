@@ -29,7 +29,12 @@
 #        ignored files that are not rebuildable output, info.txt with the undo steps) under ~/.orcastration-kit/disk-sweep/saved/,
 #        READ BACK (checksums, the tar's list, `git apply --check` on a scratch index), then the tree is reset, cleaned and removed.
 #        A tree with a hidden edit (skip-worktree, assume-unchanged), or whose save fails, is kept and listed under "needs a decision".
-#        Saves older than 30 days are removed.
+#        Saves older than 30 days are removed. Every keep of a clean tree applies first (a live process, a compose project, Docker
+#        not answering, processes not checkable, a file changed in 14 days). A save is made only when twice its size still leaves
+#        KIT_SWEEP_SAVE_MIN_FREE_GB (default 5) free. A failed save is removed and remembered: the tree is listed and not tried
+#        again until it changes. KNOWN LIMITS of a save: partial staging is flattened (the patch is against HEAD); a tree with a
+#        rebase, merge, cherry-pick, revert or bisect in progress, or with work inside a submodule, is KEPT (a patch cannot carry
+#        that state).
 #     e. inside every IDLE tree (kept or not): ignored node_modules folders that are real copies (most files not hard-linked, as
 #        npm and yarn install them; pnpm's shared store is left alone) and ignored build output found by its content (an
 #        index.html beside an assets folder, whatever the folder is called) are removed first.
@@ -47,7 +52,9 @@
 #
 # Config (env): KIT_SWEEP_SCRATCH, KIT_SWEEP_TMP, KIT_SWEEP_DOCKER (default docker), KIT_SWEEP_CACHE_CAP (GB), KIT_SWEEP_URGENT_PCT,
 # KIT_SWEEP_PROTECTED (colon list never touched), KIT_SWEEP_REPORT_DIR, KIT_SWEEP_SAVE_DIR.
-# Test seams: KIT_SWEEP_DF (a df stand-in), KIT_SWEEP_DISK_PCT, KIT_SWEEP_RM (the deleter, called with one path).
+# Test seams: KIT_SWEEP_DF (a df stand-in), KIT_SWEEP_DISK_PCT, KIT_SWEEP_RM (the deleter, called with one path),
+# KIT_SWEEP_DOCKER_TIMEOUT (seconds per docker call, default 30), KIT_SWEEP_PROC_CHECK=none (as on a machine with no /proc and no
+# lsof), KIT_SWEEP_SAVE_HOOK (run with a save's folder after it is written, before it is read back).
 set -uo pipefail
 unset CDPATH
 HERE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -107,6 +114,7 @@ REPORT_DIR="${KIT_SWEEP_REPORT_DIR:-$KH/disk-sweep/reports/$repokey}"
 SAVE_ROOT="${KIT_SWEEP_SAVE_DIR:-$KH/disk-sweep/saved}"
 SAVE_DIR="$SAVE_ROOT/$repokey"
 SAVE_DAYS=30; IDLE_DAYS=14; SCRATCH_DAYS=7
+SAVE_MIN_FREE_GB="${KIT_SWEEP_SAVE_MIN_FREE_GB:-5}"; [[ "$SAVE_MIN_FREE_GB" =~ ^[0-9]+$ ]] || SAVE_MIN_FREE_GB=5
 
 free_kb() { "$DF" -Pk "$MAIN" 2>/dev/null | awk 'NR==2 {print $4}'; }
 gb() { awk -v k="$1" 'BEGIN { if (k ~ /^[0-9]+$/) printf "%.1f", k/1048576; else printf "?" }'; }
@@ -147,7 +155,10 @@ is_protected() {  # $1 path → 0 when it is under a KIT_SWEEP_PROTECTED entry
 
 # ── live processes: one snapshot of every cwd, open file and command line ──────────────────────────────────────────────────
 HELD="$RUN_TMP/held"; : > "$HELD"; held_ok=1
-if [ -r /proc/self/cmdline ]; then
+if [ "${KIT_SWEEP_PROC_CHECK:-}" = none ]; then   # test seam: a machine with neither /proc nor lsof
+  held_ok=0
+  out "skipped: live-process check (turned off); every worktree and leftover is kept"
+elif [ -r /proc/self/cmdline ]; then
   {
     ls -l /proc/[0-9]*/cwd /proc/[0-9]*/fd/ 2>/dev/null | sed -n 's/.* -> //p'
     cat /proc/[0-9]*/cmdline 2>/dev/null | tr '\0' '\n'
@@ -189,11 +200,23 @@ board_names() {  # $1 branch → 0 when an open board line names it as a whole w
   grep -Eq "(^|[^A-Za-z0-9/_.-])$re(\$|[^A-Za-z0-9/_-])" "$BOARD.open"
 }
 
-# Docker compose projects whose working dir or config file lives in a tree. Docker present but not answering = keep every tree.
+# with_timeout <seconds> <cmd...>: a hung program (a Docker daemon that accepts and never answers) cannot hold the sweep, and so
+# the machine-wide lock. timeout(1) or gtimeout (macOS with coreutils), else perl's alarm (it survives the exec), else no limit.
+with_timeout() {
+  local s=$1; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$s" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then gtimeout "$s" "$@"
+  elif command -v perl >/dev/null 2>&1; then perl -e 'alarm shift; exec @ARGV or exit 127' "$s" "$@"
+  else "$@"; fi
+}
+DOCKER_TIMEOUT="${KIT_SWEEP_DOCKER_TIMEOUT:-30}"; [[ "$DOCKER_TIMEOUT" =~ ^[0-9]+$ ]] || DOCKER_TIMEOUT=30
+dk() { with_timeout "$DOCKER_TIMEOUT" "$DOCKER" "$@"; }
+# Docker compose projects whose working dir or config file lives in a tree. Docker installed but not answering (the daemon is
+# stopped, or hung past the timeout) = a compose project cannot be ruled out, so no tree is removed or saved, clean or dirty.
 compose_ok=1; COMPOSE="$RUN_TMP/compose"; : > "$COMPOSE"
 if command -v "$DOCKER" >/dev/null 2>&1; then
   for lbl in working_dir config_files; do
-    "$DOCKER" ps -a --format "{{.Label \"com.docker.compose.project.$lbl\"}}" >> "$COMPOSE" 2>/dev/null || { compose_ok=0; break; }
+    dk ps -a --format "{{.Label \"com.docker.compose.project.$lbl\"}}" >> "$COMPOSE" 2>/dev/null || { compose_ok=0; break; }
   done
   tr ',' '\n' < "$COMPOSE" > "$COMPOSE.1" && mv -f "$COMPOSE.1" "$COMPOSE"
 fi
@@ -233,6 +256,9 @@ sha256_of() {
   elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
   else cksum "$1" | awk '{print $1 "-" $2}'; fi
 }
+# save_fingerprint <tree>: changes when the tree's HEAD, status or tracked changes change (a failed save is retried only then)
+save_fingerprint() { { git -C "$1" rev-parse HEAD; git -C "$1" status --porcelain --untracked-files=normal --ignored=matching; git -C "$1" diff HEAD --binary; } 2>/dev/null | cksum | awk '{print $1 "-" $2}'; }
+FAILED="$SAVE_ROOT/.failed/$repokey"
 ignored_keepers() {  # $1 tree → the ignored entries that are NOT rebuildable output (they go into the save)
   git -C "$1" -c core.quotePath=false status --porcelain --ignored=matching --untracked-files=normal 2>/dev/null | sed -n 's/^!! //p' |
     while IFS= read -r e; do
@@ -246,14 +272,20 @@ ignored_keepers() {  # $1 tree → the ignored entries that are NOT rebuildable 
 # dirty_tree <path> <branch or ""> <sha> <why> [prefix]: the blocker kept the tree (<why> is its reason). A dirty reason and 14
 # idle days → save + remove; any other case → kept with "<prefix>; <why>".
 dirty_tree() {
-  local p=$1 br=$2 sha=$3 why=$4 pre=${5:-} r hidden list sd n kb pt tt line e tl fail="" idx label
+  local p=$1 br=$2 sha=$3 why=$4 pre=${5:-} r hidden list sd n kb pt tt line e tl fail="" idx label fp need fkb
   case "$why" in
     "it has uncommitted or untracked files"*|"it has an ignored file that is not rebuildable output"*|"it has a skip-worktree or assume-unchanged file"*) ;;
     *) keep worktrees "$p" "${pre:+$pre; }$why"; return ;;
   esac
-  r=$(recent "$p" $(( IDLE_DAYS * 1440 ))) || { keep worktrees "$p" "find could not scan it"; return; }
-  if [ -n "$r" ]; then keep worktrees "$p" "${pre:+$pre; }$why"; return; fi
+  # every keep a clean tree gets (compose, docker not answering, a live process, no process check, a file changed in 14 days)
+  r=$(extra_keep "$p" "$IDLE_DAYS"); if [ -n "$r" ]; then keep worktrees "$p" "${pre:+$pre; }$why; $r"; return; fi
   label=${br:-detached}
+  fp=$(save_fingerprint "$p")
+  r=$(awk -F'\t' -v p="$p" -v f="$fp" '$1 == p && $2 == f {print $3; exit}' "$FAILED" 2>/dev/null)
+  if [ -n "$r" ]; then
+    printf '%s · %s · an earlier save failed (%s); not retried until the tree changes\n' "$p" "$label" "$r" >> "$DECIDE"
+    keep worktrees "$p" "needs a decision: an earlier save failed ($r); not retried until the tree changes"; return
+  fi
   hidden=$(git -C "$p" ls-files -v 2>/dev/null | grep -E '^[a-zS] ' | head -1)
   if [ -n "$hidden" ]; then
     printf '%s · %s · a hidden edit (%s): save it by hand, then remove the tree\n' "$p" "$label" "$hidden" >> "$DECIDE"
@@ -272,6 +304,14 @@ dirty_tree() {
     printf '%s · %s · cannot be saved: %s\n' "$p" "$label" "$fail" >> "$DECIDE"
     keep worktrees "$p" "needs a decision: $fail"; return
   fi
+  # free space: the save goes to the same machine; it must leave at least KIT_SWEEP_SAVE_MIN_FREE_GB (default 5) free after twice
+  # its size (the tar and the patch, plus slack). Ignored files that are not build output can be large.
+  need=$( { git -C "$p" diff HEAD --binary 2>/dev/null | wc -c | awk '{print int($1/1024)+1}'; while IFS= read -r e; do kb_of "$p/${e%/}"; done < "$list"; } | awk '{s+=$1} END {print s+0}')
+  fkb=$("$DF" -Pk "$KH" 2>/dev/null | awk 'NR==2 {print $4}')
+  if ! [[ "$fkb" =~ ^[0-9]+$ ]] || [ $(( fkb - 2 * need )) -lt $(( SAVE_MIN_FREE_GB * 1048576 )) ]; then
+    printf '%s · %s · not saved: not enough free space for a save of %s MB (needs %s GB left after it)\n' "$p" "$label" "$(( need / 1024 ))" "$SAVE_MIN_FREE_GB" >> "$DECIDE"
+    keep worktrees "$p" "needs a decision: not enough free space to save it (${need} KB to save)"; return
+  fi
   if [ "$dry" = 1 ]; then
     out "would save and remove $p (dirty, idle $IDLE_DAYS days; branch $label)"; printf 'worktrees\t%s\n' "$(kb_of "$p")" >> "$FREED"; return
   fi
@@ -282,6 +322,8 @@ dirty_tree() {
   mkdir -p -- "$sd" || { fail="could not make $sd"; }
   [ -n "$fail" ] || git -C "$p" diff HEAD --binary > "$sd/changes.patch" 2>/dev/null || fail="git diff failed"
   if [ -z "$fail" ] && [ -s "$list" ]; then (cd "$p" && tar -cf "$sd/files.tar" -T "$list") 2>/dev/null || fail="tar failed"; fi
+  # test seam: alter the save after it is written and before it is read back (a short write, a corrupt file)
+  if [ -z "$fail" ] && [ -n "${KIT_SWEEP_SAVE_HOOK:-}" ]; then "$KIT_SWEEP_SAVE_HOOK" "$sd" >/dev/null 2>&1; fi
   if [ -z "$fail" ]; then
     pt=$(sha256_of "$sd/changes.patch"); tt=""; [ -f "$sd/files.tar" ] && tt=$(sha256_of "$sd/files.tar")
     {
@@ -311,9 +353,14 @@ dirty_tree() {
     rm -f "$idx"
   fi
   if [ -n "$fail" ]; then
-    printf '%s · %s · the save failed (%s); the partial save is in %s\n' "$p" "$label" "$fail" "$sd" >> "$DECIDE"
+    # a failed save is removed (it is not a usable save and would fill the disk run after run) and remembered, so an unchanged
+    # tree is not tried again every day
+    [ -n "$sd" ] && [ -d "$sd" ] && rm -rf -- "$sd"
+    mkdir -p -- "$(dirname "$FAILED")" && printf '%s\t%s\t%s\n' "$p" "$fp" "$fail" >> "$FAILED"
+    printf '%s · %s · the save failed (%s); nothing was removed\n' "$p" "$label" "$fail" >> "$DECIDE"
     keep worktrees "$p" "needs a decision: the save failed ($fail)"; return
   fi
+  if [ -f "$FAILED" ]; then awk -F'\t' -v p="$p" '$1 != p' "$FAILED" > "$FAILED.n" 2>/dev/null && mv -f "$FAILED.n" "$FAILED"; fi
   printf '%s\t%s\n' "$sd" "$(kb_of "$sd")" >> "$SAVED"
   kb=$(kb_of "$p")
   # The work is saved and read back: discard it in the tree, then the plain (never forced) remove.
@@ -356,6 +403,20 @@ extra_keep() {  # $1 path, $2 age in days → one reason, or nothing
   r=$(recent "$1" $(( $2 * 1440 ))) || { echo "find could not scan it"; return; }
   if [ -n "$r" ]; then echo "a file changed in the last $2 day(s) (${r#"$1"/})"; return; fi
 }
+# op_keep <tree>: state a patch cannot carry keeps the tree: a rebase, merge, cherry-pick, revert or bisect in progress, and work
+# inside a submodule (a save would hold only the submodule's pointer).
+op_keep() {
+  local gd f s
+  gd=$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null) || { echo "its git folder cannot be read"; return; }
+  for f in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD BISECT_LOG; do
+    [ -e "$gd/$f" ] && { echo "an operation is in progress ($f)"; return; }
+  done
+  [ -f "$1/.gitmodules" ] || return 0
+  if ! s=$(git -C "$1" submodule foreach --quiet --recursive 'git status --porcelain --untracked-files=normal | head -n 1' 2>/dev/null); then
+    echo "its submodules cannot be checked"; return
+  fi
+  [ -z "$s" ] || echo "a submodule has uncommitted work"
+}
 remove_tree() {  # $1 path, $2 what to print
   local kb; kb=$(kb_of "$1")
   if [ "$dry" = 1 ]; then freed worktrees "$2" "$kb"; return; fi
@@ -373,6 +434,7 @@ wt_one() {  # $1 path, $2 branch ("" = detached), $3 locked ("1" or "")
   if [ -n "$br" ] && board_names "$br"; then keep worktrees "$p" "the board names it (an open line names branch $br)"; return; fi
   if is_protected "$p"; then keep worktrees "$p" "a protected path"; return; fi
   sha=$(git -C "$p" rev-parse --verify -q HEAD 2>/dev/null) || { keep worktrees "$p" "its HEAD cannot be resolved"; return; }
+  why=$(op_keep "$p"); if [ -n "$why" ]; then keep worktrees "$p" "$why"; return; fi
   # idle trees lose their rebuildable bulk first, kept or not
   if [ -z "$(extra_keep "$p" "$wt_days")" ]; then strip_bulk "$p"; fi
   if [ -n "$br" ] && git merge-base --is-ancestor "refs/heads/$br" "$DEF" 2>/dev/null; then
@@ -454,21 +516,21 @@ to_bytes() {  # "42.3GB" "512MB" "1.2kB" → bytes
   awk -v s="$1" 'BEGIN{ if (match(s,/[A-Za-z]+$/)) {u=substr(s,RSTART); n=substr(s,1,RSTART-1)+0} else {u="B"; n=s+0}
     m=1; if(u~/^[kK]/)m=1e3; else if(u~/^M/)m=1e6; else if(u~/^G/)m=1e9; else if(u~/^T/)m=1e12; printf "%.0f", n*m }'
 }
-cache_size() { "$DOCKER" system df --format '{{.Type}}|{{.Size}}' 2>/dev/null | awk -F'|' '$1=="Build Cache"{print $2}'; }
+cache_size() { dk system df --format '{{.Type}}|{{.Size}}' 2>/dev/null | awk -F'|' '$1=="Build Cache"{print $2}'; }
 sweep_docker() {
   local cache after big free cap_b cap_gb cur_b aft_b
   if ! command -v "$DOCKER" >/dev/null 2>&1; then out "skipped: docker is not installed"; return; fi
   cache=$(cache_size)
   if [ -z "$cache" ]; then out "skipped: docker did not report a build cache size (is the daemon running?)"; return; fi
   cur_b=$(to_bytes "$cache")
-  big=$("$DOCKER" images --format '{{.Size}}' 2>/dev/null | while read -r s; do to_bytes "$s"; echo; done | sort -n | tail -1)
+  big=$(dk images --format '{{.Size}}' 2>/dev/null | while read -r s; do to_bytes "$s"; echo; done | sort -n | tail -1)
   free=$(free_kb)
   cap_b=$(awk -v big="${big:-0}" -v free="${free:-0}" -v base="$CACHE_CAP_GB" 'BEGIN{ c=base*1e9; b=1.5*big; if(b>c)c=b;
     if (free > 0) { l=0.4*free*1024; if(l<c)c=l }; printf "%.0f", c }')
   cap_gb=$(awk -v c="$cap_b" 'BEGIN{printf "%d", c/1e9}')
   if [ "$cur_b" -le "$cap_b" ]; then keep docker "build cache ($cache)" "within the cap of ${cap_gb} GB"; return; fi
   if [ "$dry" = 1 ]; then out "would trim the docker build cache from $cache down to ${cap_gb} GB"; return; fi
-  if ! "$DOCKER" builder prune --force --max-used-space "${cap_gb}GB" >/dev/null 2>&1; then keep docker "build cache" "docker builder prune failed"; return; fi
+  if ! with_timeout 1800 "$DOCKER" builder prune --force --max-used-space "${cap_gb}GB" >/dev/null 2>&1; then keep docker "build cache" "docker builder prune failed"; return; fi
   after=$(cache_size); aft_b=$(to_bytes "${after:-0}")
   if [ -z "$after" ]; then out "trimmed the docker build cache (was $cache); docker did not report the size after, so nothing is counted"; return; fi
   out "docker build cache: freed $(awk -v a="$cur_b" -v b="$aft_b" 'BEGIN{printf "%.1f", (a-b)/1e9}') GB (Docker's count: $cache before, $after after)"

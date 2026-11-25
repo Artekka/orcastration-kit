@@ -18,6 +18,8 @@ disk_sweep_main() { local c; c=$(git -C "$1" rev-parse --path-format=absolute --
 disk_sweep_repokey() { printf '%s-%s' "$(basename "$1")" "$(printf '%s' "$1" | cksum | awk '{print $1 % 100000}')"; }
 # disk_sweep_stamp <kit home> <main checkout>: the file holding the epoch second this project's last sweep started.
 disk_sweep_stamp() { printf '%s/disk-sweep/last/%s' "$1" "$(disk_sweep_repokey "$2")"; }
+# disk_sweep_first_marker <kit home> <main checkout>: present once this project's first (dry) run is done.
+disk_sweep_first_marker() { printf '%s/disk-sweep/first-run-done/%s' "$1" "$(disk_sweep_repokey "$2")"; }
 disk_sweep_free_gb() { "${KIT_SWEEP_DF:-df}" -Pk "$1" 2>/dev/null | awk 'NR==2 && $4 ~ /^[0-9]+$/ {print int($4/1024/1024)}'; }
 disk_sweep_floor_gb() {  # $1 main checkout
   local f="${KIT_SWEEP_FLOOR_GB:-}"

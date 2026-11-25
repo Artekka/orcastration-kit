@@ -9,7 +9,7 @@
 #   - The start stamp (~/.orcastration-kit/disk-sweep/last/<project>, one per project) is written BEFORE the sweep, so a crashed run does not loop.
 #   - An unreadable free-space number means "do not sweep" (exit 3), logged.
 #   - A running gate does NOT skip the sweep (Art's pick, 11-25): the sweep's own keep rules (live process, recent file) protect it.
-#   - The FIRST run on a machine is a dry run (--dry-run); the next session start shows its report. Later runs pass --apply.
+#   - The FIRST run for each project is a dry run (--dry-run); the next session start shows its report. Later runs pass --apply.
 #   - Low priority: nice 19 and ionice idle when the machine has them.
 # Log: ~/.orcastration-kit/disk-sweep/cron.log. Test seam: KIT_SWEEP_CRON_SWEEP (the sweep script).
 set -uo pipefail
@@ -72,9 +72,9 @@ mkdir -p -- "$(dirname "$STAMP")" && date +%s > "$STAMP" || { log "FAILED: canno
 free=$(disk_sweep_free_gb "$repo")
 if ! [[ "$free" =~ ^[0-9]+$ ]]; then log "UNKNOWN: free space on $repo could not be read; not sweeping"; exit 3; fi
 
-FIRST="$KH/disk-sweep.first-run-done"
+FIRST=$(disk_sweep_first_marker "$KH" "$main")
 if [ -e "$FIRST" ]; then mode=--apply
-else mode=--dry-run; log "first run on this machine: dry run (nothing is removed; from the next run the sweep removes what its report lists)"; fi
+else mode=--dry-run; log "first run for this project: dry run (nothing is removed; from the next run the sweep removes what its report lists)"; fi
 pre=()
 command -v nice >/dev/null 2>&1 && pre+=(nice -n 19)
 command -v ionice >/dev/null 2>&1 && pre+=(ionice -c3)
@@ -88,6 +88,6 @@ if [ "$rc" -ne 0 ]; then log "FAILED: the sweep exited $rc"; exit "$rc"; fi
 if [ "$mode" = --dry-run ] || printf '%s\n' "$out" | grep -q '^disk-sweep: needs a decision'; then
   [ -n "$report" ] && printf '%s\n%s\n' "$report" "$mode" > "$LOGDIR/unseen-report"
 fi
-[ "$mode" = --dry-run ] && : > "$FIRST"
+[ "$mode" = --dry-run ] && mkdir -p -- "$(dirname "$FIRST")" && : > "$FIRST"
 log "sweep exited 0; report ${report:-none}"
 exit 0
