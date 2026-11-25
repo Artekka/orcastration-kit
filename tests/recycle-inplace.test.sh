@@ -6,7 +6,7 @@ unset TMUX TMUX_PANE   # never reach the caller's real tmux: a suite run in a pa
 SUITE=recycle-inplace
 . "$(dirname "$0")/inplace-harness.sh"
 FORBID=(FAKE_TERM_MODE=forbid)          # a terminal that must never run: it leaves a marker if called
-ORIENT="/orchestration-kit:orient"
+ORIENT="/orcastration-kit:orient"
 
 # R0. ISOLATION tripwire (the m7 incident, 2026-10-03: a mutant made a detached copy lose --terminal, it
 #     auto-detected the terminal, and on this WSL box that was the REAL wt.exe: a Windows Terminal tab opened

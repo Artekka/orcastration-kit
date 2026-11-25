@@ -129,7 +129,7 @@ out="$(printf '{"tool_input":{"command":"git stash"},"cwd":"%s"}' "$R" | bash "$
 [ "$out" = "exit=0" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL [e2e] off: want silent exit 0, got: $out"; }
 sed -i.bak 's/git_guard:.*/git_guard: on/' "$R/docs/orchestration/ORCHESTRATION.md"
 out="$(json_cmd 'git stash' | sed "s#^{#{\"cwd\":\"$R\",#" | bash "$HOOK")"
-case "$out" in *'"permissionDecisionReason":"Blocked by orchestration-kit git guard. git stash is blocked'*) pass=$((pass+1)) ;;
+case "$out" in *'"permissionDecisionReason":"Blocked by orcastration-kit git guard. git stash is blocked'*) pass=$((pass+1)) ;;
   *) fail=$((fail+1)); echo "FAIL [e2e] deny reason text: $out" ;; esac
 
 echo "git-guard: awks:$AWKS — $pass passed, $fail failed"

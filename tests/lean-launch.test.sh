@@ -67,7 +67,7 @@ has "effort line says not passed" "effort     default (not passed)" "$out"
 
 # 2. Explicit: the flags land in the command, after --name, before the prompt.
 out="$(rs --model 'sonnet[1m]' --effort high ZzNone)"
-has "explicit model + effort in order" '--name ZzNone --model sonnet\[1m\] --effort high /orchestration-kit:orient' "$out"
+has "explicit model + effort in order" '--name ZzNone --model sonnet\[1m\] --effort high /orcastration-kit:orient' "$out"
 has "explicit source shown" "model      sonnet[1m] (--model)" "$out"
 out="$(rs --model haiku ZzNone)"
 has "bare model id (haiku, no [1m])" '--model haiku' "$out"
@@ -79,7 +79,7 @@ has "mode flag and model flag coexist" '--permission-mode auto --model sonnet\[1
 # A lean-start prompt (`orient --brief <ROW>`) passes launch validation on a POSIX and a WSL backend
 # and reaches the command intact.
 for b in manual wsl-wt; do
-  out="$(lrun bash "$RS" --dry-run --terminal "$b" --repo "$ROOT" --model 'sonnet[1m]' ZzNone "/orchestration-kit:orient --brief ROW-12" 2>&1; echo "rc=$?")"
+  out="$(lrun bash "$RS" --dry-run --terminal "$b" --repo "$ROOT" --model 'sonnet[1m]' ZzNone "/orcastration-kit:orient --brief ROW-12" 2>&1; echo "rc=$?")"
   has "brief prompt accepted on $b" "orient\\ --brief\\ ROW-12" "$out"
   has "brief prompt exits 0 on $b" "rc=0" "$out"
 done
@@ -210,7 +210,7 @@ done
 # claude: `recycle-sibling.sh ZzNone --bogus` used to exit 0 with `--bogus` in argv. A third
 # positional is refused too. (A prompt that starts with `/` is the normal case and stays fine.)
 for badargs in "--bogus ZzNone" "ZzNone --bogus" "ZzNone -x" "-x" "--dangerously-skip-permissions ZzNone" \
-               "ZzNone /orchestration-kit:orient extra"; do
+               "ZzNone /orcastration-kit:orient extra"; do
   # shellcheck disable=SC2086  # word-splitting the case string into argv is the point
   out="$(rs $badargs; echo "rc=$?")"
   has "recycle-sibling refuses '$badargs' rc 64" "rc=64" "$out"
@@ -232,12 +232,12 @@ done
 
 # The shared check is the last line of defense for a name or prompt a caller built itself (the flag
 # parsers above refuse `-x` first, so only a direct call reaches it).
-for pair in "-x|/orchestration-kit:orient" "ZzNone|-x" "ZzNone|--dangerously-skip-permissions"; do
+for pair in "-x|/orcastration-kit:orient" "ZzNone|-x" "ZzNone|--dangerously-skip-permissions"; do
   out="$(bash -c '. "$1/scripts/lib-launch.sh"; launch_check_args "$2" "$3"; echo ok' _ "$ROOT" "${pair%%|*}" "${pair#*|}" 2>&1; echo "rc=$?")"
   has "launch_check_args refuses '$pair' rc 64" "rc=64" "$out"
   hasnt "launch_check_args '$pair' does not pass" "ok" "${out%rc=*}"
 done
-out="$(bash -c '. "$1/scripts/lib-launch.sh"; launch_check_args ZzNone /orchestration-kit:orient; echo ok' _ "$ROOT" 2>&1; echo "rc=$?")"
+out="$(bash -c '. "$1/scripts/lib-launch.sh"; launch_check_args ZzNone /orcastration-kit:orient; echo ok' _ "$ROOT" 2>&1; echo "rc=$?")"
 has "launch_check_args accepts a normal name + slash prompt" "ok" "$out"
 
 # -h/--help prints the usage and is NOT reported as an unknown flag (the `-*)` arm would otherwise

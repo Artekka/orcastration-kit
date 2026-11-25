@@ -38,7 +38,7 @@ has "CHANGELOG: own-commands users are told how to keep the chip" "$S" "$(cat "$
 for k in quietModeFlagFile quietModeStatusCmd quietModeOnCmd quietModeOffCmd quietModeRequiresFile showForNames; do has "manifest: key $k" "$k" "$man"; done
 hasnt "manifest: no gameMode keys" "gameMode" "$man"
 has "manifest: showForNames defaults to the kit's default seat" "seatdefault=Orca" "$man"
-has "manifest: quiet-mode flag defaults to the kit's runtime file" "flagdefault=~/.orchestration-kit/runtime/quiet-mode" "$man"
+has "manifest: quiet-mode flag defaults to the kit's runtime file" "flagdefault=~/.orcastration-kit/runtime/quiet-mode" "$man"
 has "manifest: on command is the kit's quiet-mode script" "ondefault=bash scripts/quiet-mode.sh on" "$man"
 has "manifest: the chip is gated on the kit's quiet-mode script" '"default": "scripts/quiet-mode.sh"' "$(cat "$M")"
 # every place a user learns the HUD explains the WORK/QUIET chip (what it does, when it shows)
@@ -74,7 +74,7 @@ for p in json.load(open(sys.argv[1]))["plugins"]:
     print(p["name"] + "=" + p["source"])
 PY
 )"
-has "marketplace: the kit stays" "orchestration-kit=./" "$mk"
+has "marketplace: the kit stays" "orcastration-kit=./" "$mk"
 has "marketplace: lists the HUD" "status-hud=./plugins/status-hud" "$mk"
 run="$(cat "$ROOT/tests/run.sh")"
 has "run.sh: runs the HUD's own suite" "claude plugin test" "$run"
@@ -166,7 +166,7 @@ print("seat=" + d.get("showForNames", "")); print("flag=" + d.get("quietModeFlag
 print("on=" + d.get("quietModeOnCmd", "")); print("off=" + d.get("quietModeOffCmd", ""))
 print("strings=" + str(all(isinstance(x, str) for x in d.values())))' 2>&1)"
 has "HUD Yes: showForNames = the team's seat" "seat=Captain" "$v"
-has "HUD Yes: quiet-mode flag file under the kit runtime dir" "flag=$H/.orchestration-kit/runtime/quiet-mode" "$v"
+has "HUD Yes: quiet-mode flag file under the kit runtime dir" "flag=$H/.orcastration-kit/runtime/quiet-mode" "$v"
 has "HUD Yes: quiet-mode on" "on=bash scripts/quiet-mode.sh on" "$v"
 has "HUD Yes: quiet-mode off" "off=bash scripts/quiet-mode.sh off" "$v"
 has "HUD Yes: values are single-line strings (configure --values-stdin)" "strings=True" "$v"

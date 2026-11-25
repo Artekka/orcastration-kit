@@ -36,8 +36,8 @@ test('state comes from the flag file, else the status command, else it is hidden
   expect(await quietModeOn(f.io, parseConfig({}, '/h'), async () => true)).toBe(null)
 })
 
-test('a ~ in the quiet-mode flag file means home (the kit default is ~/.orchestration-kit/runtime/quiet-mode)', () => {
-  expect(parseConfig({ quietModeFlagFile: '~/.orchestration-kit/runtime/quiet-mode' }, '/h').quietFlagFile).toBe('/h/.orchestration-kit/runtime/quiet-mode')
+test('a ~ in the quiet-mode flag file means home (the kit default is ~/.orcastration-kit/runtime/quiet-mode)', () => {
+  expect(parseConfig({ quietModeFlagFile: '~/.orcastration-kit/runtime/quiet-mode' }, '/h').quietFlagFile).toBe('/h/.orcastration-kit/runtime/quiet-mode')
   expect(parseConfig({ quietModeFlagFile: '/abs/q' }, '/h').quietFlagFile).toBe('/abs/q')
   expect(parseConfig({ quietModeFlagFile: '~x/q' }, '/h').quietFlagFile).toBe('~x/q')
 })

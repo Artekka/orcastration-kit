@@ -2,7 +2,7 @@
 # Skill files must survive the skill loader. When a skill is invoked WITH arguments, Claude Code replaces
 # `$ARGUMENTS`, `$ARGUMENTS[N]` and every `$N` (a dollar sign and digits) in the rendered SKILL.md with the
 # arguments, including inside fenced shell and awk. The file on disk stays correct, so only the RENDERED
-# text breaks: `/orchestration-kit:orient --brief ROW` once turned the banner awk's `$0` into "--brief",
+# text breaks: `/orcastration-kit:orient --brief ROW` once turned the banner awk's `$0` into "--brief",
 # which matched no line and told the builder "no banner, no seat" on a live team.
 # Two layers: (1) a static ban on positional tokens in every skill file, with an exact-count allowlist;
 # (2) the shell blocks that use variables are RENDERED with arguments, as the loader does, and then run.

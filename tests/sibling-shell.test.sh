@@ -11,12 +11,12 @@ W() { WRAPPER_ARGS=("$@"); run_wrapper ${WENV[@]+"${WENV[@]}"}; }
 
 # 1. claude runs with --name FIRST and an explicit --model/--effort, then the prompt.
 sandbox; WENV=(); n=$(nameFor W1)
-W "$n" --model 'opus[1m]' --effort high "/orchestration-kit:orient --brief X"
+W "$n" --model 'opus[1m]' --effort high "/orcastration-kit:orient --brief X"
 eq "W1 exit 0" 0 "$RC"; eq "W1 one launch" 1 "$(nlaunch)"
-eq "W1 argv" "--name|$n|--model|opus[1m]|--effort|high|/orchestration-kit:orient --brief X|" "$(argv_of 1)"
+eq "W1 argv" "--name|$n|--model|opus[1m]|--effort|high|/orcastration-kit:orient --brief X|" "$(argv_of 1)"
 # default prompt when none is given
 sandbox; n=$(nameFor W1d); W "$n" --model haiku
-eq "W1 default prompt is the orient skill" "--name|$n|--model|haiku|/orchestration-kit:orient|" "$(argv_of 1)"
+eq "W1 default prompt is the orient skill" "--name|$n|--model|haiku|/orcastration-kit:orient|" "$(argv_of 1)"
 
 # 1b. --mode: the permission flags sit between --name and --model, exactly where lib-launch.sh puts them.
 for m in normal accept-edits auto; do

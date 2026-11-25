@@ -212,7 +212,7 @@ has "T17 nothing forced, the reset hint is the last line" "git checkout --detach
 sandbox; branch feat src/b.txt new
 sm SEAT_MERGE_RUNTIME_DIR= KIT_RUNTIME_DIR="$SB/kitrt" -- feat "$BSHA" "m"
 eq "T18 exit 0" 0 "$RC"; eq "T18 the lock lives under KIT_RUNTIME_DIR" 1 "$(ls "$SB/kitrt/seat-merge"/*.lock 2>/dev/null | wc -l | tr -d ' ')"
-eq "T18 and not under HOME" no "$([ -d "$SB/home/.orchestration-kit" ] && echo yes || echo no)"
+eq "T18 and not under HOME" no "$([ -d "$SB/home/.orcastration-kit" ] && echo yes || echo no)"
 sandbox; branch feat src/b.txt new
 sm KIT_RUNTIME_DIR="$SB/kitrt" -- feat "$BSHA" "m"
 eq "T18 SEAT_MERGE_RUNTIME_DIR beats KIT_RUNTIME_DIR" 0 "$(ls "$SB/kitrt/seat-merge" 2>/dev/null | wc -l | tr -d ' ')"

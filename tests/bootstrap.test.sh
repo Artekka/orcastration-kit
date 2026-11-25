@@ -100,6 +100,15 @@ before="$(snap "$P")"
 bash "$BS" "$P" --dry-run --with-team-agents >/dev/null 2>&1
 [ "$before" = "$(snap "$P")" ] && ok || bad "dry-run on an existing project changed files"
 
+# 0.17.0 plugin-id rename: a fresh install writes the new managed marker, and a project still carrying the 0.16
+# marker is recognized (SKIP + diff, never a second section appended), and the scripts' state-home lib travels with them.
+OLDM="<!-- orch""estration-kit v0.8.0 — managed section; upgrades diff against this marker -->"
+head -1 "$P/CLAUDE.md" | grep -q '^<!-- orcastration-kit v' && ok || bad "a fresh CLAUDE.md does not open with the orcastration-kit marker"
+[ -f "$P/scripts/lib-kit-home.sh" ] && ok || bad "first run did not create scripts/lib-kit-home.sh"
+P16="$TMP/p16"; mkdir -p "$P16"; printf '%s\n## Multi-session orchestration\n' "$OLDM" > "$P16/CLAUDE.md"
+out="$(bash "$BS" "$P16" 2>&1)"
+echo "$out" | grep -q 'SKIP  CLAUDE.md section' && ok || bad "a 0.16-marker CLAUDE.md is not recognized as the kit section: $(echo "$out" | grep CLAUDE.md)"
+echo "$out" | grep -q 'NOTE  CLAUDE.md exists WITHOUT' && bad "a 0.16-marker CLAUDE.md is reported as having no kit section" || ok
 bash "$BS" "$P" --bogus >/dev/null 2>&1; rc=$?
 [ $rc -eq 2 ] && ok || bad "unknown flag exit $rc (want 2)"
 

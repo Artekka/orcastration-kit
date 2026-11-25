@@ -156,10 +156,10 @@ kill "$(cat "$TMP/daemon.pid")" 2>/dev/null
 #     they share: if they disagreed, quiet mode would silently do nothing)
 H="$TMP/home"; mkdir -p "$H"
 out="$(env -u KIT_RUNTIME_DIR HOME="$H" bash "$QM" on)"
-[ -f "$H/.orchestration-kit/runtime/quiet-mode" ] && ok || bad "quiet-mode default flag is not at \$HOME/.orchestration-kit/runtime/quiet-mode"
+[ -f "$H/.orcastration-kit/runtime/quiet-mode" ] && ok || bad "quiet-mode default flag is not at \$HOME/.orcastration-kit/runtime/quiet-mode"
 env -u KIT_RUNTIME_DIR HOME="$H" GATE_SLOTS=1 timeout 2 bash "$GT" bash -c 'echo default-dir >> "$LOG"' 2>/dev/null
 ! grep -qx default-dir "$LOG" 2>/dev/null && ok || bad "gate-throttle did not see quiet mode at the default dir (the two scripts disagree)"
-[ -d "$H/.orchestration-kit/runtime/locks" ] && ok || bad "gate-throttle default runtime dir is not under HOME"
+[ -d "$H/.orcastration-kit/runtime/locks" ] && ok || bad "gate-throttle default runtime dir is not under HOME"
 grep -n 'KIT_RUNTIME_DIR:-' "$GT" "$QM" | grep -q '/tmp' && bad "a default runtime dir names /tmp" || ok
 env -u KIT_RUNTIME_DIR HOME="$H" bash "$QM" off >/dev/null
 

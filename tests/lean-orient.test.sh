@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for the lean `/orchestration-kit:orient --brief <ROW>` steps and the model-per-lane / recycle
+# Tests for the lean `/orcastration-kit:orient --brief <ROW>` steps and the model-per-lane / recycle
 # wording. The lean steps are COMMANDS in a table in skills/orient/SKILL.md; this
 # suite EXTRACTS them from the skill file and runs them against a real fixture, so editing the skill to
 # something broken turns it red (a copy of the command in this file would stay green).
@@ -221,7 +221,7 @@ for fx in \
 done
 # ...and the legitimate phrasings, alone and combined on one long line, are NOT flagged (false-flag control).
 for fx in \
-  'a bare `/clear` keeps that terminal'"'"'s OLD model; if you must `/clear`, run `/model <lane model>` first, then `/orchestration-kit:orient`' \
+  'a bare `/clear` keeps that terminal'"'"'s OLD model; if you must `/clear`, run `/model <lane model>` first, then `/orcastration-kit:orient`' \
   'terminal uptime survives `/clear`. Retro-before-clear is a **handshake**. Never pre-announce a clear. A bounded job with a clear output.' \
   'closed and relaunched with an explicit `--model` (a bare `/clear` keeps the old model).' \
   'never a bare `/clear`) when recycling isn'"'"'t available.' \
