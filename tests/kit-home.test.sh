@@ -16,8 +16,8 @@ eq()  { [ "$2" = "$3" ] && ok || bad "$1: want '$2', got '$3'"; }
 OLDN=".orch""estration-kit"   # the 0.16 folder name, split so docs-pins' old-id sweep never needs this file on its list
 fresh() { H="$TMP/h$1"; rm -rf "$H"; mkdir -p "$H"; }
 kh() {  # run kit_home under the fake HOME; stdout -> OUT, stderr -> ERR
-  OUT="$(HOME="$H" bash -c '. "$1" && kit_home' _ "$LIB" 2>"$TMP/err")"; ERR="$(cat "$TMP/err")"
-}
+  OUT="$(HOME="$H" bash -c '. "$1" && kit_home' _ "$LIB" 2>"$TMP/err")"; KRC=$?; ERR="$(cat "$TMP/err")"
+}   # KRC = kit_home's exit status
 [ -f "$LIB" ] || { echo "FAIL scripts/lib-kit-home.sh is missing"; echo "kit-home: $pass passed, 1 failed"; exit 1; }
 
 # A. Neither folder: the new name, nothing created (callers mkdir what they need), nothing said.
@@ -100,7 +100,8 @@ fi
 
 # G. A dangling link at the new name (its target is gone): kit_home heals it, says so in one line, and the callers work.
 #    The heal re-applies the normal rule: the 0.16 folder exists -> link to it again; else a real new folder.
-fresh G; ln -s ".gone-folder" "$H/.orcastration-kit"; kh; rc=$?
+fresh G; ln -s ".gone-folder" "$H/.orcastration-kit"; kh
+eq "G exit" 0 "$KRC"
 eq "G path" "$H/.orcastration-kit" "$OUT"
 [ -d "$H/.orcastration-kit" ] && [ ! -L "$H/.orcastration-kit" ] && ok || bad "G: the dangling link was not replaced by a real folder"
 eq "G one line" 1 "$(printf '%s\n' "$ERR" | grep -c .)"
@@ -127,11 +128,11 @@ fi
 
 # H. The new name is something kit_home must never remove (a regular file, a link to a file): kit_home fails non-zero,
 #    leaves it alone, and every caller exits non-zero instead of running on a path that cannot hold state.
-fresh H; echo mine > "$H/.orcastration-kit"; kh; rc=$?
+fresh H; echo mine > "$H/.orcastration-kit"; kh; rc=$KRC
 [ "$rc" -ne 0 ] && ok || bad "H: kit_home returned 0 for a regular file at the new name"
 eq "H the file is untouched" mine "$(cat "$H/.orcastration-kit" 2>/dev/null)"
 case "$ERR" in *orcastration-kit*) ok;; *) bad "H: kit_home said nothing: $ERR";; esac
-fresh H1; echo f > "$H/target-file"; ln -s target-file "$H/.orcastration-kit"; kh; rc=$?
+fresh H1; echo f > "$H/target-file"; ln -s target-file "$H/.orcastration-kit"; kh; rc=$KRC
 [ "$rc" -ne 0 ] && ok || bad "H1: kit_home returned 0 for a link to a file"
 [ -L "$H/.orcastration-kit" ] && [ "$(cat "$H/target-file")" = f ] && ok || bad "H1: a live link (to a file) was removed or changed"
 # every caller, with no env override, must exit non-zero (and run nothing)

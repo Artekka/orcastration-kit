@@ -91,7 +91,7 @@ esac
 _guard="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/gate-disk-guard.sh"
 if [ -f "$_guard" ]; then bash "$_guard" || exit 1; fi
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib-kit-home.sh" || { echo "gate-throttle: lib-kit-home.sh is missing beside this script" >&2; exit 64; }
-RT="${KIT_RUNTIME_DIR:-$(kit_home)/runtime}"
+if [ -n "${KIT_RUNTIME_DIR:-}" ]; then RT="$KIT_RUNTIME_DIR"; else RT="$(kit_home)" || exit 1; RT="$RT/runtime"; fi   # kit_home said why
 FLOCK="${KIT_FLOCK_BIN:-flock}"
 if ! command -v "$FLOCK" >/dev/null 2>&1; then
   echo "gate-throttle: flock not found (Linux: util-linux; macOS: brew install flock); running UNTHROTTLED" >&2

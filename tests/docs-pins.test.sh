@@ -45,7 +45,8 @@ grep -qE '^## (Two modes|Practice mode)' "$ROOT/$R" && { fail=$((fail+1)); echo 
 # 0.17.0: the plugin id is orcastration-kit, one spelling everywhere it is the id (install, enabledPlugins key,
 # /orcastration-kit:<skill>, the state folder). The 0.16 id may appear only where it is history or the upgrade path:
 # CHANGELOG entries (not its title), the README "Upgrading from 0.16" section, the marketplace renames map, the
-# recorded Station fixture, and code lines that carry "0.16" because they read the 0.16 folder or marker.
+# recorded Station fixture, kit-init's two upgrade lines (the copied-scripts note and step 4), and the lines tagged
+# "the 0.16 folder" in lib-kit-home.sh and ctx-guard.py. A line that merely mentions "0.16" elsewhere is a stray.
 OLD="orch""estration-kit"
 pin "plugin.json name is the new id" .claude-plugin/plugin.json '"name": "orcastration-kit"'
 pin "README install command" README.md "claude plugin install orcastration-kit@artekka-kits"
@@ -83,7 +84,8 @@ stray_lines() {
   f == "CHANGELOG.md" && line !~ /^# / { next }
   f == "station/crates/core/tests/fixtures/synthetic_session.jsonl" || f == "station/crates/core/tests/fixtures/README.md" || f == "station/crates/core/tests/fixtures_test.rs" { next }
   f == ".claude-plugin/marketplace.json" && line ~ /^ *"[a-z-]+": "orcastration-kit"/ { next }
-  index(line, "0.16") { next }
+  f == "skills/kit-init/SKILL.md" && (line ~ /^   \*\*Scripts copied on 0\.16 / || line ~ /^4\. \*\*CLAUDE\.md section\*\* /) { next }
+  (f == "scripts/lib-kit-home.sh" || f == "hooks/ctx-guard.py") && index(line, "the 0.16 folder") { next }
   { sub(/^\.\//, ""); print }')"
   up="$(awk '/^## Upgrading from 0\.16/{on=1;next} on && /^## /{on=0} on' "$root/README.md" 2>/dev/null)"
   printf '%s\n' "$st" | while IFS= read -r l; do

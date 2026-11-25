@@ -31,12 +31,30 @@ def _kit_home():
     """The kit's state home, the same rule as scripts/lib-kit-home.sh (tests/kit-home.test.sh pins both).
 
     When only the 0.16 folder (~/.orchestration-kit, before the 0.17.0 id rename) exists, the new name becomes a
-    relative symlink to it in one step, so 0.16 copies of the scripts and this hook keep sharing one folder."""
+    relative symlink to it in one step, so 0.16 copies of the scripts and this hook keep sharing one folder.
+    A dangling link at the new name is removed and the rule runs again. Anything else there that is not a folder
+    is left alone and the hook exits 1 (one line on stderr), never running on a path that cannot hold state."""
     home = os.path.expanduser("~")
     new, oldname = os.path.join(home, ".orcastration-kit"), ".orchestration-kit"  # the 0.16 folder name
     old = os.path.join(home, oldname)
-    if os.path.lexists(new):
-        if os.path.isdir(old) and not os.path.exists(os.path.join(new, ".kit-home-both-warned")) \
+    if os.path.islink(new) and not os.path.exists(new):
+        gone = os.readlink(new)
+        try:
+            if os.path.islink(new) and not os.path.exists(new):  # re-checked right before the unlink
+                os.unlink(new)
+        except OSError:
+            pass
+        try:
+            if os.path.isdir(old):
+                os.symlink(oldname, new)
+            else:
+                os.makedirs(new, exist_ok=True)
+        except OSError:
+            pass  # a racing twin healed it first: the check below decides
+        sys.stderr.write("orcastration-kit: ~/.orcastration-kit was a link to a missing folder (%s); %s\n" % (
+            gone, "it links to the 0.16 folder ~/%s again" % oldname if os.path.isdir(old) else "replaced it with a new empty folder"))
+    elif os.path.lexists(new):
+        if os.path.isdir(old) and os.path.isdir(new) and not os.path.exists(os.path.join(new, ".kit-home-both-warned")) \
                 and os.path.realpath(new) != os.path.realpath(old):
             sys.stderr.write("orcastration-kit: both ~/.orcastration-kit and the 0.16 folder ~/%s exist; using ~/.orcastration-kit\n" % oldname)
             try:
@@ -49,6 +67,9 @@ def _kit_home():
             sys.stderr.write("orcastration-kit: state folder is now ~/.orcastration-kit (a link to the 0.16 folder ~/%s)\n" % oldname)
         except OSError:
             pass  # a racing twin made it first, or HOME is read-only: the new name is used either way
+    if os.path.lexists(new) and not os.path.isdir(new):
+        sys.stderr.write("orcastration-kit: ~/.orcastration-kit is not a folder (a file or a broken link); move it away, then run this again\n")
+        sys.exit(1)
     return new
 
 

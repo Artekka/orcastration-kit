@@ -10,11 +10,21 @@ Newest first.
   the install command, the `enabledPlugins` key, the `/orcastration-kit:<skill>` prefix, the launch prompts and the
   scripts' state folder `~/.orcastration-kit/`. The 0.16.3 README note about two spellings is gone.
 - **Added: a `renames` map in the marketplace** (`orchestration-kit` → `orcastration-kit`): Claude Code moves an existing install
-  to the new id and rewrites the settings keys itself. Append-only history; `claude plugin validate .` checks it.
+  to the new id and migrates the `enabledPlugins` key in your user settings; project and local settings may need the manual
+  step below. Append-only history; `claude plugin validate .` checks it.
 - **Added: `scripts/lib-kit-home.sh`**, the one rule for the state folder (ctx-guard.py carries it in python): when only
   `~/.orchestration-kit/` exists, `~/.orcastration-kit` becomes a link to it in one step and one line says so, so tabs started on
   0.16 keep their recycle hand-offs; both folders = the new one plus one warning; env overrides still win.
-- **Changed: `kit-init` and `bootstrap.sh`** recognize a CLAUDE.md section carrying the 0.16 marker and write the new one.
+- **Changed: `kit-init` and `bootstrap.sh`** recognize a CLAUDE.md section carrying the 0.16 marker and write the new one;
+  kit-init names both 0.16 markers, the opening and the closing one.
+- **Fixed: a dangling `~/.orcastration-kit` link** (its target moved or deleted) is healed by the scripts and the context guard:
+  the link is removed, then it links to the 0.16 folder again if that exists, else a new empty folder is made, with one line.
+  Anything else there that is not a folder (a file, a link to a file) is left alone, and every script that keeps state
+  (gate-throttle, quiet-mode, seat-merge, the launch libraries, sibling-shell, the context guard) stops with a non-zero exit.
+  Before, `quiet-mode.sh on` printed a mkdir error and exited 0 with quiet mode still off.
+- **Fixed: the docs check's sweep for the 0.16 id** allows it only in the named places (history, the upgrade sections, the
+  renames map, the recorded Station fixture, kit-init's upgrade lines, the state-folder code). A line that merely mentions
+  "0.16" no longer passes.
 
 ### Upgrading from 0.16
 
@@ -23,9 +33,10 @@ claude plugin marketplace update artekka-kits
 /plugin install orcastration-kit@artekka-kits      # once, in a session (or: claude plugin install orcastration-kit@artekka-kits --scope project)
 ```
 
-Restart the sessions; use `/orcastration-kit:<skill>` from then on. A Claude Code too old for `renames`:
+Restart the sessions; use `/orcastration-kit:<skill>` from then on. A project or local settings file that still names the
+old id, or a Claude Code too old for `renames`:
 `claude plugin uninstall orchestration-kit --scope project`, then the install above, and change the `enabledPlugins` key
-`"orchestration-kit@artekka-kits"` to `"orcastration-kit@artekka-kits"` in `.claude/settings.json`.
+`"orchestration-kit@artekka-kits"` to `"orcastration-kit@artekka-kits"` in `.claude/settings.json` and `.claude/settings.local.json`.
 Then run `/orcastration-kit:kit-init` once in each project adopted on 0.16: it offers to refresh the copied launch scripts,
 whose default prompt still carries the old prefix.
 

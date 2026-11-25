@@ -189,8 +189,9 @@ if [ "$detach" = yes ]; then
   # The copy's stdout/stderr go to a log, because this process (and the seat's tool call that holds it)
   # is gone by the time the copy fails or finishes. Print the path BEFORE detaching so a failure after
   # the old claude dies is still diagnosable. The copy reads the same flags back from $orig_args.
-  mkdir -p "$(launch_state_dir)"
-  detach_log="$(launch_state_dir)/$name.recycle.log"
+  sd="$(launch_state_dir)" || exit 1   # kit_home said why
+  mkdir -p "$sd"
+  detach_log="$sd/$name.recycle.log"
   : > "$detach_log"
   self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
   echo "detaching: a copy will SIGTERM claude ${old} in ${RECYCLE_DETACH_DELAY:-2}s and restart '${name}' in place under wrapper ${wrapper_pid}; log: ${detach_log}"

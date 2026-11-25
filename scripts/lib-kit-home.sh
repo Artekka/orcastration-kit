@@ -3,7 +3,8 @@
 # script that keeps state (gate-throttle, quiet-mode, seat-merge, lib-launch, lib-model-tag, sibling-shell).
 # hooks/ctx-guard.py carries the same rule in python; tests/kit-home.test.sh pins both.
 #
-#   kit_home   prints ~/.orcastration-kit (it does not create it; callers mkdir what they need).
+#   kit_home   prints ~/.orcastration-kit (it does not create it; callers mkdir what they need), or prints one line on
+#              stderr and returns 1 when that path cannot be a folder. Callers stop on that non-zero status.
 #
 # Why a link and not a move (0.17.0 renamed the plugin id from the 0.16 spelling): every open tab runs a
 # sibling-shell.sh loop that fixed its state folder when it started, and kit-init copied the scripts into each
@@ -15,14 +16,29 @@
 # flocks stay correct because they lock the same inodes.
 # Both real folders (someone made the new one by hand): the new one wins, with one warning on stderr
 # (a marker file inside the new folder keeps it to one).
+# A dangling link at the new name (its target was moved or deleted): only that link is removed, then the rule above runs
+# again (the 0.16 folder exists -> link to it; else a real new folder), with one line. Anything else at the new name that
+# is not a folder (a regular file, a link to a file) is never touched: kit_home fails, so no caller runs on a path that
+# cannot hold state (0.17.0 READ: `quiet-mode.sh on` printed a mkdir error and exited 0 with quiet mode still OFF).
 # Env overrides (KIT_RUNTIME_DIR, SIBLING_STATE_DIR, KIT_STATE_DIR, SEAT_MERGE_RUNTIME_DIR) are applied by the
 # callers before they call kit_home, so an override never migrates anything.
 
 kit_home() {
   local new="$HOME/.orcastration-kit" oldname=".orchestration-kit"   # the 0.16 folder name
-  local old="$HOME/$oldname"
-  if [ -e "$new" ] || [ -L "$new" ]; then
-    if [ -d "$old" ] && [ ! -e "$new/.kit-home-both-warned" ] \
+  local old="$HOME/$oldname" gone
+  if [ -L "$new" ] && [ ! -e "$new" ]; then
+    gone="$(readlink "$new" 2>/dev/null)"
+    # Re-checked right before rm: only a link whose target is still missing is removed (rm without -r never removes a folder).
+    if [ -L "$new" ] && [ ! -e "$new" ]; then rm -f -- "$new" 2>/dev/null; fi
+    if [ -d "$old" ]; then
+      ln -s "$oldname" "$new" 2>/dev/null   # EEXIST = a racing twin healed it first; the check below decides
+      echo "orcastration-kit: ~/.orcastration-kit was a link to a missing folder ($gone); it links to the 0.16 folder ~/$oldname again" >&2
+    else
+      mkdir -p "$new" 2>/dev/null
+      echo "orcastration-kit: ~/.orcastration-kit was a link to a missing folder ($gone); replaced it with a new empty folder" >&2
+    fi
+  elif [ -e "$new" ] || [ -L "$new" ]; then
+    if [ -d "$old" ] && [ -d "$new" ] && [ ! -e "$new/.kit-home-both-warned" ] \
        && [ "$(cd "$new" 2>/dev/null && pwd -P)" != "$(cd "$old" 2>/dev/null && pwd -P)" ]; then
       echo "orcastration-kit: both ~/.orcastration-kit and the 0.16 folder ~/$oldname exist; using ~/.orcastration-kit (move anything you still need from the old one, then delete it)" >&2
       : > "$new/.kit-home-both-warned" 2>/dev/null
@@ -31,6 +47,11 @@ kit_home() {
     if ln -s "$oldname" "$new" 2>/dev/null; then
       echo "orcastration-kit: state folder is now ~/.orcastration-kit (a link to the 0.16 folder ~/$oldname, so tabs started on 0.16 keep working)" >&2
     fi
+  fi
+  # Something at the new name that is not a folder cannot hold state: say so and fail (it is left as it is).
+  if { [ -e "$new" ] || [ -L "$new" ]; } && [ ! -d "$new" ]; then
+    echo "orcastration-kit: ~/.orcastration-kit is not a folder (a file or a broken link); move it away, then run this again" >&2
+    return 1
   fi
   printf '%s' "$new"
 }

@@ -71,6 +71,10 @@ branch="${1#origin/}"; expected="$2"; msg="$3"
 SEAT_MERGE_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib-kit-home.sh
 . "$SEAT_MERGE_LIB/lib-kit-home.sh"
+# The runtime dir, resolved before anything else runs: a kit home that cannot be a folder stops the run here (kit_home says why).
+if [ -n "${SEAT_MERGE_RUNTIME_DIR:-}" ]; then RT="$SEAT_MERGE_RUNTIME_DIR"
+elif [ -n "${KIT_RUNTIME_DIR:-}" ]; then RT="$KIT_RUNTIME_DIR"
+else RT="$(kit_home)" || exit 2; RT="$RT/runtime"; fi
 # shellcheck source=lib-builder-worktree.sh
 . "$SEAT_MERGE_LIB/lib-builder-worktree.sh"
 # shellcheck source=lib-waiting-tickets.sh
@@ -165,7 +169,7 @@ fi
 # file, taken BEFORE git is touched. The file lives in the runtime dir (never /tmp, never inside the worktree), keyed by the
 # worktree's absolute path. The kernel holds the flock, not the file, so a lock left by a dead run (or by a reboot) never
 # blocks. The holder writes its pid into the file for the refusal message.
-RT="${SEAT_MERGE_RUNTIME_DIR:-${KIT_RUNTIME_DIR:-$(kit_home)/runtime}}"
+# RT is resolved right after the libraries are loaded (kit_home can fail).
 # Never in the shared checkout. A failed run leaves the worktree detached on an UNPUSHED merge, which under the one shared
 # checkout would sit under every sibling's `git status`. A linked worktree has its own git dir; the main working tree's git
 # dir IS the common dir.

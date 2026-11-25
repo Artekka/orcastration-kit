@@ -140,9 +140,10 @@ markers keep your customizations safe).
 ## Upgrading from 0.16
 
 0.17.0 renames the plugin id from `orchestration-kit` to `orcastration-kit`, so the product, the repo and the id
-are spelled the same way. The marketplace carries a `renames` map, so Claude Code moves an existing install
-to the new id by itself and rewrites the `enabledPlugins` key in your user, project and local settings.
-Because the marketplace is a git repo, the new id needs one install, once:
+are spelled the same way. The marketplace carries a `renames` map: when Claude Code cannot find the old id, it follows
+the map and migrates the `enabledPlugins` key in your user settings to the new id.
+Project and local settings (`.claude/settings.json`, `.claude/settings.local.json`) may keep the old key; change it there
+by hand as shown below. Because the marketplace is a git repo, the new id needs one install, once:
 
 ```bash
 claude plugin marketplace update artekka-kits
@@ -151,14 +152,16 @@ claude plugin marketplace update artekka-kits
 
 Then restart the sessions and type `/orcastration-kit:<skill>` from then on (the old `/orchestration-kit:` prefix stops working).
 
-If your Claude Code is too old to know the `renames` map (the old id reports "not found in marketplace"), do it by hand:
+If a project or local settings file still names the old id, or your Claude Code is too old to know the `renames` map
+(the old id reports "not found in marketplace"), do it by hand:
 
 ```bash
 claude plugin uninstall orchestration-kit --scope project
 claude plugin install orcastration-kit@artekka-kits --scope project
 ```
 
-and in `.claude/settings.json` change the key `"orchestration-kit@artekka-kits"` under `enabledPlugins` to `"orcastration-kit@artekka-kits"`.
+and in `.claude/settings.json` and `.claude/settings.local.json` change the key `"orchestration-kit@artekka-kits"` under
+`enabledPlugins` to `"orcastration-kit@artekka-kits"`.
 Settings an admin manages are not rewritten for you; ask the admin to change that key.
 
 The state folder moves with the id: the scripts now use `~/.orcastration-kit/`. When only the 0.16 folder `~/.orchestration-kit/` exists,

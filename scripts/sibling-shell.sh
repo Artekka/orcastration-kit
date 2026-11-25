@@ -49,7 +49,9 @@ set -uo pipefail
 
 main() {
   local name="" model="" effort="" mode="normal" prompt="/orcastration-kit:orient" have_prompt=0
-  local state_dir="${SIBLING_STATE_DIR:-$(kit_home)/sessions}"   # kit_home: lib-kit-home.sh, via lib-model-tag.sh
+  local state_dir   # kit_home: lib-kit-home.sh, via lib-model-tag.sh; a kit home that cannot be a folder stops the wrapper
+  if [ -n "${SIBLING_STATE_DIR:-}" ]; then state_dir="$SIBLING_STATE_DIR"
+  else state_dir="$(kit_home)" || return 1; state_dir="$state_dir/sessions"; fi
   local min_run="${SIBLING_MIN_RUN_SECS:-5}"
 
   while [ $# -gt 0 ]; do

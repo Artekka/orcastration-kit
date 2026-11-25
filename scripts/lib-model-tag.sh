@@ -57,7 +57,13 @@ model_tag_preflight() {  # <model> [acct dir]
   [[ "$m" =~ ^(opus|sonnet|haiku|fable)(\[1m\])?$ ]] && return 0
   [ "${MODEL_PREFLIGHT:-1}" = 0 ] && return 0
   if ! command -v claude >/dev/null 2>&1; then _model_tag_warn "no claude on PATH, so '$m' was not checked"; return 0; fi
-  local ver key dir out verdict cwd rt="${KIT_RUNTIME_DIR:-$(kit_home)/runtime}"
+  local ver key dir out verdict cwd rt
+  if [ -n "${KIT_RUNTIME_DIR:-}" ]; then rt="$KIT_RUNTIME_DIR"
+  else
+    # A kit home that cannot be a folder refuses the launch (kit_home printed why), never a silent unchecked launch.
+    rt="$(kit_home)" || { MODEL_TAG_ERR="the kit state folder ~/.orcastration-kit cannot be used (see the line above), so '$m' was not checked"; return 64; }
+    rt="$rt/runtime"
+  fi
   # -k: SIGKILL this long after the SIGTERM, so a claude that ignores TERM cannot hang a launch past the stated timeout.
   local kill="${MODEL_PREFLIGHT_KILL_AFTER:-5}"
   ver="$(timeout -k "$kill" "${MODEL_PREFLIGHT_VERSION_TIMEOUT:-10}" claude --version 2>/dev/null </dev/null | head -1)" || true

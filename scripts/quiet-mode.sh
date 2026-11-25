@@ -8,7 +8,7 @@
 # own records (no process-name guessing).
 set -u
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib-kit-home.sh" || { echo "quiet-mode: lib-kit-home.sh is missing beside this script" >&2; exit 64; }
-RT="${KIT_RUNTIME_DIR:-$(kit_home)/runtime}"
+if [ -n "${KIT_RUNTIME_DIR:-}" ]; then RT="$KIT_RUNTIME_DIR"; else RT="$(kit_home)" || exit 1; RT="$RT/runtime"; fi   # kit_home said why
 FLAG="$RT/quiet-mode"
 
 # The same start-time function as gate-throttle.sh (see there): the two must agree, or no waiter is listed.
@@ -62,7 +62,7 @@ status() {
 }
 
 case "${1:-}" in
-  on) mkdir -p "$RT" && date '+%Y-%m-%dT%H:%M:%S%z' > "$FLAG"; status ;;
+  on) { mkdir -p "$RT" && date '+%Y-%m-%dT%H:%M:%S%z' > "$FLAG"; } || { echo "quiet-mode: cannot write $FLAG; quiet mode is NOT on" >&2; exit 1; }; status ;;
   off) rm -f "$FLAG"; status ;;
   status) status ;;
   *) echo "usage: quiet-mode.sh on|off|status" >&2; exit 64 ;;

@@ -485,7 +485,12 @@ _launch_print_argv() { printf '%q' "${LAUNCH_ARGV[0]}"; printf ' %q' "${LAUNCH_A
 # (model, effort, mode, account, prompt), SIGTERMs only the old claude, and the wrapper starts the fresh
 # one in the SAME tab. Anything else (no old process, an old one started by hand, --new-tab, a timeout)
 # opens a new tab that runs the wrapper, so a hand-started session moves over at its next recycle.
-launch_state_dir() { printf '%s' "${SIBLING_STATE_DIR:-$(kit_home)/sessions}"; }   # kit_home: lib-kit-home.sh, via lib-model-tag.sh
+launch_state_dir() {   # kit_home: lib-kit-home.sh, via lib-model-tag.sh; returns 1 when the kit home cannot be a folder
+  local h
+  if [ -n "${SIBLING_STATE_DIR:-}" ]; then printf '%s' "$SIBLING_STATE_DIR"; return 0; fi
+  h="$(kit_home)" || return 1
+  printf '%s/sessions' "$h"
+}
 launch_wrapper() { printf '%s/sibling-shell.sh' "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; }
 
 # True when a tab's command should run the wrapper rather than a bare claude. Not for: the test
@@ -597,7 +602,7 @@ launch_term_old() {  # <name> <pid>...
 # The hand-off, written tmp + mv so the wrapper never reads half of it. The prompt travels as base64 on
 # one line, so no quote, `;`, `$` or newline needs escaping between here and claude's argv.
 launch_write_handoff() {  # <name> <prompt> — model/effort/mode/account come from the LAUNCH_* globals
-  local dir next tmp; dir="$(launch_state_dir)"; next="$dir/$1.next"; tmp="$next.tmp.$$"
+  local dir next tmp; dir="$(launch_state_dir)" || return 1; next="$dir/$1.next"; tmp="$next.tmp.$$"
   mkdir -p "$dir" || return 1
   {
     printf 'model=%s\n' "$LAUNCH_MODEL"
@@ -635,7 +640,8 @@ launch_wait_inplace() {
 launch_recycle_inplace() {
   local name="$1" prompt="$2" old="$3" wpid="$4" next revoked
   local t="${RECYCLE_INPLACE_TIMEOUT:-60}" g="${RECYCLE_CLAIMED_GRACE:-30}"
-  next="$(launch_state_dir)/$name.next"; revoked="$next.revoked.$$"
+  next="$(launch_state_dir)" || { echo "cannot resolve the hand-off folder; using a new tab" >&2; return 1; }
+  next="$next/$name.next"; revoked="$next.revoked.$$"
   launch_write_handoff "$name" "$prompt" || { echo "cannot write the hand-off file in $(launch_state_dir); using a new tab" >&2; return 1; }
   # SIGTERM the old claude ONLY: signalling the wrapper would end the very loop that starts the next one.
   launch_term_old "$name" "$old"
