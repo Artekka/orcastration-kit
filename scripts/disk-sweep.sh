@@ -262,9 +262,7 @@ FAILED="$SAVE_ROOT/.failed/$repokey"
 ignored_keepers() {  # $1 tree → the ignored entries that are NOT rebuildable output (they go into the save)
   git -C "$1" -c core.quotePath=false status --porcelain --ignored=matching --untracked-files=normal 2>/dev/null | sed -n 's/^!! //p' |
     while IFS= read -r e; do
-      case "$e" in
-        node_modules/ | */node_modules/ | dist/ | */dist/ | *.tsbuildinfo | .turbo/ | */.turbo/ | coverage/ | */coverage/ | __pycache__/ | */__pycache__/) continue ;;
-      esac
+      _bw_rebuildable "$e" && continue
       is_build_copy "$1/${e%/}" && continue
       printf '%s\n' "$e"
     done
@@ -342,7 +340,7 @@ dirty_tree() {
     else
       while IFS= read -r e; do
         e=${e%/}
-        printf '%s\n' "$tl" | grep -qxF -e "$e" -e "$e/" || { fail="the tar lacks $e"; break; }
+        grep -qxF -e "$e" -e "$e/" <<< "$tl" || { fail="the tar lacks $e"; break; }
       done < "$list"
     fi
   fi
@@ -431,7 +429,11 @@ wt_one() {  # $1 path, $2 branch ("" = detached), $3 locked ("1" or "")
   if [ "$p" = "$MAIN" ]; then return; fi
   if [ -n "$here" ] && [ "$p" = "$here" ]; then keep worktrees "$p" "it is the worktree this ran in"; return; fi
   if [ "$origin_ok" != 1 ]; then keep worktrees "$p" "origin cannot be read"; return; fi
-  if [ -n "$br" ] && board_names "$br"; then keep worktrees "$p" "the board names it (an open line names branch $br)"; return; fi
+  # an open board line keeps only an UNMERGED tree: a tip on the default branch loses no commit, and a stale open line kept such
+  # trees for weeks in the source project (50 GB). The blocker, age, process and compose keeps still apply to merged trees.
+  if [ -n "$br" ] && ! git merge-base --is-ancestor "refs/heads/$br" "$DEF" 2>/dev/null && board_names "$br"; then
+    keep worktrees "$p" "the board names it (an open line names branch $br)"; return
+  fi
   if is_protected "$p"; then keep worktrees "$p" "a protected path"; return; fi
   sha=$(git -C "$p" rev-parse --verify -q HEAD 2>/dev/null) || { keep worktrees "$p" "its HEAD cannot be resolved"; return; }
   why=$(op_keep "$p"); if [ -n "$why" ]; then keep worktrees "$p" "$why"; return; fi
@@ -532,8 +534,9 @@ sweep_docker() {
   if [ "$dry" = 1 ]; then out "would trim the docker build cache from $cache down to ${cap_gb} GB"; return; fi
   if ! with_timeout 1800 "$DOCKER" builder prune --force --max-used-space "${cap_gb}GB" >/dev/null 2>&1; then keep docker "build cache" "docker builder prune failed"; return; fi
   after=$(cache_size); aft_b=$(to_bytes "${after:-0}")
-  if [ -z "$after" ]; then out "trimmed the docker build cache (was $cache); docker did not report the size after, so nothing is counted"; return; fi
-  out "docker build cache: freed $(awk -v a="$cur_b" -v b="$aft_b" 'BEGIN{printf "%.1f", (a-b)/1e9}') GB (Docker's count: $cache before, $after after)"
+  if [ -z "$after" ]; then out "trimmed the docker build cache (was $cache); docker did not report the size after, so 0 is credited"; return; fi
+  [ "$aft_b" -le "$cur_b" ] || aft_b=$cur_b
+  out "docker build cache: freed $(awk -v a="$cur_b" -v b="$aft_b" 'BEGIN{printf "%.1f", (a-b)/1e9}') GB by Docker's own count (was $cache, now $after)"
   printf 'docker\t%s\n' $(( (cur_b - aft_b) / 1024 )) >> "$FREED"
 }
 

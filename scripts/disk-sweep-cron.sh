@@ -85,7 +85,7 @@ printf '%s\n' "$out" >> "$LOG" 2>/dev/null
 report=$(printf '%s\n' "$out" | sed -n 's/^disk-sweep: report //p' | tail -1)
 if [ "$rc" -ne 0 ]; then log "FAILED: the sweep exited $rc"; exit "$rc"; fi
 # The next session start shows the report: always after the first run, and later when something needs a decision.
-if [ "$mode" = --dry-run ] || printf '%s\n' "$out" | grep -q '^disk-sweep: needs a decision'; then
+if [ "$mode" = --dry-run ] || grep -q '^disk-sweep: needs a decision' <<< "$out"; then
   [ -n "$report" ] && printf '%s\n%s\n' "$report" "$mode" > "$LOGDIR/unseen-report"
 fi
 [ "$mode" = --dry-run ] && mkdir -p -- "$(dirname "$FIRST")" && : > "$FIRST"

@@ -24,6 +24,15 @@ _bw_nm_link() {  # $1 = tree path, $2 = one porcelain line
   case "$2" in "?? node_modules" | "?? "*/node_modules) e=${2#?? } ;; *) return 1 ;; esac
   [ -L "$1/$e" ]
 }
+# _bw_rebuildable <ignored entry as `status --ignored=matching` prints it>: true for output a command regenerates, never hand-written:
+# node_modules (an install), dist (a build), *.tsbuildinfo (tsc), .turbo and coverage (caches), __pycache__ (python bytecode).
+# Shared by the blocker below and scripts/disk-sweep.sh, which saves every OTHER ignored entry before it removes a dirty tree.
+_bw_rebuildable() {
+  case "$1" in
+    node_modules/ | */node_modules/ | dist/ | */dist/ | *.tsbuildinfo | .turbo/ | */.turbo/ | coverage/ | */coverage/ | __pycache__/ | */__pycache__/) return 0 ;;
+  esac
+  return 1
+}
 worktree_removal_blocker() {
   local path=$1 br=$2 exempt=${3:-} detached=${4:-} first line st dirty ign hidden ahead idle recent cwdlink target sdirs cls kind rest
   first=$(git worktree list --porcelain | sed -n '1s/^worktree //p')
@@ -45,12 +54,7 @@ worktree_removal_blocker() {
   if [ -n "$dirty" ]; then echo "it has uncommitted or untracked files ($dirty)"; return 0; fi
   # any ignored entry (`!! `) outside this allowlist of rebuildable output keeps the tree.
   ign=$(printf '%s\n' "$st" | sed -n 's/^!! //p' | while IFS= read -r ign; do
-    case "$ign" in
-      # Each entry is output a command regenerates, never hand-written: node_modules (an install), dist (a build), *.tsbuildinfo (tsc),
-      # .turbo and coverage (caches), __pycache__ (python bytecode).
-      node_modules/ | */node_modules/ | dist/ | */dist/ | *.tsbuildinfo | .turbo/ | */.turbo/ | coverage/ | */coverage/ | __pycache__/ | */__pycache__/) ;;
-      *) printf '%s\n' "$ign"; break ;;
-    esac
+    _bw_rebuildable "$ign" || { printf '%s\n' "$ign"; break; }
   done)
   if [ -n "$ign" ]; then echo "it has an ignored file that is not rebuildable output ($ign)"; return 0; fi
   # a skip-worktree (S) or assume-unchanged (lowercase) entry hides local edits from status.
