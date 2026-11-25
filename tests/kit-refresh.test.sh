@@ -243,6 +243,21 @@ has "13d left" "LEFT   scripts/gate-throttle.sh (could not replace" "$OUT"
 case "$OUT" in *"REFRESH scripts/gate-throttle.sh"*) bad "13d printed REFRESH for the folder";; *) ok;; esac
 eq "13d the folder stays empty" "" "$(ls -A "$P/scripts/gate-throttle.sh" 2>/dev/null)"
 nottmp "13d" "$P"
+#   e) a link raced in at a CREATE name between the check and the write is replaced by the move, never written through
+SL="$TMP/shim ln"; OL="$TMP/race outside"; mkdir -p "$SL" "$OL"
+printf '#!/bin/sh\ncase "$1" in */lib-kit-home.sh) ln -s "%s/lib-kit-home.sh" lib-kit-home.sh 2>/dev/null;; esac\nexec "%s" "$@"\n' "$OL" "$REALCP" > "$SL/cp"; chmod +x "$SL/cp"
+proj crace; OUT="$(cd "$P" && PATH="$SL:$PATH" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
+eq "13e CREATE race exit" 0 "$RC"
+[ -e "$OL/lib-kit-home.sh" ] && bad "13e: CREATE wrote through a raced-in link" || ok
+[ -f "$P/scripts/lib-kit-home.sh" ] && [ ! -L "$P/scripts/lib-kit-home.sh" ] && ok || bad "13e: the raced-in link was not replaced by the file"
+nottmp "13e" "$P"
+#   f) a TERM while the temp file exists: the run stops and the trap removes the temp file
+ST="$TMP/shim term"; mkdir -p "$ST"
+printf '#!/bin/sh\n"%s" "$@" || exit 1\ncase "$1 $2" in */gate-throttle.sh*.kit-refresh.*) kill -TERM "$PPID";; esac\n' "$REALCP" > "$ST/cp"; chmod +x "$ST/cp"
+proj term; OUT="$(cd "$P" && PATH="$ST:$PATH" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
+eq "13f TERM exit" 143 "$RC"
+case "$OUT" in *"REFRESH scripts/gate-throttle.sh"*) bad "13f a stopped write was printed as REFRESH";; *) ok;; esac
+nottmp "13f" "$P"
 
 echo "kit-refresh: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
