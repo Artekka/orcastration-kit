@@ -144,7 +144,7 @@ has "6 unknown content left as edited" "LEFT   scripts/gate-throttle.sh (edited 
 proj seam; OUT="$(cd "$P" && env -u KIT_REFRESH_TEST KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
 eq "7 the variable alone is ignored: exit 3" 3 "$RC"
 has "7 the variable alone: left as edited" "LEFT   scripts/gate-throttle.sh (edited by the project" "$OUT"
-case "$OUT" in *REFRESH*) bad "7 the variable alone refreshed a copy";; *) ok;; esac
+case "$OUT" in *"REFRESH scripts/"*) bad "7 the variable alone refreshed a copy";; *) ok;; esac
 ERR="$(cd "$P" && KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" 2>&1 >/dev/null)"
 eq "7 with the switch: one stderr line" 1 "$(printf '%s\n' "$ERR" | grep -c 'KIT_REFRESH_TEST_KNOWN')"
 SO="$(cd "$P" && KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" 2>/dev/null)"
@@ -184,7 +184,7 @@ before="$(cd "$PAR" && md5sum "shared scripts"/*; git status --porcelain)"
 rf; eq "10 linked scripts/ dry run exit 3" 3 "$RC"
 rf --apply; eq "10 linked scripts/ apply exit 3" 3 "$RC"
 has "10 refused" "nothing was changed" "$OUT"
-case "$OUT" in *REFRESH*|*CREATE*) bad "10 a linked scripts/ was written";; *) ok;; esac
+case "$OUT" in *"REFRESH scripts/"*|*"CREATE  scripts/"*) bad "10 a linked scripts/ was written";; *) ok;; esac
 eq "10 nothing changed" "$before" "$(cd "$PAR" && md5sum "shared scripts"/*; git status --porcelain)"
 
 # 11. Git's repo-discovery variables from the caller's shell are ignored: the project's own git decides.
@@ -216,7 +216,7 @@ if [ "$ROOTUSER" = 0 ]; then
   proj rodir; before="$(md5sum "$P"/scripts/*)"; chmod a-w "$P/scripts"; rf --apply; chmod u+w "$P/scripts"
   eq "13a read-only folder exit 3" 3 "$RC"
   has "13a left" "LEFT   scripts/gate-throttle.sh (could not replace" "$OUT"
-  case "$OUT" in *REFRESH*) bad "13a a failed write was printed as REFRESH";; *) ok;; esac
+  case "$OUT" in *"REFRESH scripts/"*) bad "13a a failed write was printed as REFRESH";; *) ok;; esac
   eq "13a nothing changed" "$before" "$(md5sum "$P"/scripts/*)"; nottmp "13a" "$P"
   #   b) a read-only copy in a writable scripts/ (the [ -w ] test)
   proj rofile; chmod a-w "$P/scripts/gate-throttle.sh"; before="$(md5sum < "$P/scripts/gate-throttle.sh")"; rf --apply
@@ -232,11 +232,11 @@ proj mvfail; before="$(md5sum "$P"/scripts/*)"
 OUT="$(cd "$P" && PATH="$SH:$PATH" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
 eq "13c failed mv exit 3" 3 "$RC"
 has "13c left" "LEFT   scripts/seat-merge.sh (could not replace" "$OUT"
-case "$OUT" in *REFRESH*|*CREATE*) bad "13c a failed mv was printed as REFRESH or CREATE";; *) ok;; esac
+case "$OUT" in *"REFRESH scripts/"*|*"CREATE  scripts/"*) bad "13c a failed mv was printed as REFRESH or CREATE";; *) ok;; esac
 eq "13c nothing changed" "$before" "$(md5sum "$P"/scripts/*)"; nottmp "13c" "$P"
 #   d) a folder appears at the name between the copy and the move: mv must not move the new file INTO it
 SC="$TMP/shim cp"; mkdir -p "$SC"; REALCP="$(command -v cp)"
-printf '#!/bin/sh\n"%s" "$@" || exit 1\ncase "$*" in *.kit-refresh.*) if [ -f gate-throttle.sh ]; then rm -f gate-throttle.sh; mkdir gate-throttle.sh; fi;; esac\n' "$REALCP" > "$SC/cp"; chmod +x "$SC/cp"
+printf '#!/bin/sh\n"%s" "$@" || exit 1\ncase "$1 $2" in */gate-throttle.sh*.kit-refresh.*) if [ -f gate-throttle.sh ]; then rm -f gate-throttle.sh; mkdir gate-throttle.sh; fi;; esac\n' "$REALCP" > "$SC/cp"; chmod +x "$SC/cp"
 proj race; OUT="$(cd "$P" && PATH="$SC:$PATH" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
 eq "13d folder at the name exit 3" 3 "$RC"
 has "13d left" "LEFT   scripts/gate-throttle.sh (could not replace" "$OUT"

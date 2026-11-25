@@ -173,7 +173,13 @@ new marker in its delta.
 
 In each project adopted on 0.16, run `/orcastration-kit:kit-init` once more: the launch scripts it copied into `scripts/`
 still start sessions with the old command prefix, and kit-init offers to refresh them (it asks first, because they may carry
-local edits).
+local edits). The refresh works on the `scripts/` folder of the folder you run it from, writes nowhere else, replaces only
+exact kit 0.16 copies that git tracks unchanged, and changes nothing without `--apply`. Its limits:
+
+- kit-refresh limit: a bind mount at or above scripts/ is not seen (it compares paths only).
+- kit-refresh limit: do not edit scripts/ while it runs; an edit made between its check and its write is lost.
+- kit-refresh limit: on a case-folding file system (macOS, Windows) it knows only the exact file names; rename a copy whose name differs in case first.
+- kit-refresh limit: a read-only copy in a writable scripts/ is LEFT by the shell's `-w` test, which root always passes.
 
 ## The workflow in one paragraph
 
