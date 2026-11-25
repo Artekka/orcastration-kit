@@ -141,23 +141,33 @@ printf '#!/usr/bin/env bash\nif [ "${1:-}" = --version ]; then echo "9.9.9 (Stan
 callers() {  # runs each caller under the fake HOME with every override unset; prints "<name> <rc>" lines
   local u='unset KIT_RUNTIME_DIR SIBLING_STATE_DIR KIT_STATE_DIR SEAT_MERGE_RUNTIME_DIR'
   rm -f "$TMP/stub-ran" "$TMP/gt-ran"
-  ( cd "$TMP" && HOME="$H" KIT_GATE_MIN_FREE_GB=0 bash -c "$u; bash \"\$1/scripts/gate-throttle.sh\" touch \"\$2/gt-ran\"" _ "$ROOT" "$TMP" >/dev/null 2>&1 ); echo "gate-throttle $?"
-  HOME="$H" bash -c "$u; bash \"\$1/scripts/quiet-mode.sh\" on" _ "$ROOT" >/dev/null 2>&1; echo "quiet-mode $?"
-  HOME="$H" bash -c "$u; bash \"\$1/scripts/seat-merge.sh\" b 0000000 m" _ "$ROOT" >"$TMP/sm-out" 2>&1; echo "seat-merge $?"
+  ( cd "$TMP" && HOME="$H" KIT_GATE_MIN_FREE_GB=0 bash -c "$u; bash \"\$1/scripts/gate-throttle.sh\" touch \"\$2/gt-ran\"" _ "$ROOT" "$TMP" >/dev/null 2>"$TMP/gt-err" ); echo "gate-throttle $?"
+  HOME="$H" bash -c "$u; bash \"\$1/scripts/quiet-mode.sh\" on" _ "$ROOT" >/dev/null 2>"$TMP/qm-err"; echo "quiet-mode $?"
+  HOME="$H" bash -c "$u; bash \"\$1/scripts/quiet-mode.sh\" status" _ "$ROOT" >/dev/null 2>&1; echo "quiet-mode-status $?"
+  ( cd "$TMP" && HOME="$H" bash -c "$u; bash \"\$1/scripts/seat-merge.sh\" b 0000000 m" _ "$ROOT" >/dev/null 2>"$TMP/sm-out" ); echo "seat-merge $?"
   HOME="$H" PATH="$STUB:$PATH" MODEL_PREFLIGHT_TIMEOUT=2 MODEL_PREFLIGHT_KILL_AFTER=1 bash -c "$u; . \"\$1/scripts/lib-model-tag.sh\" && model_tag_check claude-opus-5-5 ''" _ "$ROOT" >/dev/null 2>&1; echo "lib-model-tag $?"
   HOME="$H" bash -c "$u; . \"\$1/scripts/lib-launch.sh\" && launch_state_dir >/dev/null" _ "$ROOT" >/dev/null 2>&1; echo "lib-launch $?"
   HOME="$H" bash -c "$u; . \"\$1/scripts/lib-launch.sh\" && launch_write_handoff Sib1 hi" _ "$ROOT" >/dev/null 2>&1; echo "lib-launch-handoff $?"
   HOME="$H" PATH="$STUB:$PATH" bash -c "$u; bash \"\$1/scripts/sibling-shell.sh\" Sib1 --model opus hi" _ "$ROOT" >/dev/null 2>&1 </dev/null; echo "sibling-shell $?"
 }
 fresh H2; echo mine > "$H/.orcastration-kit"; res="$(callers)"
-for c in gate-throttle quiet-mode seat-merge lib-model-tag lib-launch lib-launch-handoff sibling-shell; do
+for c in gate-throttle quiet-mode quiet-mode-status seat-merge lib-model-tag lib-launch lib-launch-handoff sibling-shell; do
   r="$(printf '%s\n' "$res" | awk -v c="$c" '$1==c{print $2}')"
   [ -n "$r" ] && [ "$r" -ne 0 ] && ok || bad "H2: $c exited $r with an unresolvable kit home"
 done
 [ ! -e "$TMP/gt-ran" ] && ok || bad "H2: gate-throttle ran its command with an unresolvable kit home"
 [ ! -e "$TMP/stub-ran" ] && ok || bad "H2: a claude ran (sibling-shell or the model preflight) with an unresolvable kit home"
-grep -q 'orcastration-kit:' "$TMP/sm-out" && ok || bad "H2: seat-merge did not stop on the kit home: $(head -c 200 "$TMP/sm-out")"
+# each script stops AT the kit home: its stderr is kit_home's one line, nothing after it (no later mkdir/git error)
+for e in gt-err qm-err sm-out; do
+  [ "$(grep -c . "$TMP/$e")" = 1 ] && grep -q '^orcastration-kit: .*is not a folder' "$TMP/$e" && ok \
+    || bad "H2: $e: the script did not stop at the kit home: $(head -c 300 "$TMP/$e")"
+done
 eq "H2 the file is untouched" mine "$(cat "$H/.orcastration-kit" 2>/dev/null)"
+# quiet-mode on that cannot write its flag (an override under a regular file) fails and says quiet mode is NOT on
+fresh H2b; echo f > "$H/blocker"
+out="$(HOME="$H" KIT_RUNTIME_DIR="$H/blocker/rt" bash "$ROOT/scripts/quiet-mode.sh" on 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && ok || bad "H2b: quiet-mode on exited 0 without writing its flag"
+case "$out" in *"NOT on"*) ok;; *) bad "H2b: quiet-mode on did not say quiet mode is NOT on: $out";; esac
 # and the same callers all work through a healed dangling link (positive control for H2's harness)
 fresh H3; ln -s ".gone-folder" "$H/.orcastration-kit"; res="$(callers)"
 for c in gate-throttle quiet-mode lib-model-tag lib-launch lib-launch-handoff; do
