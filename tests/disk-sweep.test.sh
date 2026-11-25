@@ -125,10 +125,14 @@ sandbox; tree s1/a 1; a="$TREE"; tree s1/b 1; b="$TREE"
 out="$(ds)"; has "no board: one skipped line" "skipped: no board" "$out"
 G -C "$SB/work" fetch -q origin; G -C "$SB/work" merge -q --ff-only origin/main   # the merged trees moved origin/main on
 mkdir -p "$SB/work/docs/orchestration"
-printf '# board\n🔨 **ROW-1 CLAIMED** builder on s1/a\n✅ **ROW-2 DONE** merged from s1/b\n' > "$SB/work/docs/orchestration/AGENT_BOARD.md"
+printf '# board\n🔨 **ROW-1 CLAIMED** builder on s1/a\n✅ **ROW-2 DONE** merged from s1/b\n🔨 **ROW-3 CLAIMED** on s1/c\n' > "$SB/work/docs/orchestration/AGENT_BOARD.md"
 G -C "$SB/work" add docs; G -C "$SB/work" commit -q -m board; G -C "$SB/work" push -q origin main; G -C "$SB/work" fetch -q origin
+# s1/c: unmerged, clean, 15 days idle, origin has the same tip (rule a would remove it) and an open line names it
+G -C "$SB/work" worktree add -q -b s1/c "$SB/s1-c" origin/main; c="$SB/s1-c"; commit_in "$c"; G -C "$c" push -q origin s1/c; G -C "$SB/work" fetch -q origin; age "$c" 15
+age "$a" 3; age "$b" 3
 out="$(ds -- --apply)"
-has "an open board line that names the branch keeps the tree" "the board names it" "$out"; there "the open-row tree stays" "$a"
+has "an open board line that names an UNMERGED branch keeps the tree" "the board names it" "$out"; there "the open-row unmerged tree stays" "$c"
+gone "r1 (726 item 9): an open line does not keep a tree whose tip is on main" "$a"
 gone "a DONE line does not keep the tree" "$b"
 
 # ── C. unmerged branches (rule a: 14 days, clean, origin has the SAME tip) ─────────────────────────────────────────────────────
@@ -279,6 +283,7 @@ sandbox; : > "$DCALLS"; rm -f "$DSTATE"
 out="$(ds KIT_SWEEP_DOCKER="$FDK" -- --apply)"
 has "the cache is trimmed to the cap" "builder prune --force --max-used-space 20GB" "$(cat "$DCALLS")"
 has "freed comes from Docker's own count (30 GB before, 10 GB after)" "freed 20.0 GB" "$out"
+has "r1 (726 item 13): the line reads (was X, now Y)" "(was 30GB, now 10GB)" "$out"
 c="$(cat "$DCALLS")"; hasnt "never docker system prune" "system prune" "$c"; hasnt "never a volume" "volume" "$c"; hasnt "never an image removal" "rmi" "$c"; hasnt "never image rm" "image rm" "$c"
 sandbox; : > "$DCALLS"; rm -f "$DSTATE"; out="$(ds KIT_SWEEP_DOCKER="$FDK")"; hasnt "a dry run prunes nothing" "builder prune" "$(cat "$DCALLS")"; has "a dry run says what it would trim" "would trim" "$out"
 sandbox; out="$(ds)"; has "no docker: one skipped line" "skipped: docker" "$out"
