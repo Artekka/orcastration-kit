@@ -11,7 +11,8 @@
 set -u
 unset TMUX TMUX_PANE   # never reach the caller's real tmux (tests/no-real-tmux.test.sh)
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; RF="$ROOT/scripts/kit-refresh.sh"
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+TMP0="$(mktemp -d)"; trap 'chmod -R u+w "$TMP0" 2>/dev/null; rm -rf "$TMP0"' EXIT
+TMP="$TMP0/k r"; mkdir -p "$TMP/home"; export HOME="$TMP/home"   # a path with a space; a fake HOME (never the real one)
 pass=0; fail=0
 ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $*"; }
@@ -36,8 +37,11 @@ proj() {  # <name>: a git project with every listed script as a committed 0.16 c
   KNOWN="$TMP/$1.known"; : > "$KNOWN"
   for f in $WRITERS $LAUNCH; do echo "$f $(git -C "$P" hash-object "scripts/$f")" >> "$KNOWN"; done
 }
-rf() { OUT="$(cd "$P" && KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" "$@" 2>&1)"; RC=$?; }
-rf_noseam() { OUT="$(cd "$P" && env -u KIT_REFRESH_TEST_KNOWN bash "$RF" "$@" 2>&1)"; RC=$?; }
+rf() { OUT="$(cd "$P" && KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" "$@" 2>&1)"; RC=$?; }
+rf_noseam() { OUT="$(cd "$P" && env -u KIT_REFRESH_TEST -u KIT_REFRESH_TEST_KNOWN bash "$RF" "$@" 2>&1)"; RC=$?; }
+nottmp() {  # <label> <dir>: no temp file of the safe write is left behind
+  eq "$1: no temp file left" "" "$(find "$2" -name '.kit-refresh.*' 2>/dev/null)"; }
+ROOTUSER=0; [ "$(id -u)" = 0 ] && ROOTUSER=1   # root passes every -w test and writes into read-only folders
 
 # 1. Dry run (no --apply): lists each stale copy, changes nothing.
 proj dry; before="$(cd "$P" && git status --porcelain; md5sum scripts/*)"
@@ -67,6 +71,7 @@ eq "2 the current lib is untouched" "" "$(cd "$P" && git status --porcelain scri
 # the refreshed writer runs: quiet-mode on/off under a fake HOME lands in the new folder
 HOME="$TMP/apply-home" bash -c 'unset KIT_RUNTIME_DIR; mkdir -p "$HOME"; bash "$1/scripts/quiet-mode.sh" on' _ "$P" >/dev/null 2>&1
 [ -f "$TMP/apply-home/.orcastration-kit/runtime/quiet-mode" ] && ok || bad "2: the refreshed quiet-mode.sh did not write under the new folder"
+nottmp "2" "$P"
 rf --apply; eq "2 second apply exit" 0 "$RC"; has "2 second apply: nothing stale" "nothing to refresh" "$OUT"
 
 # 3. Unsafe copies are left, with the reason: edited by the project, uncommitted changes, untracked, outside a git repo.
@@ -133,6 +138,111 @@ fi
 proj noseam; rf_noseam --apply
 eq "6 unknown content exit 3" 3 "$RC"
 has "6 unknown content left as edited" "LEFT   scripts/gate-throttle.sh (edited by the project" "$OUT"
+
+# 7. The test seam needs its own switch: KIT_REFRESH_TEST_KNOWN alone is ignored (a normal run); with KIT_REFRESH_TEST=1
+#    it is used and one stderr line says so.
+proj seam; OUT="$(cd "$P" && env -u KIT_REFRESH_TEST KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
+eq "7 the variable alone is ignored: exit 3" 3 "$RC"
+has "7 the variable alone: left as edited" "LEFT   scripts/gate-throttle.sh (edited by the project" "$OUT"
+case "$OUT" in *REFRESH*) bad "7 the variable alone refreshed a copy";; *) ok;; esac
+ERR="$(cd "$P" && KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" 2>&1 >/dev/null)"
+eq "7 with the switch: one stderr line" 1 "$(printf '%s\n' "$ERR" | grep -c 'KIT_REFRESH_TEST_KNOWN')"
+SO="$(cd "$P" && KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" 2>/dev/null)"
+case "$SO" in *KIT_REFRESH_TEST_KNOWN*) bad "7 the seam line went to stdout";; *) ok;; esac
+rf --apply; eq "7 with the switch: used (exit 0)" 0 "$RC"
+
+# 8. A hard-linked copy is LEFT (a second name shares the file); the other name, outside the project, keeps its bytes.
+proj hard; OH="$TMP/outside hard"; mkdir -p "$OH"; mv "$P/scripts/gate-throttle.sh" "$OH/gate-throttle.sh"
+ln "$OH/gate-throttle.sh" "$P/scripts/gate-throttle.sh"; git -C "$P" add -A && git -C "$P" commit -qm hard
+before="$(md5sum < "$OH/gate-throttle.sh")"; rf --apply
+eq "8 hard link exit 3" 3 "$RC"
+has "8 hard link left" "LEFT   scripts/gate-throttle.sh (hard-linked" "$OUT"
+eq "8 the outside name keeps its bytes" "$before" "$(md5sum < "$OH/gate-throttle.sh")"
+eq "8 the copy keeps its bytes" "$before" "$(md5sum < "$P/scripts/gate-throttle.sh")"
+cmp -s "$P/scripts/quiet-mode.sh" "$ROOT/scripts/quiet-mode.sh" && ok || bad "8: the plain copy beside it was not refreshed"
+
+# 9. The known-version hash is byte-exact (no git filters): a CRLF working copy under core.autocrlf=true hashes, with
+#    filters, to the known LF blob, but its bytes are not a kit 0.16 version: LEFT. The file mode is not hashed.
+proj crlf; git -C "$P" config core.autocrlf true
+sed 's/$/\r/' "$P/scripts/gate-throttle.sh" > "$TMP/crlf.tmp" && cat "$TMP/crlf.tmp" > "$P/scripts/gate-throttle.sh"
+git -C "$P" add -A 2>/dev/null; git -C "$P" commit -qm crlf 2>/dev/null
+eq "9 precondition: the CRLF copy is clean in git" "" "$(git -C "$P" status --porcelain)"
+chmod -x "$P/scripts/quiet-mode.sh"; git -C "$P" commit -qam mode
+before="$(md5sum < "$P/scripts/gate-throttle.sh")"; rf --apply
+eq "9 CRLF exit 3" 3 "$RC"
+has "9 CRLF copy left as edited" "LEFT   scripts/gate-throttle.sh (edited by the project" "$OUT"
+eq "9 CRLF copy keeps its bytes" "$before" "$(md5sum < "$P/scripts/gate-throttle.sh")"
+has "9 a copy with another mode is still known" "REFRESH scripts/quiet-mode.sh" "$OUT"
+
+# 10. scripts/ must be a real folder of the project (the folder the script runs from), even when a parent repo holds the
+#     link target: exit 3, nothing changed, dry run and apply.
+PAR="$TMP/parent repo"; mkdir -p "$PAR/shared scripts" "$PAR/proj"; git -C "$PAR" init -q; git -C "$PAR" config user.email t@t; git -C "$PAR" config user.name t
+for f in $WRITERS $LAUNCH; do old016 "$f" > "$PAR/shared scripts/$f"; done
+ln -s "../shared scripts" "$PAR/proj/scripts"; git -C "$PAR" add -A && git -C "$PAR" commit -qm adopt
+P="$PAR/proj"; KNOWN="$TMP/parent.known"; : > "$KNOWN"; for f in $WRITERS $LAUNCH; do echo "$f $(git hash-object "$PAR/shared scripts/$f")" >> "$KNOWN"; done
+before="$(cd "$PAR" && md5sum "shared scripts"/*; git status --porcelain)"
+rf; eq "10 linked scripts/ dry run exit 3" 3 "$RC"
+rf --apply; eq "10 linked scripts/ apply exit 3" 3 "$RC"
+has "10 refused" "nothing was changed" "$OUT"
+case "$OUT" in *REFRESH*|*CREATE*) bad "10 a linked scripts/ was written";; *) ok;; esac
+eq "10 nothing changed" "$before" "$(cd "$PAR" && md5sum "shared scripts"/*; git status --porcelain)"
+
+# 11. Git's repo-discovery variables from the caller's shell are ignored: the project's own git decides.
+#     a) GIT_DIR + GIT_WORK_TREE name a repo whose work tree is a parent: the project has no git of its own, so LEFT.
+M2="$TMP/m2 parent"; GD="$TMP/m2 gitdir"; P="$M2/proj"; mkdir -p "$P/scripts"; old016 gate-throttle.sh > "$P/scripts/gate-throttle.sh"
+GIT_DIR="$GD" GIT_WORK_TREE="$M2" git init -q; GIT_DIR="$GD" git config user.email t@t; GIT_DIR="$GD" git config user.name t
+(cd "$M2" && GIT_DIR="$GD" GIT_WORK_TREE="$M2" git add -A && GIT_DIR="$GD" GIT_WORK_TREE="$M2" git commit -qm adopt)
+KNOWN="$TMP/m2.known"; echo "gate-throttle.sh $(git hash-object "$P/scripts/gate-throttle.sh")" > "$KNOWN"
+before="$(md5sum < "$P/scripts/gate-throttle.sh")"
+OUT="$(cd "$P" && GIT_DIR="$GD" GIT_WORK_TREE="$M2" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
+eq "11a exit 3" 3 "$RC"
+has "11a left: not tracked by the project's git" "LEFT   scripts/gate-throttle.sh (not tracked by git" "$OUT"
+eq "11a unchanged" "$before" "$(md5sum < "$P/scripts/gate-throttle.sh")"
+#     b) GIT_WORK_TREE alone set to a parent folder: the project's own repo still decides, so the copies refresh.
+proj m2b; OUT="$(cd "$P" && GIT_WORK_TREE="$TMP" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
+eq "11b exit 0" 0 "$RC"; has "11b refreshed" "REFRESH scripts/gate-throttle.sh" "$OUT"
+
+# 12. CREATE writes through no link: a missing library whose name is a dangling link to outside is not created there.
+proj clink; OC="$TMP/create outside"; mkdir -p "$OC"; ln -s "$OC/lib-kit-home.sh" "$P/scripts/lib-kit-home.sh"
+git -C "$P" add -A && git -C "$P" commit -qm clink; rf --apply
+[ -e "$OC/lib-kit-home.sh" ] && bad "12: CREATE wrote through the link" || ok
+[ -L "$P/scripts/lib-kit-home.sh" ] && ok || bad "12: the link was replaced"
+has "12 the copies beside it refresh" "REFRESH scripts/gate-throttle.sh" "$OUT"
+nottmp "12" "$P"
+
+# 13. A failed write is LEFT (could not replace), counts toward exit 3, is never printed as REFRESH, and leaves no temp file.
+if [ "$ROOTUSER" = 0 ]; then
+  #   a) a read-only scripts/ folder
+  proj rodir; before="$(md5sum "$P"/scripts/*)"; chmod a-w "$P/scripts"; rf --apply; chmod u+w "$P/scripts"
+  eq "13a read-only folder exit 3" 3 "$RC"
+  has "13a left" "LEFT   scripts/gate-throttle.sh (could not replace" "$OUT"
+  case "$OUT" in *REFRESH*) bad "13a a failed write was printed as REFRESH";; *) ok;; esac
+  eq "13a nothing changed" "$before" "$(md5sum "$P"/scripts/*)"; nottmp "13a" "$P"
+  #   b) a read-only copy in a writable scripts/ (the [ -w ] test)
+  proj rofile; chmod a-w "$P/scripts/gate-throttle.sh"; before="$(md5sum < "$P/scripts/gate-throttle.sh")"; rf --apply
+  eq "13b read-only copy exit 3" 3 "$RC"
+  has "13b left" "LEFT   scripts/gate-throttle.sh (read-only" "$OUT"
+  eq "13b unchanged" "$before" "$(md5sum < "$P/scripts/gate-throttle.sh")"
+else
+  echo "SKIP 13a/13b: running as root (every file passes -w); the read-only cases did not run"
+fi
+#   c) mv fails (a shim on PATH)
+SH="$TMP/shim mv"; mkdir -p "$SH"; printf '#!/bin/sh\nexit 1\n' > "$SH/mv"; chmod +x "$SH/mv"
+proj mvfail; before="$(md5sum "$P"/scripts/*)"
+OUT="$(cd "$P" && PATH="$SH:$PATH" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
+eq "13c failed mv exit 3" 3 "$RC"
+has "13c left" "LEFT   scripts/seat-merge.sh (could not replace" "$OUT"
+case "$OUT" in *REFRESH*|*CREATE*) bad "13c a failed mv was printed as REFRESH or CREATE";; *) ok;; esac
+eq "13c nothing changed" "$before" "$(md5sum "$P"/scripts/*)"; nottmp "13c" "$P"
+#   d) a folder appears at the name between the copy and the move: mv must not move the new file INTO it
+SC="$TMP/shim cp"; mkdir -p "$SC"; REALCP="$(command -v cp)"
+printf '#!/bin/sh\n"%s" "$@" || exit 1\ncase "$*" in *.kit-refresh.*) if [ -f gate-throttle.sh ]; then rm -f gate-throttle.sh; mkdir gate-throttle.sh; fi;; esac\n' "$REALCP" > "$SC/cp"; chmod +x "$SC/cp"
+proj race; OUT="$(cd "$P" && PATH="$SC:$PATH" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
+eq "13d folder at the name exit 3" 3 "$RC"
+has "13d left" "LEFT   scripts/gate-throttle.sh (could not replace" "$OUT"
+case "$OUT" in *"REFRESH scripts/gate-throttle.sh"*) bad "13d printed REFRESH for the folder";; *) ok;; esac
+eq "13d the folder stays empty" "" "$(ls -A "$P/scripts/gate-throttle.sh" 2>/dev/null)"
+nottmp "13d" "$P"
 
 echo "kit-refresh: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

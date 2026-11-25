@@ -61,6 +61,14 @@ pin "CHANGELOG upgrade block" CHANGELOG.md "Upgrading from 0.16"
 pin "kit-refresh detects the 0.16 prefix and folder" scripts/kit-refresh.sh 'grep -qF -e "$OLD_PREFIX" -e "$OLD_FOLDER"'
 pin "kit-init runs the refresh" skills/kit-init/SKILL.md 'bash "$K/scripts/kit-refresh.sh" --apply'
 pin "kit-init refresh dry run first" skills/kit-init/SKILL.md 'bash "$K/scripts/kit-refresh.sh"`'
+# kit-refresh's written limits (713b r4), one line each in the README and the CHANGELOG
+for lim in \
+  "kit-refresh limit: a bind mount at or above scripts/ is not seen (it compares paths only)." \
+  "kit-refresh limit: do not edit scripts/ while it runs; an edit made between its check and its write is lost." \
+  "kit-refresh limit: on a case-folding file system (macOS, Windows) it knows only the exact file names; rename a copy whose name differs in case first." \
+  "kit-refresh limit: a read-only copy in a writable scripts/ is LEFT by the shell's \`-w\` test, which root always passes."; do
+  pin "README: $lim" README.md "$lim"; pin "CHANGELOG: $lim" CHANGELOG.md "$lim"
+done
 # the written limit of the one-folder rule (713b r2), in the README and the CHANGELOG
 LIMIT="one folder unless the 0.16 name's link is deleted while a 0.16 copy runs first, or HOME cannot hold links; kit-init's refresh closes it"
 pin "README one-folder limit" README.md "$LIMIT"
