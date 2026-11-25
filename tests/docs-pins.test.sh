@@ -113,6 +113,12 @@ for f in docs/GETTING-STARTED.md README.md skills/kit-init/SKILL.md scripts/lib-
   out="$(stray_lines "$PT/t")"
   case "$out" in *"$f:"*"$PROBE"*) pass=$((pass+1));; *) fail=$((fail+1)); echo "FAIL probe: '$PROBE' appended to $f is not a stray line";; esac
 done
+# A line tagged "the 0.16 folder" may name the 0.16 id only as the folder (.<id>); a command on it is a stray (READ r1, LOW-2).
+for f in scripts/lib-kit-home.sh hooks/ctx-guard.py; do
+  probe_tree; TAGGED="# the 0.16 folder ~/.$OLD: run /$OLD:orient after it"
+  printf '%s\n' "$TAGGED" >> "$PT/t/$f"; out="$(stray_lines "$PT/t")"
+  case "$out" in *"$f:"*"/$OLD:orient"*) pass=$((pass+1));; *) fail=$((fail+1)); echo "FAIL probe: a tagged line in $f carrying /$OLD:orient is not a stray line";; esac
+done
 # README: the renames map migrates USER settings only (Claude Code's marketplace schema: "migrates user settings to the
 # new name"); project and local settings get the manual step. Never claim the CLI rewrites them.
 pin "README upgrade: renames migrates user settings" README.md "migrates the \`enabledPlugins\` key in your user settings"

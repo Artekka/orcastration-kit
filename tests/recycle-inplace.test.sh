@@ -360,4 +360,19 @@ rematch "R16 new-tab" '^mode: new-tab$' "$(cat "$SB/nw.out")"
 rematch "R16 no detach" '^detach: no$' "$(cat "$SB/nw.out")"
 renomatch "R16 no detach note" 'detach' "$(cat "$SB/nw.err")"
 
+# R17. In place with an alias model on a broken kit home (READ r1, LOW-1): the hand-off folder cannot be resolved, so the
+#      recycle stops BEFORE anything is touched: non-zero exit, no new tab, the old claude never signalled, nothing launched.
+sandbox; n=$(nameFor R17)
+start_wrapper "$n" STUB_MODE=term-trap; W17PID=$WPID; OLD17="$(launch_pid 1)"
+echo mine > "$SB/home/.orcastration-kit"
+recycle "${FORBID[@]}" STUB_MODE=term-trap SIBLING_STATE_DIR= -- "$n" --model 'sonnet[1m]'
+ne "R17 non-zero exit" 0 "$RC"
+has "R17 says why" "is not a folder" "$ERR"
+absent "R17 no new tab" "$SB/TERM-WAS-CALLED"
+absent "R17 the old claude was never signalled" "$SB/stub/sigterm.$OLD17"
+alive "$OLD17" && ok || bad "R17 the old claude is gone"
+eq "R17 nothing relaunched" 1 "$(nlaunch)"
+eq "R17 the file is untouched" mine "$(cat "$SB/home/.orcastration-kit" 2>/dev/null)"
+kill -TERM "$OLD17" 2>/dev/null
+
 finish

@@ -99,11 +99,15 @@ else
 fi
 
 # G. A dangling link at the new name (its target is gone): kit_home heals it, says so in one line, and the callers work.
-#    The heal re-applies the normal rule: the 0.16 folder exists -> link to it again; else a real new folder.
+#    The heal always links to the 0.16 folder, making that folder again when it is gone, and never makes a second real
+#    folder: an old 0.16 copy of gate-throttle/quiet-mode/seat-merge re-creates the 0.16 folder, and two real folders
+#    would be two throttle slot sets (0.17.0 READ r1, MED-1).
 fresh G; ln -s ".gone-folder" "$H/.orcastration-kit"; kh
 eq "G exit" 0 "$KRC"
 eq "G path" "$H/.orcastration-kit" "$OUT"
-[ -d "$H/.orcastration-kit" ] && [ ! -L "$H/.orcastration-kit" ] && ok || bad "G: the dangling link was not replaced by a real folder"
+[ -L "$H/.orcastration-kit" ] && [ -d "$H/$OLDN" ] && [ ! -L "$H/$OLDN" ] \
+  && [ "$(cd "$H/.orcastration-kit" 2>/dev/null && pwd -P)" = "$(cd "$H/$OLDN" && pwd -P)" ] && ok \
+  || bad "G: the heal did not make the 0.16 folder and link the new name to it"
 eq "G one line" 1 "$(printf '%s\n' "$ERR" | grep -c .)"
 case "$ERR" in *"missing folder"*) ok;; *) bad "G: the line does not say the link led to a missing folder: $ERR";; esac
 kh; eq "G second call silent" "" "$ERR"
@@ -121,10 +125,31 @@ case "$out" in *"quiet mode: ON"*) ok;; *) bad "G3: quiet-mode on does not repor
 if command -v python3 >/dev/null 2>&1; then
   fresh G4; ln -s ".gone-folder" "$H/.orcastration-kit"; KSD=""; out="$(pyhome)"
   eq "G4 ctx-guard state dir" "$H/.orcastration-kit/ctx-guard" "$out"
-  [ -d "$H/.orcastration-kit" ] && [ ! -L "$H/.orcastration-kit" ] && ok || bad "G4: ctx-guard.py did not heal the dangling link"
+  [ -L "$H/.orcastration-kit" ] && [ -d "$H/$OLDN" ] && [ ! -L "$H/$OLDN" ] \
+    && [ "$(cd "$H/.orcastration-kit" 2>/dev/null && pwd -P)" = "$(cd "$H/$OLDN" && pwd -P)" ] && ok \
+    || bad "G4: ctx-guard.py did not make the 0.16 folder and link the new name to it"
   fresh G5; mkdir -p "$H/$OLDN"; ln -s ".moved-away" "$H/.orcastration-kit"; KSD=""; out="$(pyhome)"
   [ -L "$H/.orcastration-kit" ] && [ "$(cd "$H/.orcastration-kit" 2>/dev/null && pwd -P)" = "$(cd "$H/$OLDN" && pwd -P)" ] && ok || bad "G5: ctx-guard.py did not re-link to the 0.16 folder"
 fi
+
+# G6. The READ r1 case: linked (B), then the 0.16 folder is deleted. Heal (bash, then python), then an old 0.16 copy of a
+#     script runs its own `mkdir -p` on the 0.16 path. Result: exactly ONE real folder (the 0.16 one) and one link to it.
+one_real() {  # <label>: the 0.16 folder is the only real folder, the new name links to it, a write lands in both views
+  local real=0
+  [ -d "$H/$OLDN" ] && [ ! -L "$H/$OLDN" ] && real=$((real + 1))
+  [ -d "$H/.orcastration-kit" ] && [ ! -L "$H/.orcastration-kit" ] && real=$((real + 1))
+  eq "$1 one real folder" 1 "$real"
+  [ -L "$H/.orcastration-kit" ] && [ "$(cd "$H/.orcastration-kit" 2>/dev/null && pwd -P)" = "$(cd "$H/$OLDN" 2>/dev/null && pwd -P)" ] && ok \
+    || bad "$1: the new name is not a link to the 0.16 folder"
+  echo slot > "$H/$OLDN/runtime/locks/probe" 2>/dev/null
+  eq "$1 an old copy's lock is seen through the new name" slot "$(cat "$H/.orcastration-kit/runtime/locks/probe" 2>/dev/null)"
+}
+for tw in bash python; do
+  fresh "G6$tw"; mkdir -p "$H/$OLDN"; kh; rm -rf "${H:?}/$OLDN"
+  if [ "$tw" = bash ]; then kh; else command -v python3 >/dev/null 2>&1 || continue; KSD=""; pyhome >/dev/null; fi
+  mkdir -p "$H/$OLDN/runtime/locks"   # what a 0.16 copy of gate-throttle.sh does on its own path
+  one_real "G6 $tw"
+done
 
 # H. The new name is something kit_home must never remove (a regular file, a link to a file): kit_home fails non-zero,
 #    leaves it alone, and every caller exits non-zero instead of running on a path that cannot hold state.
@@ -175,6 +200,21 @@ for c in gate-throttle quiet-mode lib-model-tag lib-launch lib-launch-handoff; d
   eq "H3 $c works through a healed link" 0 "$r"
 done
 [ -e "$TMP/gt-ran" ] && ok || bad "H3: gate-throttle did not run its command"
+# H5. Launchers on a broken kit home: --dry-run of recycle-sibling and start-team exits non-zero (READ r1, LOW-1).
+fresh H5; echo mine > "$H/.orcastration-kit"
+HOME="$H" bash -c 'unset SIBLING_STATE_DIR KIT_RUNTIME_DIR; bash "$1/scripts/recycle-sibling.sh" --dry-run --terminal manual --repo "$1" ZzKitHome' _ "$ROOT" >/dev/null 2>"$TMP/h5-rs"; rc=$?
+[ "$rc" -ne 0 ] && ok || bad "H5: recycle-sibling --dry-run exited 0 on a broken kit home"
+grep -q 'is not a folder' "$TMP/h5-rs" && ok || bad "H5: recycle-sibling did not say why: $(head -c 300 "$TMP/h5-rs")"
+HOME="$H" bash -c 'unset SIBLING_STATE_DIR KIT_RUNTIME_DIR; bash "$1/scripts/start-team.sh" --dry-run --terminal manual --repo "$1" --seat ZzSeatKH --prefix ZzKH' _ "$ROOT" >/dev/null 2>"$TMP/h5-st"; rc=$?
+[ "$rc" -ne 0 ] && ok || bad "H5: start-team --dry-run exited 0 on a broken kit home"
+grep -q 'is not a folder' "$TMP/h5-st" && ok || bad "H5: start-team did not say why: $(head -c 300 "$TMP/h5-st")"
+eq "H5 the file is untouched" mine "$(cat "$H/.orcastration-kit" 2>/dev/null)"
+# a dry run on a dangling link changes nothing on disk (it only checks), and exits 0
+fresh H6; ln -s ".gone-folder" "$H/.orcastration-kit"
+HOME="$H" bash -c 'unset SIBLING_STATE_DIR KIT_RUNTIME_DIR; bash "$1/scripts/recycle-sibling.sh" --dry-run --terminal manual --repo "$1" ZzKitHome' _ "$ROOT" >/dev/null 2>&1; rc=$?
+eq "H6 dry run on a dangling link exits 0" 0 "$rc"
+[ -L "$H/.orcastration-kit" ] && [ ! -e "$H/.orcastration-kit" ] && [ ! -e "$H/$OLDN" ] && ok || bad "H6: a dry run changed the kit home"
+
 if command -v python3 >/dev/null 2>&1; then
   fresh H4; echo mine > "$H/.orcastration-kit"
   env -u KIT_STATE_DIR HOME="$H" python3 "$ROOT/hooks/ctx-guard.py" </dev/null >/dev/null 2>"$TMP/py-err"; rc=$?
