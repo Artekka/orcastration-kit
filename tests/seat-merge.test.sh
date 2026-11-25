@@ -273,20 +273,29 @@ sm -- feat "$BSHA" "m"; eq "T21 a branch cannot exempt its own markers" 1 "$RC";
 for sg in TERM:143 INT:130 HUP:129; do
   name=${sg%%:*}; want=${sg##*:}
   sandbox; branch feat src/b.txt new; before=$(omain)
+  # The launcher is python so the status is Python's returncode: a normal exit by the trap is +143 (130, 129), while death BY the signal is
+  # -15 (-2, -1). A bash subshell's $? shows 143 for both and could not tell the trap from no trap. The launcher also restores SIGINT (a
+  # background job of a non-interactive shell starts with it ignored, and an ignored signal cannot be trapped) and writes the script's pid.
+  rm -f "$SB/rc" "$SB/scr.pid"
   ( env HOME="$SB/home" PATH="$SB/bin:$PATH" SEAT_MERGE_REPO="$SB/merge" SEAT_MERGE_RUNTIME_DIR="$SB/rt" SEAT_MERGE_ALLOW_SHARED_CHECKOUT=1 SEAT_MERGE_FORMAT_CMD=true \
       SEAT_MERGE_CHECKS="slow | * | echo 'FAIL-line from the check'; echo \$\$ > $SB/chk.pid; sleep 60" \
-      python3 -c 'import os, signal, sys; signal.signal(signal.SIGINT, signal.SIG_DFL); os.execvp("bash", ["bash"] + sys.argv[1:])' "$SM" feat "$BSHA" "m" >"$SB/out" 2>"$SB/err" </dev/null; echo $? > "$SB/rc" ) & smpid=$!; PIDS+=("$smpid")
-  # (a background job of a non-interactive shell starts with SIGINT ignored, and an ignored signal cannot be trapped: the launcher above restores it)
+      python3 -c 'import signal, subprocess, sys
+p = subprocess.Popen(["bash"] + sys.argv[3:], stdin=subprocess.DEVNULL, preexec_fn=lambda: signal.signal(signal.SIGINT, signal.SIG_DFL))
+open(sys.argv[1], "w").write(str(p.pid))
+open(sys.argv[2], "w").write(str(p.wait()))' "$SB/scr.pid" "$SB/rc" "$SM" feat "$BSHA" "m" >"$SB/out" 2>"$SB/err" ) & smpid=$!; PIDS+=("$smpid")
   for _ in $(seq 1 50); do [ -s "$SB/chk.pid" ] && break; sleep 0.1; done
-  chkpid=$(cat "$SB/chk.pid" 2>/dev/null)
-  # the subshell's child is the script: signal the script itself, not the subshell
-  scr=$(pgrep -P "$smpid" -f seat-merge.sh | head -n1); [ -n "$scr" ] || scr=$smpid
+  chkpid=$(cat "$SB/chk.pid" 2>/dev/null); scr=$(cat "$SB/scr.pid")
   kill -s "$name" "$scr"; t0=$SECONDS; wait "$smpid" 2>/dev/null
-  eq "T22 $name exits $want" "$want" "$(cat "$SB/rc")"; [ $((SECONDS - t0)) -le 5 ] && ok || bad "T22 $name took over 5 s to end the run"
+  eq "T22 $name exits $want by the trap (a death by the signal would read -$((want - 128)))" "$want" "$(cat "$SB/rc")"; [ $((SECONDS - t0)) -le 5 ] && ok || bad "T22 $name took over 5 s to end the run"
   sleep 0.3; eq "T22 $name: the check is gone" no "$(kill -0 "$chkpid" 2>/dev/null && echo yes || echo no)"
   has "T22 $name: the log is kept" "check log kept:" "$(cat "$SB/err")"; has "T22 $name: its failure line is shown" "FAIL-line from the check" "$(cat "$SB/err")"
   eq "T22 $name: main untouched" "$before" "$(omain)"
 done
+
+# 22b. a GREEN run keeps no check log (the log is for a refused run only)
+sandbox; branch feat src/b.txt new
+sm SEAT_MERGE_LOG_DIR="$SB/keptlogs" SEAT_MERGE_CHECKS="loud | * | echo 'FAIL-looking line from a green check'" -- feat "$BSHA" "m"
+eq "T22b green run: exit 0" 0 "$RC"; eq "T22b a green run leaves the log dir empty" 0 "$(ls -A "$SB/keptlogs" 2>/dev/null | wc -l | tr -d ' ')"; hasnt "T22b no 'check log kept' line" "check log kept" "$ERR"
 
 # 23. every origin fetch and push retries a TRANSIENT denial, never a rejection by the remote
 sandbox; branch feat src/b.txt new; real_git=$(command -v git)
