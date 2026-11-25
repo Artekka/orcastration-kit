@@ -32,8 +32,10 @@ Newest first.
   broken link stops every script (no change on disk). With two real folders, gate-throttle warns on every start and names
   the fix; the new folder is used. The rule: one folder unless the 0.16 name's link is deleted while a 0.16 copy runs first, or HOME cannot hold links; kit-init's refresh closes it.
 - **Added: `scripts/kit-refresh.sh`**, which kit-init runs to list and replace a project's script copies made on 0.16 (the
-  launch scripts and the three that write to the state folder). It replaces only copies the project's git tracks with no
-  uncommitted change, so `git diff` shows the refresh and `git checkout` undoes it; the rest are listed with the reason.
+  launch scripts and the three that write to the state folder). It replaces a copy only when its content is a kit 0.16
+  version (never a project-edited copy), it is a regular file inside the project (never through a symlink), and the
+  project's git tracks it with no uncommitted change, so `git diff` shows the refresh and `git checkout` undoes it. The
+  rest are listed with the reason and the manual step. Libraries it creates are new untracked files (delete to undo).
 - **Fixed: the docs check's sweep for the 0.16 id** allows it only in the named places (history, the upgrade sections, the
   renames map, the recorded Station fixture, kit-init's upgrade lines, the state-folder code). A line that merely mentions
   "0.16" no longer passes.
