@@ -206,6 +206,8 @@ eq "11b exit 0" 0 "$RC"; has "11b refreshed" "REFRESH scripts/gate-throttle.sh" 
 proj clink; OC="$TMP/create outside"; mkdir -p "$OC"; ln -s "$OC/lib-kit-home.sh" "$P/scripts/lib-kit-home.sh"
 git -C "$P" add -A && git -C "$P" commit -qm clink; rf --apply
 [ -e "$OC/lib-kit-home.sh" ] && bad "12: CREATE wrote through the link" || ok
+eq "12 dangling link counts toward exit 3" 3 "$RC"
+has "12 dangling link reported" "LEFT   scripts/lib-kit-home.sh (a dangling link at a library name" "$OUT"
 [ -L "$P/scripts/lib-kit-home.sh" ] && ok || bad "12: the link was replaced"
 has "12 the copies beside it refresh" "REFRESH scripts/gate-throttle.sh" "$OUT"
 nottmp "12" "$P"
@@ -243,6 +245,16 @@ has "13d left" "LEFT   scripts/gate-throttle.sh (could not replace" "$OUT"
 case "$OUT" in *"REFRESH scripts/gate-throttle.sh"*) bad "13d printed REFRESH for the folder";; *) ok;; esac
 eq "13d the folder stays empty" "" "$(ls -A "$P/scripts/gate-throttle.sh" 2>/dev/null)"
 nottmp "13d" "$P"
+#   g) CDPATH from the caller's shell is ignored: `cd scripts` must enter the project's scripts/, never the scripts/ of a
+#      folder named in CDPATH (a false refusal, or with a weaker folder check, writes into that other folder)
+CD="$TMP/cdpath other"; mkdir -p "$CD/scripts"; for f in $WRITERS $LAUNCH; do old016 "$f" > "$CD/scripts/$f"; done
+before_cd="$(md5sum "$CD"/scripts/*)"; before_ls="$(ls -A "$CD/scripts")"
+proj cdp; OUT="$(cd "$P" && CDPATH="$CD" KIT_REFRESH_TEST=1 KIT_REFRESH_TEST_KNOWN="$KNOWN" bash "$RF" --apply 2>&1)"; RC=$?
+eq "13g CDPATH exit 0" 0 "$RC"
+has "13g refreshed in the project" "REFRESH scripts/gate-throttle.sh" "$OUT"
+cmp -s "$P/scripts/gate-throttle.sh" "$ROOT/scripts/gate-throttle.sh" && ok || bad "13g: the project's copy was not refreshed"
+eq "13g the CDPATH folder is untouched" "$before_cd" "$(md5sum "$CD"/scripts/*)"
+eq "13g no file created in the CDPATH folder" "$before_ls" "$(ls -A "$CD/scripts")"
 #   e) a link raced in at a CREATE name between the check and the write is replaced by the move, never written through
 SL="$TMP/shim ln"; OL="$TMP/race outside"; mkdir -p "$SL" "$OL"
 printf '#!/bin/sh\ncase "$1" in */lib-kit-home.sh) ln -s "%s/lib-kit-home.sh" lib-kit-home.sh 2>/dev/null;; esac\nexec "%s" "$@"\n' "$OL" "$REALCP" > "$SL/cp"; chmod +x "$SL/cp"
