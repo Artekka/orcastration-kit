@@ -209,6 +209,13 @@ HOME="$H" bash -c 'unset SIBLING_STATE_DIR KIT_RUNTIME_DIR; bash "$1/scripts/sta
 [ "$rc" -ne 0 ] && ok || bad "H5: start-team --dry-run exited 0 on a broken kit home"
 grep -q 'is not a folder' "$TMP/h5-st" && ok || bad "H5: start-team did not say why: $(head -c 300 "$TMP/h5-st")"
 eq "H5 the file is untouched" mine "$(cat "$H/.orcastration-kit" 2>/dev/null)"
+# in place, a hand-off folder that cannot be resolved STOPS (rc 2: no new tab, nothing signalled), the second guard
+# behind the launchers' own check (recycle-sibling maps 2 to exit 1 and never falls back to a tab).
+( sleep 30 ) & SPID=$!
+HOME="$H" bash -c 'unset SIBLING_STATE_DIR KIT_RUNTIME_DIR; . "$1/scripts/lib-launch.sh" && launch_recycle_inplace ZzKH hi "$2" "$2"' _ "$ROOT" "$SPID" >/dev/null 2>&1; rc=$?
+eq "H5 in-place hand-off folder unresolved = stop (2)" 2 "$rc"
+kill -0 "$SPID" 2>/dev/null && ok || bad "H5: launch_recycle_inplace signalled the old process"
+kill "$SPID" 2>/dev/null; wait "$SPID" 2>/dev/null
 # a dry run on a dangling link changes nothing on disk (it only checks), and exits 0
 fresh H6; ln -s ".gone-folder" "$H/.orcastration-kit"
 HOME="$H" bash -c 'unset SIBLING_STATE_DIR KIT_RUNTIME_DIR; bash "$1/scripts/recycle-sibling.sh" --dry-run --terminal manual --repo "$1" ZzKitHome' _ "$ROOT" >/dev/null 2>&1; rc=$?
