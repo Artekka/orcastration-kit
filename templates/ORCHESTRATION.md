@@ -103,6 +103,7 @@ refuse the accidents that shared checkouts keep producing, each with ONE stderr 
 `prettier-dir-guard` (`prettier --write` on a directory), `conflict-marker-guard` (a commit or `--continue` that would
 commit a conflict marker) and `sendmessage-sha-guard` (a message naming a sha git cannot resolve). They need python3 and
 fail open on anything they cannot read. A human can still run those commands in their own terminal.
+`interface` is `cli` or `station` (default `cli`). `station` means you chose the optional Orcastration Station window (the README section of that name); nothing in the kit's scripts reads it, and `cli` changes nothing. `kit-init` sets it with `scripts/station-interface.sh`.
 `max_sessions` (unset = no check): the most Claude sessions this machine should run, the seat and every
 verifier included. `start-team.sh` and `recycle-sibling.sh` warn (never refuse) before passing it. Each
 session holds several GB of RAM; on WSL, Windows kills the whole VM when it runs out of commit, with
@@ -133,6 +134,7 @@ team:
   gate_slots:       2
   max_sessions:     8
   terminal:         auto
+  interface:        cli             # cli | station
 ```
 
 `evidence dir`: every scratch file a session makes (probes, logs it will quote, a verifier's evidence)

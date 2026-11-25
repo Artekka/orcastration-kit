@@ -1,0 +1,15 @@
+[package]
+name = "observatory-bridge"
+edition.workspace = true
+version.workspace = true
+description = "Runs inside WSL: tails Claude Code session logs and writes observatory wire frames on stdout"
+
+[[bin]]
+name = "observatory-bridge"
+path = "src/main.rs"
+
+[dependencies]
+observatory-core = { path = "../core" }
+serde.workspace = true
+serde_json.workspace = true
+notify.workspace = true

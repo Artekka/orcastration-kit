@@ -4,7 +4,7 @@ Newest first.
 
 ## Unreleased
 
-## 0.15.1 — 2026-11-24
+## 0.16.1 — 2026-11-24
 
 The merge script and the throttle take the fixes their source project made after the first port.
 
@@ -21,6 +21,20 @@ The merge script and the throttle take the fixes their source project made after
 - **Fixed: a priority-list line ending in `/` also matches the tree itself**, not only the folders inside it. The old rule was pinned by a test; that pin now says the opposite.
 - **Fixed: deploy mode sizes the confined share from the kernel's online CPU list**, not the caller's `nproc`, which follows the caller's CPU mask and `OMP_NUM_THREADS` (a release gate under `taskset -c 0-7` confined the others to 2 of 28 CPUs; with `OMP_NUM_THREADS=2` it confined nothing). A missing or malformed list falls back to `nproc --all` with one stderr line (`KIT_CPU_ONLINE_FILE` is the test seam).
 - **Not ported, on purpose:** the typecheck-after-merge stage (the `check:` lines of the `seat_merge:` block already run any command on the merged tree, for example a `typecheck | *.ts | <command>` line); the docs-push yield and guard-round waits, the hosted-page date bump, the old-host scan, the generated-bundle conflict resolver, the remote guard stage and the vitest pool settings of the merge script; the sim and pages pools, the process sandbox and the one-command gate entry of the throttle; the lane marker, launch log and remote-host notes of `recycle-sibling.sh` (the launch timeout kill and the model guard are already in 0.15.0); every `pending-work.sh` change (they read one project's board and hub shapes); detached-worktree removal and the masters-sparse set of the worktree check (they need the disk sweep, which the kit does not have yet).
+
+## 0.16.0 — 2026-11-24
+
+The Orcastration Station joins the kit: a desktop window for watching, and typing to, several teams at once. It is optional, and the CLI stays the default. The window is the work of an outside author (a pull request), adapted here under the name Orcastration Station.
+
+- **Added: `station/`** (moved with `git mv` from the pull request's `extras/observatory/`, so history stays): two Rust programs (`observatory.exe`, a Windows window; `observatory-bridge`, a WSL bridge that reads Claude Code's session logs and can type into a tmux pane), their scripts and the product brief. Credit line: "Orcastration Station, adapted from Omar's Observatory".
+- **Added: the README section "Orcastration Station"**: what it is, the two programs, requirements, build-from-source install (prebuilt binaries are stated as arriving in 0.17.0), config, the typing safety rules and every known limit in full. The rustup step says it is a `curl | sh` install and links the manual one.
+- **Added: the interface question in `kit-init`** (a new step after the HUD): CLI (the default, writes nothing) or the Station. The answer is the `interface: cli | station` line in the team block of `ORCHESTRATION.md`, set by `scripts/station-interface.sh`, which runs from the plugin and prints the install paths for the Station without running anything.
+- **Added: a `station` job in `.github/workflows/test.yml`**: the Station's own gate (privacy checks, fmt, clippy, every test, the Windows cross-check) on ubuntu-latest, plus a pinned `cargo audit` of the locked crates. Pinned action shas, a read-only token, no secrets, cached cargo. This is where Rust is built for the kit.
+- **Changed: the Station's scripts judge only `station/`**: `deploy.sh` no longer refuses over a dirty or unpushed file elsewhere in the kit, and a `station/` folder identical to `origin/main`'s counts as landed. The cargo target dir is named `station-<tree>-<hash>`. Shell messages and the desktop shortcut say Orcastration Station.
+- **Fixed: the desktop shortcut command** doubles a single quote in a path (PowerShell single-quoted strings), so a path such as `O'Brien` can no longer end the string and run the rest as code.
+- **Fixed: two safety holes in the Station found by the pull-request review** (Rust, proven only by the CI job): a chat link opens only `http://` and `https://` addresses (a file path, a network share or another scheme is refused and shown struck through); a send types only when the registry status is `idle`, `busy` or `shell` AND Claude Code's idle input box is on screen, checked right before the paste and right before the Enter (the old rule refused only on `waiting`, and let an unknown status through). The README safety rules and known limits say what is still not covered.
+- **Added: tests** `tests/station-scripts.test.sh` (deploy scoping, target dir, shortcut quoting; dry runs and stand-ins, no cargo) and `tests/station-interface.test.sh` (a CLI answer changes nothing; a Station answer runs nothing).
+- Not in this release: prebuilt binaries and their release workflow, a native Linux window and installer, renaming the crates, binaries, config folders and `OBSERVATORY_*` variables (0.17.0).
 
 ## 0.15.0 — 2026-11-24
 
