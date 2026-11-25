@@ -59,7 +59,13 @@ pin "README upgrade: the old-Claude-Code fallback" README.md "claude plugin unin
 pin "CHANGELOG upgrade block" CHANGELOG.md "Upgrading from 0.16"
 # kit-init only creates missing files, so launch scripts copied on 0.16 keep the old prefix: kit-init must offer the refresh
 pin "kit-init detects 0.16 launch scripts" skills/kit-init/SKILL.md "grep -lF '/$OLD:' scripts/*.sh"
-pin "kit-init refresh list" skills/kit-init/SKILL.md "(start-team.sh recycle-sibling.sh sibling-shell.sh lib-launch.sh lib-model-tag.sh lib-kit-home.sh;"
+pin "kit-init runs the refresh" skills/kit-init/SKILL.md 'bash "$K/scripts/kit-refresh.sh" --apply'
+pin "kit-init refresh dry run first" skills/kit-init/SKILL.md 'bash "$K/scripts/kit-refresh.sh"`'
+# the written limit of the one-folder rule (713b r2), in the README and the CHANGELOG
+LIMIT="one folder unless the 0.16 name's link is deleted while a 0.16 copy runs first, or HOME cannot hold links; kit-init's refresh closes it"
+pin "README one-folder limit" README.md "$LIMIT"
+pin "CHANGELOG one-folder limit" CHANGELOG.md "$LIMIT"
+pin "CHANGELOG fresh-install link" CHANGELOG.md "a fresh install makes ~/.orcastration-kit and links the 0.16 name to it"
 pin "README upgrade: re-run kit-init for the copied scripts" README.md "In each project adopted on 0.16, run \`/orcastration-kit:kit-init\` once more"
 grep -qF "plugin id is \`$OLD\`" "$ROOT/README.md" && { fail=$((fail+1)); echo "FAIL the 0.16.3 two-spellings note is still in the README"; } || pass=$((pass+1))
 # marketplace: entry name = plugin.json name, and the renames map sends the 0.16 id to it (Claude Code rewrites the keys)

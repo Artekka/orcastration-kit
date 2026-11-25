@@ -13,6 +13,7 @@ pass=0; fail=0
 ok()  { pass=$((pass+1)); }
 bad() { fail=$((fail+1)); echo "FAIL $*"; }
 eq()  { [ "$2" = "$3" ] && ok || bad "$1: want '$2', got '$3'"; }
+ne()  { [ "$2" != "$3" ] && ok || bad "$1: did not want '$2'"; }
 OLDN=".orch""estration-kit"   # the 0.16 folder name, split so docs-pins' old-id sweep never needs this file on its list
 fresh() { H="$TMP/h$1"; rm -rf "$H"; mkdir -p "$H"; }
 kh() {  # run kit_home under the fake HOME; stdout -> OUT, stderr -> ERR
@@ -20,12 +21,15 @@ kh() {  # run kit_home under the fake HOME; stdout -> OUT, stderr -> ERR
 }   # KRC = kit_home's exit status
 [ -f "$LIB" ] || { echo "FAIL scripts/lib-kit-home.sh is missing"; echo "kit-home: $pass passed, 1 failed"; exit 1; }
 
-# A. Neither folder: the new name, nothing created (callers mkdir what they need), nothing said.
+# A. Neither folder (a fresh install): the new name becomes a REAL folder and the 0.16 name a link to it, so a 0.16 copy of
+#    a script that runs later lands in the same folder (713b r2, F-1). One line says so; the next call is silent.
 fresh A; kh
+eq "A exit" 0 "$KRC"
 eq "A path" "$H/.orcastration-kit" "$OUT"
-[ ! -e "$H/.orcastration-kit" ] && [ ! -L "$H/.orcastration-kit" ] && ok || bad "A created the new folder"
-[ ! -e "$H/$OLDN" ] && ok || bad "A created the old folder"
-eq "A silent" "" "$ERR"
+[ -d "$H/.orcastration-kit" ] && [ ! -L "$H/.orcastration-kit" ] && ok || bad "A: the new name is not a real folder"
+[ -L "$H/$OLDN" ] && [ "$(cd "$H/$OLDN" 2>/dev/null && pwd -P)" = "$(cd "$H/.orcastration-kit" && pwd -P)" ] && ok || bad "A: the 0.16 name is not a link to the new folder"
+eq "A one line" 1 "$(printf '%s\n' "$ERR" | grep -c .)"
+kh; eq "A second call silent" "" "$ERR"
 
 # B. Only the 0.16 folder: the new name becomes a link to it, one line says so, the data is reachable both ways.
 fresh B; mkdir -p "$H/$OLDN/sessions" "$H/$OLDN/runtime/locks"; echo keep > "$H/$OLDN/sessions/Sib1.next"
@@ -150,6 +154,74 @@ for tw in bash python; do
   mkdir -p "$H/$OLDN/runtime/locks"   # what a 0.16 copy of gate-throttle.sh does on its own path
   one_real "G6 $tw"
 done
+
+# FR. Fresh install, per twin: empty HOME, kit_home, then a 0.16 copy's own `mkdir -p` and a lock on the 0.16 path.
+#     One real folder (the new one), one link (the 0.16 name), and the lock is seen through both names.
+one_folder_new() {  # <label>
+  local real=0
+  [ -d "$H/.orcastration-kit" ] && [ ! -L "$H/.orcastration-kit" ] && real=$((real + 1))
+  [ -d "$H/$OLDN" ] && [ ! -L "$H/$OLDN" ] && real=$((real + 1))
+  eq "$1 one real folder" 1 "$real"
+  [ -L "$H/$OLDN" ] && [ "$(cd "$H/$OLDN" 2>/dev/null && pwd -P)" = "$(cd "$H/.orcastration-kit" 2>/dev/null && pwd -P)" ] && ok \
+    || bad "$1: the 0.16 name is not a link to the new folder"
+  echo slot > "$H/$OLDN/runtime/locks/probe" 2>/dev/null
+  eq "$1 a lock via the 0.16 path is seen via the new one" slot "$(cat "$H/.orcastration-kit/runtime/locks/probe" 2>/dev/null)"
+}
+for tw in bash python; do
+  fresh "FR$tw"
+  if [ "$tw" = bash ]; then kh; else command -v python3 >/dev/null 2>&1 || continue; KSD=""; pyhome >/dev/null; fi
+  mkdir -p "$H/$OLDN/runtime/locks"   # what a 0.16 copy of gate-throttle.sh does on its own path
+  one_folder_new "FR $tw"
+done
+# RL. Re-link on every call: the new folder is real and the 0.16 link was deleted -> the next call makes it again.
+for tw in bash python; do
+  fresh "RL$tw"; mkdir -p "$H/.orcastration-kit"
+  if [ "$tw" = bash ]; then kh; else command -v python3 >/dev/null 2>&1 || continue; KSD=""; pyhome >/dev/null; fi
+  [ -L "$H/$OLDN" ] && ok || bad "RL $tw: the 0.16 link was not made again"
+  mkdir -p "$H/$OLDN/runtime/locks"; one_folder_new "RL $tw"
+done
+# RLF. A failed link is not fatal: HOME read-only -> a warning, the new path, exit 0 (bash) / the state dir (python).
+if [ "$(id -u)" != 0 ]; then
+  fresh RLF; mkdir -p "$H/.orcastration-kit"; chmod 555 "$H"
+  kh; eq "RLF exit 0" 0 "$KRC"; eq "RLF path" "$H/.orcastration-kit" "$OUT"
+  case "$ERR" in *"could not link"*) ok;; *) bad "RLF: no warning for the failed link: $ERR";; esac
+  if command -v python3 >/dev/null 2>&1; then
+    KSD=""; out="$(env -u KIT_STATE_DIR HOME="$H" python3 -c 'import runpy,sys; print(runpy.run_path(sys.argv[1], run_name="probe")["STATE_DIR"])' "$ROOT/hooks/ctx-guard.py" 2>"$TMP/rlf-py")"
+    eq "RLF python state dir" "$H/.orcastration-kit/ctx-guard" "$out"
+    grep -q 'could not link' "$TMP/rlf-py" && ok || bad "RLF python: no warning: $(head -c 200 "$TMP/rlf-py")"
+  fi
+  chmod 755 "$H"
+fi
+# LOW-A / LOW-B. The 0.16 path exists but is not a folder (a FILE, or a dangling link): kit_home, kit_home_check and the
+# python twin all call it broken: rc 1, one line, and NO change on disk (the dangling new link keeps its target).
+snap() { (cd "$H" && find . -mindepth 1 -maxdepth 1 -printf '%p %y %l\n' | sort; cat "$H/$OLDN" 2>/dev/null); }
+for shape in oldfile olddangling; do
+  for start in dangling none real; do
+    fresh "LA$shape$start"
+    case "$shape" in oldfile) echo mine > "$H/$OLDN";; olddangling) ln -s ".gone-old" "$H/$OLDN";; esac
+    case "$start" in dangling) ln -s ".gone-new" "$H/.orcastration-kit";; real) mkdir -p "$H/.orcastration-kit";; esac
+    before="$(snap)"
+    kh; ne "LA $shape/$start kit_home rc" 0 "$KRC"
+    case "$ERR" in *"is not a folder"*) ok;; *) bad "LA $shape/$start: kit_home did not say the 0.16 path is broken: $ERR";; esac
+    HOME="$H" bash -c '. "$1" && kit_home_check' _ "$LIB" 2>/dev/null; ne "LA $shape/$start kit_home_check rc" 0 "$?"
+    if command -v python3 >/dev/null 2>&1; then
+      env -u KIT_STATE_DIR HOME="$H" python3 -c 'import runpy,sys; runpy.run_path(sys.argv[1], run_name="probe")' "$ROOT/hooks/ctx-guard.py" >/dev/null 2>&1
+      ne "LA $shape/$start python rc" 0 "$?"
+    fi
+    eq "LA $shape/$start no change on disk" "$before" "$(snap)"
+  done
+done
+# C-shape (two real folders): gate-throttle warns on EVERY start, names the fix, and the new folder wins.
+fresh GTC; mkdir -p "$H/.orcastration-kit" "$H/$OLDN"
+for i in 1 2; do
+  ( cd "$TMP" && HOME="$H" KIT_GATE_MIN_FREE_GB=0 bash -c 'unset KIT_RUNTIME_DIR; bash "$1/scripts/gate-throttle.sh" true' _ "$ROOT" >/dev/null 2>"$TMP/gtc$i" ); rc=$?
+  eq "GTC start $i exit" 0 "$rc"
+  grep -q 'two state folders' "$TMP/gtc$i" && grep -qF '/orcastration-kit:kit-init' "$TMP/gtc$i" && ok || bad "GTC start $i: no two-folders warning naming kit-init: $(head -c 300 "$TMP/gtc$i")"
+done
+[ -d "$H/.orcastration-kit/runtime" ] && [ ! -e "$H/$OLDN/runtime" ] && ok || bad "GTC: the new folder did not win"
+fresh GTC1; mkdir -p "$H/$OLDN"
+( cd "$TMP" && HOME="$H" KIT_GATE_MIN_FREE_GB=0 bash -c 'unset KIT_RUNTIME_DIR; bash "$1/scripts/gate-throttle.sh" true' _ "$ROOT" >/dev/null 2>"$TMP/gtc1" )
+grep -q 'two state folders' "$TMP/gtc1" && bad "GTC1: the two-folders warning in the one-folder shape" || ok
 
 # H. The new name is something kit_home must never remove (a regular file, a link to a file): kit_home fails non-zero,
 #    leaves it alone, and every caller exits non-zero instead of running on a path that cannot hold state.
