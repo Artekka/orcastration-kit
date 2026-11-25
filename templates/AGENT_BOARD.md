@@ -2,7 +2,7 @@
 
 > **What this is:** the live coordination surface for ALL Claude sessions working on this
 > repo at the same time. Read it AFTER the project's orientation docs, BEFORE claiming any
-> work. Every edit is committed AND pushed at once (`/orchestration-kit:board` → shared-checkout recipe).
+> work. Every edit is committed AND pushed at once (`/orcastration-kit:board` → shared-checkout recipe).
 >
 > **This board carries STATUS, not narrative.** Briefs go to builders by message; write-ups,
 > verdict transcripts and post-mortems go to the log, and the board links to them. Past

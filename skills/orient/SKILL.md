@@ -7,9 +7,9 @@ description: Bring a fresh session up to speed on a kit-adopted project — rest
 
 Load a fresh session's working memory without the human re-explaining. End state: five bullets + a productive next question (or a report to the orchestrator).
 
-## Lean mode: `/orchestration-kit:orient --brief <ROW>` (fallback)
+## Lean mode: `/orcastration-kit:orient --brief <ROW>` (fallback)
 
-Prefer `/orchestration-kit:orient-brief <ROW>`: it runs steps 1–2 below before the session reads anything (the brief and banner arrive injected). This table is the same start by hand, for a host that cannot run skill-injected commands.
+Prefer `/orcastration-kit:orient-brief <ROW>`: it runs steps 1–2 below before the session reads anything (the brief and banner arrive injected). This table is the same start by hand, for a host that cannot run skill-injected commands.
 
 For a builder the seat assigned a row that has a brief file (`docs/orchestration/briefs/<ROW>.md`, made from `templates/briefs/_TEMPLATE.md`). A full orient costs ~100K tokens of a fresh context; the brief already holds what this row needs. The full mode below stays for the seat, for a lone session, and for any start without a brief.
 
@@ -24,7 +24,7 @@ Skip: the status doc, the log, `git log`, the overlay (unless the brief names no
 
 ## Step 0 — The multi-session non-negotiables (restate in your summary)
 
-1. **ALL edits happen in your own worktree** — the main thread's included (instructed by default; enforced by a hook only if ORCHESTRATION.md says `worktrees: enforced`). Board/docs edits in the shared checkout are committed within seconds via the board-write recipe (`/orchestration-kit:board`). Never `git add -A` / `.` / `git commit -a`; never `git stash` (stash refs are shared across worktrees) — a hook refuses these if ORCHESTRATION.md says `git_guard: on`. A dirty status you didn't cause is a sibling at work — leave it.
+1. **ALL edits happen in your own worktree** — the main thread's included (instructed by default; enforced by a hook only if ORCHESTRATION.md says `worktrees: enforced`). Board/docs edits in the shared checkout are committed within seconds via the board-write recipe (`/orcastration-kit:board`). Never `git add -A` / `.` / `git commit -a`; never `git stash` (stash refs are shared across worktrees) — a hook refuses these if ORCHESTRATION.md says `git_guard: on`. A dirty status you didn't cause is a sibling at work — leave it.
 2. **Refresh before claiming** — `git fetch origin && git rebase origin/main` (NOT `git pull --rebase`: shared FETCH_HEAD race). `cannot lock ref` = a sibling's fetch won; retry: `git fetch origin || { sleep 2; git fetch origin; } && git rebase origin/main`. A claim is only real once pushed. OPEN rows and briefs are hypotheses — verify against the CODE.
 3. **New rows carry YOUR session prefix** (`<tag>-1`, `<tag>-2` …) — never the board's highest id + 1 (LESSON 16). State your prefix in the summary.
 4. **Run the gate from INSIDE your own worktree** and check its printed counts against your delta — a script that `cd`s to its own directory gates whichever tree it lives in.

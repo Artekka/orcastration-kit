@@ -1,6 +1,6 @@
 # AI Context — read this first
 
-> The fast orientation for a fresh Claude session (`/orchestration-kit:orient` reads it first).
+> The fast orientation for a fresh Claude session (`/orcastration-kit:orient` reads it first).
 > Keep it short and TRUE. Refreshed in the same pass as every build-log entry — a stale
 > version or test count here is the #1 cross-session friction.
 

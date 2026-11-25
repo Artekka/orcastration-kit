@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# recycle-sibling.sh — replace a named Claude Code session with a fresh one (orchestration-kit).
+# recycle-sibling.sh — replace a named Claude Code session with a fresh one (orcastration-kit).
 #
 # Two modes (v0.7.0). Run ONLY after the session replied "retro complete" (the retro-before-clear
 # handshake); SIGTERM, never KILL, so the old transcript flushes either way.
@@ -26,7 +26,7 @@
 #   scripts/recycle-sibling.sh [--dry-run] [--mode normal|accept-edits|auto] [--account N|DIR]
 #                              [--model M] [--effort E] [--new-tab] [--force|--force-children]
 #                              [--terminal BACKEND|auto|list] [--repo DIR] <Name> [prompt]
-#     prompt defaults to /orchestration-kit:orient, or /orchestration-kit:orchestrate for the seat.
+#     prompt defaults to /orcastration-kit:orient, or /orcastration-kit:orchestrate for the seat.
 #     mode / terminal default to the team block (ORCHESTRATION.md), else normal / auto-detect.
 #     account: the fresh session INHERITS the old one's Claude Code account (its CLAUDE_CONFIG_DIR);
 #     --account N|DIR moves it (1 = default ~/.claude, N = ~/.claude-acctN). docs/MULTI-ACCOUNT.md
@@ -44,7 +44,7 @@
 #   DRY_RUN=1 scripts/recycle-sibling.sh <Name>   # same as --dry-run; prints `mode: in-place|new-tab`
 #
 # Env overrides: REPO_DIR (repo to open in), WT_EXE (full path to wt.exe), SIBLING_STATE_DIR (hand-off
-# dir, default ~/.orchestration-kit/sessions), RECYCLE_INPLACE_TIMEOUT (seconds to wait for the in-place
+# dir, default ~/.orcastration-kit/sessions), RECYCLE_INPLACE_TIMEOUT (seconds to wait for the in-place
 # child, default 60), RECYCLE_CLAIMED_GRACE (extra seconds once the wrapper has claimed the hand-off,
 # default 30), RECYCLE_POLL_SECS (default 1), RECYCLE_DETACH_DELAY (seconds the detached copy of a
 # self-recycle waits before the SIGTERM, default 2), RECYCLE_DETACH_WAIT (seconds it waits to leave the
@@ -85,8 +85,8 @@ if [ "$TERM_OPT" = list ]; then launch_list_backends; exit 0; fi
 [ "${#args[@]}" -ge 1 ] || usage
 name="${args[0]}"
 launch_team_conf "$REPO"
-default_prompt="/orchestration-kit:orient"
-if [ "$name" = "${TEAM_SEAT:-Orca}" ]; then default_prompt="/orchestration-kit:orchestrate"; fi
+default_prompt="/orcastration-kit:orient"
+if [ "$name" = "${TEAM_SEAT:-Orca}" ]; then default_prompt="/orcastration-kit:orchestrate"; fi
 prompt="${args[1]:-$default_prompt}"
 launch_check_args "$name" "$prompt"
 launch_set_mode "${MODE:-${TEAM_MODE:-normal}}"

@@ -51,7 +51,7 @@ Each piece has the same three parts.
 
 ### Briefs and the lean start
 
-**What it does:** The seat writes a row's contract to `docs/orchestration/briefs/<ROW>.md` (from `templates/briefs/_TEMPLATE.md`) and pushes it before assigning. The builder runs `/orchestration-kit:orient-brief <ROW>`: it loads only that brief and the board banner, then sends one READY line to the seat.
+**What it does:** The seat writes a row's contract to `docs/orchestration/briefs/<ROW>.md` (from `templates/briefs/_TEMPLATE.md`) and pushes it before assigning. The builder runs `/orcastration-kit:orient-brief <ROW>`: it loads only that brief and the board banner, then sends one READY line to the seat.
 
 **Why it exists:** A chat summary decays, and a full orientation spends a context window before any work. A brief is the same contract for the builder and for the validator who reads it later.
 
@@ -91,7 +91,7 @@ Each piece has the same three parts.
 
 ### Context guard, retro and recycle
 
-**What it does:** Each session's real context fill is measured (`scripts/ctx-fill.py`, never bytes divided by four). With the guard on, a `CONTEXT GUARD:` line appears as a session nears its report mark and its hand-over mark. At the mark the session runs `/orchestration-kit:retro` (writes down what it learned), and the seat recycles it into a fresh session: in the same tab when that tab runs the kit's `scripts/sibling-shell.sh` wrapper (every tab `start-team.sh` opens does), otherwise in a new window. Auto-compact stays off.
+**What it does:** Each session's real context fill is measured (`scripts/ctx-fill.py`, never bytes divided by four). With the guard on, a `CONTEXT GUARD:` line appears as a session nears its report mark and its hand-over mark. At the mark the session runs `/orcastration-kit:retro` (writes down what it learned), and the seat recycles it into a fresh session: in the same tab when that tab runs the kit's `scripts/sibling-shell.sh` wrapper (every tab `start-team.sh` opens does), otherwise in a new window. Auto-compact stays off.
 
 **Why it exists:** A session that runs into its window wall degrades silently: it re-reads files, loses SHAs and fences, and nobody notices until the damage is merged.
 

@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# quiet-mode.sh (orchestration-kit): free the machine for the human (a game, a call, a render) without
+# quiet-mode.sh (orcastration-kit): free the machine for the human (a game, a call, a render) without
 # killing anything. While quiet mode is on, scripts/gate-throttle.sh starts no NEW command; running ones
 # finish. Sessions should also hold off on their own heavy work (headless browsers, renders) until it is off.
 # Usage: bash scripts/quiet-mode.sh on|off|status
-# State: the flag file "$KIT_RUNTIME_DIR/quiet-mode" (default ~/.orchestration-kit/runtime), shared with
+# State: the flag file "$KIT_RUNTIME_DIR/quiet-mode" (default ~/.orcastration-kit/runtime), shared with
 # gate-throttle.sh. The status lists what the throttle is running and who is waiting, from the throttle's
 # own records (no process-name guessing).
 set -u
-RT="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib-kit-home.sh" || { echo "quiet-mode: lib-kit-home.sh is missing beside this script" >&2; exit 64; }
+RT="${KIT_RUNTIME_DIR:-$(kit_home)/runtime}"
 FLAG="$RT/quiet-mode"
 
 # The same start-time function as gate-throttle.sh (see there): the two must agree, or no waiter is listed.

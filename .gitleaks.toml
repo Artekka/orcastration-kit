@@ -1,7 +1,7 @@
 # gitleaks config for this repo. CI runs it on each push and pull request diff; the opt-in pre-push hook
 # (.github/hooks/install-pre-push.sh) runs it on the commits you push. Tested with gitleaks 8.30.1.
 # tests/leak-guard.test.sh checks the same personal-detail classes on the working tree.
-title = "orchestration-kit"
+title = "orcastration-kit"
 
 # Every built-in gitleaks rule (cloud keys, GitHub, Anthropic, OpenAI and other tokens, private keys, ...).
 [extend]

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # sibling-shell.sh — the respawn loop a team terminal runs, so a recycle can happen in the SAME tab
-# (orchestration-kit v0.7.0).
+# (orcastration-kit v0.7.0).
 #
 #   scripts/sibling-shell.sh <Name> [--mode M] --model M [--effort E] [prompt]
-#       (prompt defaults to /orchestration-kit:orient; --mode is normal|accept-edits|auto)
+#       (prompt defaults to /orcastration-kit:orient; --mode is normal|accept-edits|auto)
 #
 # It runs `claude --name <Name> [mode flags] --model M [--effort E] <prompt>` as a CHILD, not via exec.
 # When the child exits it looks for a hand-off file; if scripts/recycle-sibling.sh left one, it starts
@@ -16,7 +16,7 @@
 # started by the kit recycles in place from its first recycle on. A session started by hand (a bare
 # `claude`) is not under a wrapper: its first recycle opens a new tab that runs one.
 #
-# HAND-OFF FILE  ${SIBLING_STATE_DIR:-$HOME/.orchestration-kit/sessions}/<Name>.next
+# HAND-OFF FILE  ${SIBLING_STATE_DIR:-~/.orcastration-kit/sessions}/<Name>.next
 #   model=opus[1m]        required: the model is always explicit, never inherited
 #   effort=high           optional; empty = no --effort flag
 #   mode=auto             optional permission mode. recycle-sibling.sh always writes it (its --mode, else the
@@ -48,8 +48,8 @@ set -uo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib-model-tag.sh" || { echo "sibling-shell: lib-model-tag.sh is missing beside this script; refusing to launch an unchecked model" >&2; exit 64; }
 
 main() {
-  local name="" model="" effort="" mode="normal" prompt="/orchestration-kit:orient" have_prompt=0
-  local state_dir="${SIBLING_STATE_DIR:-$HOME/.orchestration-kit/sessions}"
+  local name="" model="" effort="" mode="normal" prompt="/orcastration-kit:orient" have_prompt=0
+  local state_dir="${SIBLING_STATE_DIR:-$(kit_home)/sessions}"   # kit_home: lib-kit-home.sh, via lib-model-tag.sh
   local min_run="${SIBLING_MIN_RUN_SECS:-5}"
 
   while [ $# -gt 0 ]; do
@@ -134,7 +134,7 @@ main() {
     # `|| true`: a prompt that is not valid base64 becomes an empty one, which falls back to the default
     # orient prompt. `--decode` (not -d) is the spelling both GNU and macOS base64 accept.
     prompt=$(printf '%s' "$p64" | base64 --decode 2>/dev/null || true)
-    [ -n "$prompt" ] || prompt="/orchestration-kit:orient"
+    [ -n "$prompt" ] || prompt="/orcastration-kit:orient"
     # The account is part of the hand-off: empty means the default account, so unset the variable a
     # previous iteration may have exported.
     if [ "$have_a" = 1 ]; then

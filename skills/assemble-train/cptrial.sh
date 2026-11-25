@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cptrial.sh (orchestration-kit, assemble-train): simulate cherry-picking ONE commit onto a base (a rider that
+# cptrial.sh (orcastration-kit, assemble-train): simulate cherry-picking ONE commit onto a base (a rider that
 # must land by cherry-pick, e.g. one whose branch also carries a commit that would revert a later fix).
 # Run as:  B=<base commit> C=<commit to pick> bash cptrial.sh   (chain one call per commit, in order)
 # Named variables only (the skill loader eats positionals). Same output as trial.sh; the SYNTH has ONE parent.

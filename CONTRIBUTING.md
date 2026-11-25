@@ -1,4 +1,4 @@
-# Contributing to orchestration-kit
+# Contributing to orcastration-kit
 
 Thanks for helping. Bug reports, fixes, docs and new lessons from your own multi-session setups are all
 welcome. By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
@@ -25,7 +25,7 @@ To try your change in a real project, install the plugin from your local clone:
 
 ```bash
 claude plugin marketplace add /path/to/your/clone
-claude plugin install orchestration-kit@artekka-kits --scope project
+claude plugin install orcastration-kit@artekka-kits --scope project
 ```
 
 ## Branches and pull requests

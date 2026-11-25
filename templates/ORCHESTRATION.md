@@ -1,6 +1,6 @@
 # Project Orchestration Config — the overlay the kit's skills read
 
-> Generic protocol lives in the kit (`orchestration-kit` plugin) and in `AGENT_BOARD.md`'s
+> Generic protocol lives in the kit (`orcastration-kit` plugin) and in `AGENT_BOARD.md`'s
 > protocol table. THIS file holds everything project-specific. Every kit skill reads this
 > file first and defers to it. Keep it short, keep it true.
 
@@ -69,7 +69,7 @@ board path:     docs/orchestration/AGENT_BOARD.md
 archive dir:    docs/orchestration/archive/   (BOARD_ARCHIVE_<YYYY-MM-DD>.md; archive past ~60 KB)
 tag scheme:     <Name> [<ref>]  — Name = the terminal's `claude --name`, ref = from ListAgents
 context marks:  1M window: self-report ~350K, hand over by ~400K · 200K window: ~120K / ~150K
-evidence dir:   ~/.orchestration-kit/scratch/<YYYY>/<Month>/<row>/   (probe scripts, gate/run logs, READ evidence, mutant outputs)
+evidence dir:   ~/.orcastration-kit/scratch/<YYYY>/<Month>/<row>/   (probe scripts, gate/run logs, READ evidence, mutant outputs)
 questions:      blocking   (blocking | non-blocking — see the orchestrate skill §11)
                 measure: python3 scripts/ctx-fill.py <uuid> --window 1m|200k   (never bytes ÷ 4)
 start team:     bash scripts/start-team.sh [--dry-run] [--siblings N]   (skips names already running)
@@ -111,7 +111,7 @@ nothing logged inside Linux. After such a crash, relaunch ONE session at a time 
 before the next. Lower it if the machine struggles; raise it only with RAM to spare.
 `gate_slots` (default 2) is how many throttled runs (`scripts/gate-throttle.sh`) may run at once on
 this machine, plus one priority slot for the paths the seat lists in
-`~/.orchestration-kit/runtime/gate-priority.txt` (release/train gates). Lower it if gates flake under load.
+`~/.orcastration-kit/runtime/gate-priority.txt` (release/train gates). Lower it if gates flake under load.
 While a priority gate runs (deploy mode) new normal gates wait and the other running gates are confined to the first `GATE_DEPLOY_OTHERS_PCT` (25) percent of the CPUs, then given their own masks back. `gate_reuse_check` (optional; add it to the team block, or set `GATE_REUSE_CHECK`) is a command run as `<it> <the gate command>` before a gate queues: exit 0 means the tree already has a green record, so the gate is skipped.
 `model` / `effort` (both optional) set the default for every launch: `model` is `opus[1m]`, `sonnet[1m]`, `haiku` or a full model id (default `opus[1m]`), `effort` one of `low|medium|high|xhigh|max` (default: not passed). The launch scripts ALWAYS pass `--model` and never inherit the old session's, so a recycled session starts on the model its lane needs, not on whatever the terminal had. `--model` / `--effort` flags override the block; a bad value in the block is ignored with a warning, a bad flag exits 64. Per-lane choices: orchestrate skill, "Model per lane".
 `terminal` picks how session windows open: `auto` (detect) or one of `wsl-wt`, `wsl-conhost`,
@@ -156,7 +156,7 @@ The seat merges a READ-passed branch with `bash scripts/seat-merge.sh <branch> <
 - `marker_exempt`: repeatable, a path prefix the committed-conflict-marker scan skips (default none; a doc that quotes markers on purpose). The scan runs on every merge before the format check and refuses a merged tree that holds markers. It is read before the merge, so a branch cannot exempt its own markers.
 - `idle_minutes`: the builder's worktree is removed after a merge only if nothing in it changed this recently (default 30).
 - `SEAT_MERGE_LOG_DIR` (env only): where a refused run keeps its check log; defaults to `logs/` under the runtime dir.
-- `SEAT_MERGE_RUNTIME_DIR` (env only): where the lock and tickets live; defaults to `KIT_RUNTIME_DIR`, else `~/.orchestration-kit/runtime`.
+- `SEAT_MERGE_RUNTIME_DIR` (env only): where the lock and tickets live; defaults to `KIT_RUNTIME_DIR`, else `~/.orcastration-kit/runtime`.
 
 ```
 seat_merge:

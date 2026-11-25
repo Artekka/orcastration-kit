@@ -1,6 +1,6 @@
 ---
 name: kit-init
-description: Initialize a project for the multi-session orchestration workflow — scaffold the shared AGENT_BOARD, the ORCHESTRATION.md project overlay, the institutional-memory docs (AI_CONTEXT + build log), the session scripts (start-team, recycle-sibling, ctx-fill), and (with approval) the CLAUDE.md starter section. Use on any project adopting the orchestration-kit, when the user says "set up the board", "init the orchestration kit", "make this project multi-session ready". Idempotent — safe to re-run; never overwrites an existing file.
+description: Initialize a project for the multi-session orchestration workflow — scaffold the shared AGENT_BOARD, the ORCHESTRATION.md project overlay, the institutional-memory docs (AI_CONTEXT + build log), the session scripts (start-team, recycle-sibling, ctx-fill), and (with approval) the CLAUDE.md starter section. Use on any project adopting the orcastration-kit, when the user says "set up the board", "init the orchestration kit", "make this project multi-session ready". Idempotent — safe to re-run; never overwrites an existing file.
 ---
 
 # kit-init
@@ -23,11 +23,12 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
             templates/build-log.md:docs/timeline/build-log.md; do
      SRC="$K/${p%%:*}" DST="${p#*:}" put
    done
-   [ -e docs/orchestration/.kit-hooks ] || { printf '%s\n' "# opt-in marker: the orchestration-kit SessionStart hook runs only in repos carrying this file. Delete it to silence the hook." > docs/orchestration/.kit-hooks && echo "CREATE docs/orchestration/.kit-hooks"; }
-   for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh seat-merge.sh lib-waiting-tickets.sh lib-builder-worktree.sh pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh bottleneck-watch.sh lib-prompt-dialog.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py lib-model-tag.sh lib-git-retry.sh lib-conflict-markers.sh lib-mono-clock.sh; do SRC="$K/scripts/$f" DST="scripts/$f" put; done
+   [ -e docs/orchestration/.kit-hooks ] || { printf '%s\n' "# opt-in marker: the orcastration-kit SessionStart hook runs only in repos carrying this file. Delete it to silence the hook." > docs/orchestration/.kit-hooks && echo "CREATE docs/orchestration/.kit-hooks"; }
+   for f in lib-launch.sh lib-kit-home.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh seat-merge.sh lib-waiting-tickets.sh lib-builder-worktree.sh pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh bottleneck-watch.sh lib-prompt-dialog.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py lib-model-tag.sh lib-git-retry.sh lib-conflict-markers.sh lib-mono-clock.sh; do SRC="$K/scripts/$f" DST="scripts/$f" put; done
    chmod +x scripts/start-team.sh scripts/recycle-sibling.sh scripts/ctx-fill.py scripts/statusline-ctx.sh scripts/gate-throttle.sh scripts/quiet-mode.sh scripts/seat-merge.sh scripts/pending-work.sh scripts/tmux-session.sh scripts/sibling-shell.sh scripts/retro-worktrees.sh scripts/docker-cache-cap.sh scripts/gate-disk-guard.sh scripts/bottleneck-watch.sh scripts/main-checkout-sync.sh scripts/sync-main-checkout.sh scripts/launched_window.py
    ```
    If the overlay names different doc paths (ORCHESTRATION.md → Docs), use those instead.
+   **Scripts copied on 0.16 (before the 0.17.0 id rename):** `put` never overwrites, so a project adopted on 0.16 keeps launch scripts whose default prompt is the 0.16 command prefix, which no longer exists. Check with `grep -lF '/orchestration-kit:' scripts/*.sh 2>/dev/null` (the 0.16 prefix); any hit → show the list and ask the human ONCE whether to refresh the kit's own launch scripts from `$K/scripts/` (start-team.sh recycle-sibling.sh sibling-shell.sh lib-launch.sh lib-model-tag.sh lib-kit-home.sh; `git diff` first if they were edited locally). Yes → copy those six, `chmod +x` the three runnables, report `REFRESH scripts/<f>` per file and stage them with the CREATE paths. Until then, pass the prompt explicitly (`recycle-sibling.sh <Name> /orcastration-kit:orient`).
 2. **Fill the overlay** (only if just created) — infer candidates from the repo (`package.json` scripts, `Makefile`, CI config), then ASK the human to confirm: gate command + pass-proof line, never-run commands, deploy vehicle (or "none"), validator seat (optional), locked items. Never silently guess a gate. Leave the `team:` block at its defaults unless the human wants other names.
 3. **Write AI_CONTEXT.md** (only if just created) — never leave it a template.
    **First ask, once — ONE `AskUserQuestion`:** "No orientation doc found. How should I learn this project?" → **Search the project (Recommended)** · **I'll give you an outline** (a file path, or paste it in your reply) · **Both — my outline first, then check it against the project**. With an outline: read it, treat it as the human's word on purpose/priorities, and verify its factual claims (paths, commands, versions) against the repo — the repo wins on facts, flag any mismatch. The doc you then write is the record, so this question never repeats.
@@ -38,10 +39,10 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    find . -maxdepth 2 -type d -not -path './.git*' -not -path '*/node_modules*' | head -60
    ls docs .github/workflows 2>/dev/null; git log --oneline -30; git tag --sort=-v:refname | head -3
    ```
-   Fill EVERY section: version (tag/manifest), test count (one gate run, literal pass line), what works, in flight (open branches), architecture quick-ref (path → what it is), deferred work (TODO/FIXME hotspots, open issues if visible). Mark anything inferred-not-verified `(unverified)`. Ask the human ONE `AskUserQuestion` for what the repo can't tell you: top priority right now + working-style preferences (offer "skip"). Also append the first log entry: `Milestone 1 — <date>: adopted orchestration-kit (baseline: <version>, <test line>)`.
-4. **CLAUDE.md section** — offer to append `templates/CLAUDE-section.md` (managed block `<!-- orchestration-kit vX -->`). Requires the human's yes; no CLAUDE.md → offer to create it with just this section. Marker already present → diff against the new template and propose the delta.
-5. **Memory** — nothing to create. Claude Code makes its auto-memory (`~/.claude/projects/<slug>/memory/`) itself; `/orchestration-kit:retro` writes lessons there.
-6. **Commit** — stage exactly the paths reported CREATE (never `git add -A`), `git commit -m "chore(orchestration): adopt orchestration-kit vX"`, `git push`.
+   Fill EVERY section: version (tag/manifest), test count (one gate run, literal pass line), what works, in flight (open branches), architecture quick-ref (path → what it is), deferred work (TODO/FIXME hotspots, open issues if visible). Mark anything inferred-not-verified `(unverified)`. Ask the human ONE `AskUserQuestion` for what the repo can't tell you: top priority right now + working-style preferences (offer "skip"). Also append the first log entry: `Milestone 1 — <date>: adopted orcastration-kit (baseline: <version>, <test line>)`.
+4. **CLAUDE.md section** — offer to append `templates/CLAUDE-section.md` (managed block `<!-- orcastration-kit vX -->`). Requires the human's yes; no CLAUDE.md → offer to create it with just this section. Marker already present → diff against the new template and propose the delta. The 0.16 marker spelling (`<!-- orchestration-kit vX -->`) counts as present, and the delta rewrites it to the new one.
+5. **Memory** — nothing to create. Claude Code makes its auto-memory (`~/.claude/projects/<slug>/memory/`) itself; `/orcastration-kit:retro` writes lessons there.
+6. **Commit** — stage exactly the paths reported CREATE (never `git add -A`), `git commit -m "chore(orchestration): adopt orcastration-kit vX"`, `git push`.
 7. **Ask to start the team — ONE `AskUserQuestion` call, three questions.** Never run start-team without the answers.
    First detect the terminal backend (no question — shown in the summary; override later with `terminal:` in the team block):
    ```bash
@@ -78,7 +79,7 @@ Scaffold a repo for the seat + siblings workflow. Sources: `${CLAUDE_PLUGIN_ROOT
    HUD=<yes|no>
    if [ "$HUD" != yes ]; then echo "SKIP status HUD (not installed; say \"install the status HUD\" any time)"; else
      SEAT=$(sed -nE 's/^[[:space:]]+seat:[[:space:]]*([^[:space:]#]+).*/\1/p' docs/orchestration/ORCHESTRATION.md | head -1)
-     QF="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}/quiet-mode"
+     QF="${KIT_RUNTIME_DIR:-$HOME/.orcastration-kit/runtime}/quiet-mode"
      VALS=$(printf '{"showForNames":"%s","quietModeFlagFile":"%s","quietModeOnCmd":"bash scripts/quiet-mode.sh on","quietModeOffCmd":"bash scripts/quiet-mode.sh off"}' "${SEAT:-Orca}" "$QF")
      for D in default "$HOME"/.claude-acct*; do
        # an extra account counts when logged in; macOS keeps logins in the Keychain, so there every dir counts

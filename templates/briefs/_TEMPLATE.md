@@ -1,7 +1,7 @@
 # <ROW> — <one-line title>
 
 > Copy to `docs/orchestration/briefs/<ROW>.md`, fill every section, commit + push BEFORE the assign
-> message. The builder runs `/orchestration-kit:orient-brief <ROW>`, which injects ONLY this file + the
+> message. The builder runs `/orcastration-kit:orient-brief <ROW>`, which injects ONLY this file + the
 > board banner. Contract only: no reasoning, no history of how you got here.
 
 | field | value |
@@ -21,7 +21,7 @@ rests on (the human or the seat, with the date).
 
 1. …
 2. …
-3. A `/orchestration-kit:falsify` record (at least one mutant per new guard) in the commit body.
+3. A `/orcastration-kit:falsify` record (at least one mutant per new guard) in the commit body.
 
 ## Fence
 

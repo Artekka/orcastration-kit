@@ -170,7 +170,7 @@ command -v flock >/dev/null 2>&1 && {
   out="$(gt 100)"; has "enough disk: the gate runs" "rc=0" "$out"; eq "the command ran once" 1 "$(wc -l < "$TMP/ran")"
   out="$(gt 5 KIT_GATE_MIN_FREE_GB=1)"; has "a lowered minimum lets it through" "rc=0" "$out"
   # a project that did not copy the guard script has no check
-  mkdir -p "$TMP/noguard/scripts"; cp "$GT" "$TMP/noguard/scripts/"; : > "$TMP/ran"
+  mkdir -p "$TMP/noguard/scripts"; cp "$GT" "$ROOT/scripts/lib-kit-home.sh" "$TMP/noguard/scripts/"; : > "$TMP/ran"
   out="$(cd "$TMP" && env KIT_RUNTIME_DIR="$RTD" GATE_POLL=0.1 GATE_MAX_LOAD=1000000 GATE_SLOTS=2 KIT_DF_BIN="$FDF" FAKE_FREE_GB=1 bash "$TMP/noguard/scripts/gate-throttle.sh" bash -c 'echo ran >> "$0"' "$TMP/ran" 2>&1; echo "rc=$?")"
   has "without the guard script the throttle just runs" "rc=0" "$out"
 }

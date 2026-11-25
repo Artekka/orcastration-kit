@@ -5,12 +5,12 @@ description: Land READ-PASS riders onto a train branch one merge at a time — c
 
 # assemble-train
 
-The seat owns the rider list, the order and every ruling. The assembler merges, measures and reports. **A conflict or an unexpected red is information: stop, report, wait for a ruling.** The auditor (`/orchestration-kit:audit-train`) re-derives all of this afterwards, so every claim you make must be checkable in git.
+The seat owns the rider list, the order and every ruling. The assembler merges, measures and reports. **A conflict or an unexpected red is information: stop, report, wait for a ruling.** The auditor (`/orcastration-kit:audit-train`) re-derives all of this afterwards, so every claim you make must be checkable in git.
 
 | name | meaning |
 |---|---|
 | `W` | the train worktree the seat names (never the shared checkout) |
-| `S` | your evidence dir: ORCHESTRATION.md → `evidence dir:` (default `~/.orchestration-kit/scratch/<YYYY>/<Month>/<row>/`), never `/tmp` (a reboot wipes it) |
+| `S` | your evidence dir: ORCHESTRATION.md → `evidence dir:` (default `~/.orcastration-kit/scratch/<YYYY>/<Month>/<row>/`), never `/tmp` (a reboot wipes it) |
 | `H` | this skill's base directory (printed above this text when the skill loads): `trial.sh`, `cptrial.sh`, `gsum.sh` live there |
 | gate | ORCHESTRATION.md → Gate `command`, run through the throttle (`bash scripts/gate-throttle.sh <command>`) |
 

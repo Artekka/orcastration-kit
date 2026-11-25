@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# start-team.sh — open the seat + N sibling Claude sessions, each in its own window (orchestration-kit).
+# start-team.sh — open the seat + N sibling Claude sessions, each in its own window (orcastration-kit).
 #
-# Zero setup: with no flags and no config it opens `Orca` (/orchestration-kit:orchestrate) and
-# `Sib1`..`Sib2` (/orchestration-kit:orient) in the repo's main checkout, in normal permission
+# Zero setup: with no flags and no config it opens `Orca` (/orcastration-kit:orchestrate) and
+# `Sib1`..`Sib2` (/orcastration-kit:orient) in the repo's main checkout, in normal permission
 # mode. Names already running are SKIPPED, so re-running only fills the gaps. The terminal is
 # detected per machine (WSL, tmux, macOS Terminal/iTerm2, Linux desktop emulators, Git Bash;
 # see lib-launch.sh); with nothing usable it prints the commands to run by hand and exits 2.
@@ -35,8 +35,8 @@ set -euo pipefail
 
 usage() { sed -n '11,31p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 64; }
 
-SEAT_PROMPT="/orchestration-kit:orchestrate"
-SIB_PROMPT="/orchestration-kit:orient"
+SEAT_PROMPT="/orcastration-kit:orchestrate"
+SIB_PROMPT="/orcastration-kit:orient"
 DRY=0; REPO=""; f_seat=""; f_prefix=""; f_n=""; f_mode=""; f_term=""; f_account=""; f_model=""; f_effort=""; f_model_set=0; f_effort_set=0
 # A flag whose value is missing is exit 64 like a bad value (`${1:?}` would exit 1).
 need_value() { [ "$1" -ge 2 ] || { echo "$2 needs a value: $3" >&2; exit 64; }; }

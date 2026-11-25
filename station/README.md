@@ -2,7 +2,7 @@
 
 Orcastration Station, adapted from Omar's Observatory.
 
-A desktop window for watching, and typing to, several orchestration-kit teams at once.
+A desktop window for watching, and typing to, several orcastration-kit teams at once.
 
 When a kit team runs, every agent has its own terminal: a seat plus its siblings, often in more
 than one project. Orcastration Station puts them all in one place. The sidebar lists every agent in every

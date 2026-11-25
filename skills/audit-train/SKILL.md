@@ -11,7 +11,7 @@ Read-only lane. Report to the SEAT only (never answer the assembler). State per 
 |---|---|
 | `BASE` | the train's base: the last approved main SHA |
 | `TIP` | the train branch tip you audit (`git fetch origin` first; audit what is PUSHED, never a local checkout) |
-| `SP` | your evidence dir: ORCHESTRATION.md → `evidence dir:` (default `~/.orchestration-kit/scratch/<YYYY>/<Month>/<row>/`), never `/tmp` |
+| `SP` | your evidence dir: ORCHESTRATION.md → `evidence dir:` (default `~/.orcastration-kit/scratch/<YYYY>/<Month>/<row>/`), never `/tmp` |
 | `H` | this skill's base directory (printed above this text when the skill loads): `audit.sh` lives there |
 
 ⚠ `audit.sh` takes NAMED variables, never positionals: the skill loader replaces positional tokens in this text with the invocation's arguments.

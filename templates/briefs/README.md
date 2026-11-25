@@ -7,7 +7,7 @@ gate · model · report protocol — so a fresh builder can start from it alone.
 | who | does |
 |---|---|
 | seat | writes the brief, commits + pushes it, THEN sends the assign message naming the file |
-| builder | `/orchestration-kit:orient-brief <ROW>`: the brief + the board banner arrive injected (the always-loaded CLAUDE.md comes with the session), sends READY, builds |
+| builder | `/orcastration-kit:orient-brief <ROW>`: the brief + the board banner arrive injected (the always-loaded CLAUDE.md comes with the session), sends READY, builds |
 | verifier (READ) | reads the brief + the diff — the brief IS the contract; never the builder's reports |
 
 - **Why a file and not a long message:** a fresh session otherwise spends 100K+ tokens orienting on

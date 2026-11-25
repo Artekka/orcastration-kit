@@ -34,7 +34,7 @@ body:
     attributes:
       label: Kit version
       description: From CHANGELOG.md or `claude plugin list`.
-      placeholder: "0.16.3"
+      placeholder: "0.17.0"
     validations:
       required: true
   - type: input

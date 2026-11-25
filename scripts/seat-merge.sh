@@ -53,7 +53,7 @@
 #                   (newline-separated).
 #     idle_minutes: a builder worktree with a file changed this recently is kept (default 30). Env SEAT_MERGE_IDLE_MINUTES.
 # Env only: SEAT_MERGE_LOG_DIR (where a refused run keeps its check log), SEAT_MERGE_REPO (the directory to run in; a test seam), SEAT_MERGE_RUNTIME_DIR (default KIT_RUNTIME_DIR, the
-#   runtime dir gate-throttle.sh and quiet-mode.sh share, else $HOME/.orchestration-kit/runtime; the lock and the tickets
+#   runtime dir gate-throttle.sh and quiet-mode.sh share, else ~/.orcastration-kit/runtime (lib-kit-home.sh); the lock and the tickets
 #   live there, never inside the worktree),
 #   SEAT_MERGE_ALLOW_SHARED_CHECKOUT=1 (skip the linked-worktree check; for tests that use plain clones).
 #
@@ -69,6 +69,8 @@ branch="${1#origin/}"; expected="$2"; msg="$3"
 
 # Libraries are resolved before the cd below.
 SEAT_MERGE_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib-kit-home.sh
+. "$SEAT_MERGE_LIB/lib-kit-home.sh"
 # shellcheck source=lib-builder-worktree.sh
 . "$SEAT_MERGE_LIB/lib-builder-worktree.sh"
 # shellcheck source=lib-waiting-tickets.sh
@@ -163,7 +165,7 @@ fi
 # file, taken BEFORE git is touched. The file lives in the runtime dir (never /tmp, never inside the worktree), keyed by the
 # worktree's absolute path. The kernel holds the flock, not the file, so a lock left by a dead run (or by a reboot) never
 # blocks. The holder writes its pid into the file for the refusal message.
-RT="${SEAT_MERGE_RUNTIME_DIR:-${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}}"
+RT="${SEAT_MERGE_RUNTIME_DIR:-${KIT_RUNTIME_DIR:-$(kit_home)/runtime}}"
 # Never in the shared checkout. A failed run leaves the worktree detached on an UNPUSHED merge, which under the one shared
 # checkout would sit under every sibling's `git status`. A linked worktree has its own git dir; the main working tree's git
 # dir IS the common dir.

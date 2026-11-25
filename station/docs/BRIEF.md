@@ -5,7 +5,7 @@
 
 ## Why
 
-People who run one or more orchestration-kit teams have every agent in its own terminal: a
+People who run one or more orcastration-kit teams have every agent in its own terminal: a
 `claude --name <Name>` session per agent, a seat (`Orca` by the kit's defaults) and its siblings
 (`Sib1`…). Terminal text is hard to read across many agents. The Station is **one window where every
 agent's chat, in every configured project, reads like the VS Code Claude panel**.

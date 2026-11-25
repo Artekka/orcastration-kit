@@ -106,7 +106,7 @@
       "type": "string",
       "title": "Quiet mode flag file",
       "description": "If set, this file existing means quiet mode is on (cheap check). The default is the orchestration kit's flag (scripts/quiet-mode.sh writes it; a leading ~ means your home). Empty uses quietModeStatusCmd.",
-      "default": "~/.orchestration-kit/runtime/quiet-mode"
+      "default": "~/.orcastration-kit/runtime/quiet-mode"
     },
     "quietModeStatusCmd": {
       "type": "string",

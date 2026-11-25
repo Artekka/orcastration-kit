@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# orchestration-kit bootstrap — spin a directory up as a kit-adopted project.
+# orcastration-kit bootstrap — spin a directory up as a kit-adopted project.
 #
 # Usage: bash bootstrap.sh <target-dir> [--dry-run] [--with-team-agents]
 #
@@ -54,7 +54,7 @@ install_if_missing templates/briefs/README.md docs/orchestration/briefs/README.m
 install_if_missing templates/briefs/_TEMPLATE.md docs/orchestration/briefs/_TEMPLATE.md
 install_if_missing templates/CLAUDE-slimness.md docs/orchestration/CLAUDE-slimness.md
 if [ -e "$TARGET/CLAUDE.md" ]; then
-  if grep -q "orchestration-kit v" "$TARGET/CLAUDE.md" 2>/dev/null; then
+  if grep -qE "or(che|ca)stration-kit v" "$TARGET/CLAUDE.md" 2>/dev/null; then   # the 0.16 marker spelling counts too (0.17.0 renamed the id)
     say "SKIP  CLAUDE.md section (managed marker present — upgrades diff, not clobber)"
   else
     say "NOTE  CLAUDE.md exists WITHOUT the kit section — offer templates/CLAUDE-section.md as an APPEND (human approval), never overwrite"
@@ -64,7 +64,7 @@ else
 fi
 
 # ── 2b. Session scripts (context measurement + sibling recycling) ────────────
-for f in lib-launch.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh seat-merge.sh lib-waiting-tickets.sh lib-builder-worktree.sh pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh bottleneck-watch.sh lib-prompt-dialog.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py lib-model-tag.sh lib-git-retry.sh lib-conflict-markers.sh lib-mono-clock.sh; do
+for f in lib-launch.sh lib-kit-home.sh start-team.sh recycle-sibling.sh ctx-fill.py statusline-ctx.sh gate-throttle.sh quiet-mode.sh seat-merge.sh lib-waiting-tickets.sh lib-builder-worktree.sh pending-work.sh tmux-session.sh tmux/agents.tmux.conf sibling-shell.sh retro-worktrees.sh docker-cache-cap.sh gate-disk-guard.sh bottleneck-watch.sh lib-prompt-dialog.sh main-checkout-sync.sh sync-main-checkout.sh launched_window.py lib-model-tag.sh lib-git-retry.sh lib-conflict-markers.sh lib-mono-clock.sh; do
   install_if_missing "scripts/$f" "scripts/$f"
 done
 [ "$DRY" -eq 1 ] || chmod +x "$TARGET"/scripts/{start-team.sh,recycle-sibling.sh,ctx-fill.py,statusline-ctx.sh,gate-throttle.sh,quiet-mode.sh,seat-merge.sh,pending-work.sh,tmux-session.sh,sibling-shell.sh,retro-worktrees.sh,docker-cache-cap.sh,gate-disk-guard.sh,bottleneck-watch.sh,main-checkout-sync.sh,sync-main-checkout.sh,launched_window.py}
@@ -107,7 +107,7 @@ else
   if [ "$DRY" -eq 0 ]; then
     cp "$KIT_ROOT"/templates/memory-starter/feedback_*.md "$MEMDIR/"
     {
-      echo "# Memory index (seeded by orchestration-kit bootstrap)"
+      echo "# Memory index (seeded by orcastration-kit bootstrap)"
       echo
       for f in "$MEMDIR"/feedback_*.md; do
         desc="$(grep -m1 '^description:' "$f" | sed 's/^description: //')"

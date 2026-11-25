@@ -7,7 +7,7 @@ them; it never applies them without a yes.
 
 Since v0.4.0 the plugin ships its own SessionStart hook (`hooks/hooks.json`): on a fresh
 session (startup or /clear) in a repo that has `docs/orchestration/AGENT_BOARD.md`, it tells
-the session to run `/orchestration-kit:orient` and, if an `ORCHESTRATOR ACTIVE` banner names
+the session to run `/orcastration-kit:orient` and, if an `ORCHESTRATOR ACTIVE` banner names
 another session, to send that seat a READY signal instead of asking the user for work. In any
 other repo it is a silent no-op. If you copied the v0.3.0 hook snippet into
 `.claude/settings.json`, remove it — otherwise sessions get the nudge twice.

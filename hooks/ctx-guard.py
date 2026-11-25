@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Context guard (orchestration-kit): measures the session's context fill on every tool call and prompt.
+"""Context guard (orcastration-kit): measures the session's context fill on every tool call and prompt.
 
 Why: "self-report at 350K, hand over by 400K" depended on each session remembering to run ctx-fill.py,
 and on the origin project seats kept missing it (sessions found at 378K, 411K, 462K; one ran into the
@@ -27,7 +27,32 @@ import sys
 sys.dont_write_bytecode = True   # loading scripts/launched_window.py must not leave a __pycache__ in the plugin or a checkout
 
 TAIL_BYTES = 512 * 1024
-STATE_DIR = os.path.join(os.environ.get("KIT_STATE_DIR") or os.path.expanduser("~/.orchestration-kit"), "ctx-guard")
+def _kit_home():
+    """The kit's state home, the same rule as scripts/lib-kit-home.sh (tests/kit-home.test.sh pins both).
+
+    When only the 0.16 folder (~/.orchestration-kit, before the 0.17.0 id rename) exists, the new name becomes a
+    relative symlink to it in one step, so 0.16 copies of the scripts and this hook keep sharing one folder."""
+    home = os.path.expanduser("~")
+    new, oldname = os.path.join(home, ".orcastration-kit"), ".orchestration-kit"  # the 0.16 folder name
+    old = os.path.join(home, oldname)
+    if os.path.lexists(new):
+        if os.path.isdir(old) and not os.path.exists(os.path.join(new, ".kit-home-both-warned")) \
+                and os.path.realpath(new) != os.path.realpath(old):
+            sys.stderr.write("orcastration-kit: both ~/.orcastration-kit and the 0.16 folder ~/%s exist; using ~/.orcastration-kit\n" % oldname)
+            try:
+                open(os.path.join(new, ".kit-home-both-warned"), "w").close()
+            except OSError:
+                pass
+    elif os.path.isdir(old):
+        try:
+            os.symlink(oldname, new)
+            sys.stderr.write("orcastration-kit: state folder is now ~/.orcastration-kit (a link to the 0.16 folder ~/%s)\n" % oldname)
+        except OSError:
+            pass  # a racing twin made it first, or HOME is read-only: the new name is used either way
+    return new
+
+
+STATE_DIR = os.path.join(os.environ.get("KIT_STATE_DIR") or _kit_home(), "ctx-guard")
 MARKS = {
     "large": {"warn": 300_000, "report": 350_000, "handover": 400_000, "wall": 1_000_000, "step": 15_000},
     "small": {"warn": 100_000, "report": 120_000, "handover": 150_000, "wall": 200_000, "step": 8_000},
@@ -105,7 +130,7 @@ def message(fill, m):
     if fill >= m["handover"]:
         return (f"CONTEXT GUARD: fill {k(fill)} is PAST the {k(m['handover'])} handover mark (wall {k(m['wall'])}). "
                 f"Stop taking new work now. Sibling: finish or park the row, report your fill to the seat, run "
-                f"/orchestration-kit:retro and reply \"retro complete\". Seat: wait for your own subagents and background "
+                f"/orcastration-kit:retro and reply \"retro complete\". Seat: wait for your own subagents and background "
                 f"shells, write the handover block under the board banner, then recycle yourself with "
                 f"scripts/recycle-sibling.sh. Tell the human in one line that you are recycling.")
     if fill >= m["report"]:

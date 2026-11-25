@@ -3,7 +3,7 @@
 A Claude Code mod that shows, pixel-style in the terminal, what every session is doing and how loaded the machine is.
 It is project-agnostic: it knows nothing about any repo until you configure it.
 
-It ships with the orchestration kit as an **optional** component: `/orchestration-kit:kit-init` asks whether to install it (default No), and you can add or remove it any time — just ask Claude.
+It ships with the orchestration kit as an **optional** component: `/orcastration-kit:kit-init` asks whether to install it (default No), and you can add or remove it any time — just ask Claude.
 This copy was renamed from the upstream HUD's `gameMode*` keys to `quietMode*` (and its slash command to `/hud quiet`) to match the kit's quiet mode; an install configured with the old keys must be reconfigured.
 
 Two looks, one setting (`variant`):
@@ -42,7 +42,7 @@ Every session that runs the mod reports itself and reads everyone else, through 
 
 ## Install
 
-With the orchestration kit (recommended): run `/orchestration-kit:kit-init` and answer Yes to the Status HUD question, or ask Claude to "install the status HUD". That runs, for each account the team uses:
+With the orchestration kit (recommended): run `/orcastration-kit:kit-init` and answer Yes to the Status HUD question, or ask Claude to "install the status HUD". That runs, for each account the team uses:
 
 ```bash
 claude plugin install status-hud@artekka-kits --scope project
@@ -80,7 +80,7 @@ claude plugin configure status-hud@artekka-kits --values-stdin <<'JSON'
   "mounts": "/",
   "staleSeconds": "120",
   "showForNames": "Orca",
-  "quietModeFlagFile": "~/.orchestration-kit/runtime/quiet-mode",
+  "quietModeFlagFile": "~/.orcastration-kit/runtime/quiet-mode",
   "quietModeOnCmd": "bash scripts/quiet-mode.sh on",
   "quietModeOffCmd": "bash scripts/quiet-mode.sh off"
 }
@@ -91,7 +91,7 @@ Installed from the kit's marketplace the id is `status-hud@artekka-kits`; loaded
 
 If you edit settings JSON by hand instead, write numbers as numbers (`"contextReportMark": 350000`): a string in a number field stops the module from loading.
 
-The quiet-mode values above are the defaults: the flag file the kit's `scripts/quiet-mode.sh` writes (under `KIT_RUNTIME_DIR` if you set it, else `~/.orchestration-kit/runtime`), and its on and off commands, which run in the session's directory (your repo).
+The quiet-mode values above are the defaults: the flag file the kit's `scripts/quiet-mode.sh` writes (under `KIT_RUNTIME_DIR` if you set it, else `~/.orcastration-kit/runtime`), and its on and off commands, which run in the session's directory (your repo).
 
 | Option | Default | Meaning |
 |---|---|---|
@@ -109,7 +109,7 @@ The quiet-mode values above are the defaults: the flag file the kit's `scripts/q
 | `refreshSeconds` | 3 | Heartbeat and redraw interval. |
 | `staleSeconds` | 120 | When a silent session counts as gone. |
 | `cpuRedLoad` | 0 | Load at which CPU turns red. 0 means 90% of the thread count. |
-| `quietModeFlagFile` | `~/.orchestration-kit/runtime/quiet-mode` | If this file exists, quiet mode is on (cheap check, preferred). A leading `~` means your home. |
+| `quietModeFlagFile` | `~/.orcastration-kit/runtime/quiet-mode` | If this file exists, quiet mode is on (cheap check, preferred). A leading `~` means your home. |
 | `quietModeStatusCmd` | (none) | Alternative, used when the flag file is empty: exit code 0 means on. |
 | `quietModeOnCmd` / `quietModeOffCmd` | `bash scripts/quiet-mode.sh on` / `off` | Run by the Quiet Mode chip and `/hud quiet`. Both are needed for the chip to be clickable. |
 | `quietModeRequiresFile` | `scripts/quiet-mode.sh` | The chip shows only when this file exists in the session's directory (or quiet mode is already on). Empty always shows it. |

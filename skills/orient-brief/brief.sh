@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# What `/orchestration-kit:orient-brief <ROW>` injects into the skill text before the session reads it:
+# What `/orcastration-kit:orient-brief <ROW>` injects into the skill text before the session reads it:
 # the row's brief and the board's live ORCHESTRATOR ACTIVE section. ALWAYS exits 0, because the skill
 # loader aborts the whole skill on a non-zero exit; every failure prints a NO BRIEF / NO BANNER /
 # FETCH FAILED line the session can act on instead.
@@ -9,7 +9,7 @@
 # Usage (by the skill): bash brief.sh <ROW>     Env: BRIEF_BRANCH overrides the default branch.
 row="${1:-}"
 if ! [[ "$row" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-  echo "NO BRIEF: bad or missing row id (usage: /orchestration-kit:orient-brief <ROW>); tell the seat and fall back to /orchestration-kit:orient"
+  echo "NO BRIEF: bad or missing row id (usage: /orcastration-kit:orient-brief <ROW>); tell the seat and fall back to /orcastration-kit:orient"
   exit 0
 fi
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
@@ -25,7 +25,7 @@ branch="${branch:-main}"
 echo "=== BRIEF ($row) ==="
 git show "origin/$branch:docs/orchestration/briefs/$row.md" 2>/dev/null \
   || cat "docs/orchestration/briefs/$row.md" 2>/dev/null \
-  || echo "NO BRIEF for $row (not on origin/$branch, not in this checkout): tell the seat and fall back to /orchestration-kit:orient"
+  || echo "NO BRIEF for $row (not on origin/$branch, not in this checkout): tell the seat and fall back to /orcastration-kit:orient"
 
 echo
 echo "=== BOARD BANNER ==="

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Tests for the kit's state home after the 0.17.0 plugin-id rename (orchestration-kit -> orcastration-kit):
+# Tests for the kit's state home after the 0.17.0 plugin-id rename (from the 0.16 spelling to orcastration-kit):
 # scripts/lib-kit-home.sh (bash) and hooks/ctx-guard.py (python) resolve ~/.orcastration-kit, and when only
-# the 0.16 folder ~/.orchestration-kit exists they link the new name to it in one step (no gap, no lost file),
+# the 0.16 folder (~/.orch""estration-kit) exists they link the new name to it in one step (no gap, no lost file),
 # say so in one line, and keep env overrides first. A tab that started on 0.16 keeps watching the OLD path,
 # so a recycle hand-off written through the new path must land where it looks (and the reverse).
 # Run: bash tests/kit-home.test.sh   (fake HOME; nothing outside the temp dir is touched)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report a Claude Code session's REAL context fill (orchestration-kit).
+"""Report a Claude Code session's REAL context fill (orcastration-kit).
 
 The only honest number is the `usage` block the API returns on each assistant turn:
     input_tokens + cache_read_input_tokens + cache_creation_input_tokens

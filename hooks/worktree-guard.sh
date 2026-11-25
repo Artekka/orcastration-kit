@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse hook (orchestration-kit) for Edit|Write|MultiEdit|NotebookEdit: OPTIONAL worktree
+# PreToolUse hook (orcastration-kit) for Edit|Write|MultiEdit|NotebookEdit: OPTIONAL worktree
 # enforcement. Blocks file edits in the repo's MAIN checkout so every session works in its own
 # linked worktree.
 #
@@ -72,7 +72,7 @@ case "$rel" in
 esac
 
 repo="$(basename -- "$main")"
-reason="Blocked by orchestration-kit: this repo enforces one git worktree per session, and $rel is in the MAIN checkout ($main). Create or use your own worktree, then make this edit there: git worktree add ../$repo-<session> -b <branch> (or the EnterWorktree tool if available). Board, log and status-doc files stay editable in place. The user can turn enforcement off by setting worktrees: advised in docs/orchestration/ORCHESTRATION.md, or by asking Claude to change it."
+reason="Blocked by orcastration-kit: this repo enforces one git worktree per session, and $rel is in the MAIN checkout ($main). Create or use your own worktree, then make this edit there: git worktree add ../$repo-<session> -b <branch> (or the EnterWorktree tool if available). Board, log and status-doc files stay editable in place. The user can turn enforcement off by setting worktrees: advised in docs/orchestration/ORCHESTRATION.md, or by asking Claude to change it."
 reason="$(printf '%s' "$reason" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
 printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
 exit 0

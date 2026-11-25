@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse hook (orchestration-kit) for Bash: OPTIONAL git guard. Blocks the git commands that
+# PreToolUse hook (orcastration-kit) for Bash: OPTIONAL git guard. Blocks the git commands that
 # silently damage OTHER sessions' work when several sessions share one repo:
 #
 #   git stash ...            (anything except `stash list` / `stash show`) - stash refs are shared
@@ -221,7 +221,7 @@ case "$rule" in
   pull-rebase) why="git pull --rebase is blocked: sessions sharing one .git race on .git/FETCH_HEAD (Cannot rebase onto multiple branches). Use: git fetch origin && git rebase origin/main (retry the fetch once if it reports cannot lock ref)." ;;
   *) exit 0 ;;
 esac
-reason="Blocked by orchestration-kit git guard. $why This guard is on because docs/orchestration/ORCHESTRATION.md sets git_guard: on. A human can still run the command in their own terminal, or turn the guard off with git_guard: off (or by asking Claude to)."
+reason="Blocked by orcastration-kit git guard. $why This guard is on because docs/orchestration/ORCHESTRATION.md sets git_guard: on. A human can still run the command in their own terminal, or turn the guard off with git_guard: off (or by asking Claude to)."
 reason="$(printf '%s' "$reason" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
 printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$reason"
 exit 0

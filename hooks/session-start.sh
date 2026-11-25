@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SessionStart hook (orchestration-kit). Fires on fresh sessions only (matcher startup|clear;
+# SessionStart hook (orcastration-kit). Fires on fresh sessions only (matcher startup|clear;
 # resume/compact re-entries are skipped by hooks.json).
 #
 # NO-OP (exit 0, no output) unless the session's repo carries the opt-in marker
@@ -17,6 +17,6 @@ fi
 top="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || printf '%s' "$dir")"
 [ -f "$top/docs/orchestration/.kit-hooks" ] || exit 0
 
-msg="This repo uses the orchestration-kit multi-session workflow. Before any other work, run /orchestration-kit:orient. Then check the top of docs/orchestration/AGENT_BOARD.md for an ORCHESTRATOR ACTIVE banner: if one names ANOTHER session as the seat, end orientation by sending that seat a READY signal (SendMessage) and wait for its assignment instead of asking the user for work; route any question or approval to the seat. If you were launched as the seat (/orchestration-kit:orchestrate), take or resume the seat per that skill."
+msg="This repo uses the orcastration-kit multi-session workflow. Before any other work, run /orcastration-kit:orient. Then check the top of docs/orchestration/AGENT_BOARD.md for an ORCHESTRATOR ACTIVE banner: if one names ANOTHER session as the seat, end orientation by sending that seat a READY signal (SendMessage) and wait for its assignment instead of asking the user for work; route any question or approval to the seat. If you were launched as the seat (/orcastration-kit:orchestrate), take or resume the seat per that skill."
 printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$msg"
 exit 0

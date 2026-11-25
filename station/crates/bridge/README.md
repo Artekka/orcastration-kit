@@ -23,7 +23,7 @@ the same line in that note, and starts with the same defaults. It never fails to
 
 ### Worked example
 
-Two orchestration-kit teams, each project with its kit worktrees, one with a screenshot gallery, plus
+Two orcastration-kit teams, each project with its kit worktrees, one with a screenshot gallery, plus
 the home folder:
 
 ```json

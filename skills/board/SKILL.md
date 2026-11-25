@@ -16,7 +16,7 @@ git fetch origin || { sleep 2; git fetch origin; } && git rebase origin/main
 # not a `for …; do git fetch && break; sleep 2; done && …` loop — it exits with sleep's 0 and rebases after every fetch failed
 ```
 
-Read top to bottom: every open row's file fence is a hard no-edit zone for you. Check the top for an `ORCHESTRATOR ACTIVE` banner — if one stands, IDs/slots are single-allocator (see `/orchestration-kit:orchestrate` §1) and task intake routes through the orchestrator.
+Read top to bottom: every open row's file fence is a hard no-edit zone for you. Check the top for an `ORCHESTRATOR ACTIVE` banner — if one stands, IDs/slots are single-allocator (see `/orcastration-kit:orchestrate` §1) and task intake routes through the orchestrator.
 
 ## Claim
 

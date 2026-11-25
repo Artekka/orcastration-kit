@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-throttle.sh (orchestration-kit): run a heavy command (your gate, a whole test suite) only when one of
+# gate-throttle.sh (orcastration-kit): run a heavy command (your gate, a whole test suite) only when one of
 # N host-wide slots is free, so several sessions on one machine do not run N full gates at once and flake
 # on load. Usage, from inside YOUR worktree:
 #   bash scripts/gate-throttle.sh <command> [args...]        e.g. bash scripts/gate-throttle.sh npm test
@@ -26,7 +26,7 @@
 # Quiet mode: while "$RT/quiet-mode" exists (scripts/quiet-mode.sh on), no NEW command starts; running
 #            ones finish. GATE_IGNORE_QUIET=1 is the seat's escape for a hotfix gate; while quiet
 #            mode is on it also skips the line, because the waiters ahead of it are parked.
-# Runtime dir: $KIT_RUNTIME_DIR, default ~/.orchestration-kit/runtime. Not /tmp: a reboot wipes /tmp.
+# Runtime dir: $KIT_RUNTIME_DIR, default ~/.orcastration-kit/runtime (lib-kit-home.sh). Not /tmp: a reboot wipes /tmp.
 #            A lock file that survives a reboot is harmless, because flock locks are held by the kernel,
 #            not by the file: the holder died with the machine, so the next command simply takes it.
 # One slot per worktree: a throttle whose worktree (the git toplevel of its directory, else the directory) already holds a
@@ -90,7 +90,8 @@ esac
 # minimum, default 20 GB, 0 = off). A project that did not copy the guard script simply has no check.
 _guard="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/gate-disk-guard.sh"
 if [ -f "$_guard" ]; then bash "$_guard" || exit 1; fi
-RT="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}"
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib-kit-home.sh" || { echo "gate-throttle: lib-kit-home.sh is missing beside this script" >&2; exit 64; }
+RT="${KIT_RUNTIME_DIR:-$(kit_home)/runtime}"
 FLOCK="${KIT_FLOCK_BIN:-flock}"
 if ! command -v "$FLOCK" >/dev/null 2>&1; then
   echo "gate-throttle: flock not found (Linux: util-linux; macOS: brew install flock); running UNTHROTTLED" >&2

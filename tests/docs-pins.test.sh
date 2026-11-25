@@ -55,6 +55,10 @@ pin "README upgrade block" README.md "## Upgrading from 0.16"
 pin "README upgrade: the one install step" README.md "/plugin install orcastration-kit@artekka-kits"
 pin "README upgrade: the old-Claude-Code fallback" README.md "claude plugin uninstall $OLD --scope project"
 pin "CHANGELOG upgrade block" CHANGELOG.md "Upgrading from 0.16"
+# kit-init only creates missing files, so launch scripts copied on 0.16 keep the old prefix: kit-init must offer the refresh
+pin "kit-init detects 0.16 launch scripts" skills/kit-init/SKILL.md "grep -lF '/$OLD:' scripts/*.sh"
+pin "kit-init refresh list" skills/kit-init/SKILL.md "(start-team.sh recycle-sibling.sh sibling-shell.sh lib-launch.sh lib-model-tag.sh lib-kit-home.sh;"
+pin "README upgrade: re-run kit-init for the copied scripts" README.md "In each project adopted on 0.16, run \`/orcastration-kit:kit-init\` once more"
 grep -qF "plugin id is \`$OLD\`" "$ROOT/README.md" && { fail=$((fail+1)); echo "FAIL the 0.16.3 two-spellings note is still in the README"; } || pass=$((pass+1))
 # marketplace: entry name = plugin.json name, and the renames map sends the 0.16 id to it (Claude Code rewrites the keys)
 rn="$(python3 -c "

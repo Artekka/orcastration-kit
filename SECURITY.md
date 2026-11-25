@@ -1,6 +1,6 @@
 # Security policy
 
-orchestration-kit is shell scripts, Claude Code hooks and skill text that run on your own machine with
+orcastration-kit is shell scripts, Claude Code hooks and skill text that run on your own machine with
 your user's rights. A bug in them can run a command you did not mean, leak a path or token into a file,
 or change the wrong git worktree. We take reports about that seriously.
 

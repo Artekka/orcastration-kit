@@ -22,8 +22,13 @@
 #   model_tag_check     <model> [acct dir]  both
 # Env: MODEL_PREFLIGHT=0 skips layers 4-5 (offline hosts, tests); MODEL_PREFLIGHT_TIMEOUT seconds (default 20),
 # MODEL_PREFLIGHT_VERSION_TIMEOUT (default 10) and MODEL_PREFLIGHT_KILL_AFTER (default 5: the SIGKILL after the
-# timeout's SIGTERM). The cache lives in ${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}/model-preflight.
+# timeout's SIGTERM). The cache lives in ${KIT_RUNTIME_DIR:-~/.orcastration-kit/runtime}/model-preflight.
 
+# The state home (kit_home) travels with this lib, so every script that sources it (lib-launch, sibling-shell) has it.
+# shellcheck source=lib-kit-home.sh
+# No dirname: this lib must load with an empty PATH (tests/model-tag.test.sh T7), so the directory is cut from BASH_SOURCE.
+_mt_dir="${BASH_SOURCE[0]%/*}"; [ "$_mt_dir" = "${BASH_SOURCE[0]}" ] && _mt_dir=.
+. "$_mt_dir/lib-kit-home.sh" || { echo "lib-model-tag: lib-kit-home.sh is missing beside this file" >&2; return 64 2>/dev/null || exit 64; }
 MODEL_TAG_FORMS="opus[1m], sonnet[1m], haiku or a full model id (a claude- name)"
 MODEL_TAG_ERR=""
 
@@ -52,7 +57,7 @@ model_tag_preflight() {  # <model> [acct dir]
   [[ "$m" =~ ^(opus|sonnet|haiku|fable)(\[1m\])?$ ]] && return 0
   [ "${MODEL_PREFLIGHT:-1}" = 0 ] && return 0
   if ! command -v claude >/dev/null 2>&1; then _model_tag_warn "no claude on PATH, so '$m' was not checked"; return 0; fi
-  local ver key dir out verdict cwd rt="${KIT_RUNTIME_DIR:-$HOME/.orchestration-kit/runtime}"
+  local ver key dir out verdict cwd rt="${KIT_RUNTIME_DIR:-$(kit_home)/runtime}"
   # -k: SIGKILL this long after the SIGTERM, so a claude that ignores TERM cannot hang a launch past the stated timeout.
   local kill="${MODEL_PREFLIGHT_KILL_AFTER:-5}"
   ver="$(timeout -k "$kill" "${MODEL_PREFLIGHT_VERSION_TIMEOUT:-10}" claude --version 2>/dev/null </dev/null | head -1)" || true

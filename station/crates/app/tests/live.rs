@@ -81,7 +81,7 @@ fn scenario() -> (Vec<Session>, Vec<String>) {
     lead.items.push(item(
         168,
         ItemKind::SlashCommand {
-            name: "/orchestration-kit:orchestrate".into(),
+            name: "/orcastration-kit:orchestrate".into(),
             args: String::new(),
         },
     ));
@@ -259,7 +259,7 @@ fn frame_stream_maps_to_the_expected_view_model() {
                 at_label: "15:12".into()
             },
             ChatItem::User {
-                text: "/orchestration-kit:orchestrate".into(),
+                text: "/orcastration-kit:orchestrate".into(),
                 images: vec![]
             },
             ChatItem::Assistant {

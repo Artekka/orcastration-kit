@@ -4,8 +4,6 @@
 
 <p align="center"><img src="assets/orcastration-kit-banner.jpg" alt="An orca developer at a desk directing four agents on a screen under the Orcastration Kit logo" width="820"></p>
 
-> The product is **Orcastration Kit**. Its plugin id is `orchestration-kit`, so the install command and the `/orchestration-kit:` commands below use that spelling on purpose.
-
 Run **several Claude Code sessions on one repo at the same time** without file collisions,
 lost work, or confabulated green: a shared claimable board, one git worktree per session,
 and every piece of work verified by a session that didn't build it. Proven on the origin
@@ -17,12 +15,12 @@ project: three concurrent sessions, ~15 workstreams, one evening, zero collision
 # 1. Install into your repo (normal shell, not inside Claude; on Windows run `wsl` first)
 cd ~/projects/myapp
 claude plugin marketplace add Artekka/orcastration-kit
-claude plugin install orchestration-kit@artekka-kits --scope project
+claude plugin install orcastration-kit@artekka-kits --scope project
 
 # 2. Set up the repo and start the team — inside Claude; tell it your test command,
 #    then accept "Seat + 2 siblings" and approve the one command it runs
 claude
-/orchestration-kit:kit-init
+/orcastration-kit:kit-init
 ```
 
 Three windows open: **Orca** (the seat) and **Sib1**, **Sib2** (siblings). Talk only to the seat:
@@ -53,12 +51,12 @@ workflow; upgrade it, get the newly distilled lessons.
 
 | Piece | What it does |
 |---|---|
-| `skills/kit-init` | `/orchestration-kit:kit-init` — scaffold a project (board + overlay + scripts + CLAUDE.md section), idempotent |
+| `skills/kit-init` | `/orcastration-kit:kit-init` — scaffold a project (board + overlay + scripts + CLAUDE.md section), idempotent |
 | `skills/orchestrate` | the seat loop: banner, single-allocator, briefed rows, DAG + disjoint fences, sibling-session verification, one-at-a-time reconcile, wave-train deploys, LOG slot, sibling + seat recycling, approvals through the seat |
 | `skills/orient` | session orientation: multi-session non-negotiables, five-bullet state, READY signal to the seat |
 | `skills/board` | claim/update/close rows, per-session prefixes, the shared-checkout write recipe, status-not-narrative + archiving |
 | `skills/verify-feature` | subagent verification — the fallback when no independent sibling session is free |
-| `skills/orient-brief` | `/orchestration-kit:orient-brief <ROW>`: the lean start for a builder: the row's brief and the live seat banner arrive already loaded, then one READY line to the seat |
+| `skills/orient-brief` | `/orcastration-kit:orient-brief <ROW>`: the lean start for a builder: the row's brief and the live seat banner arrive already loaded, then one READY line to the seat |
 | `skills/assemble-train` · `skills/audit-train` | release trains: the seat lands approved rows one merge at a time with a dry run (`trial.sh`, `cptrial.sh`, `gsum.sh`) · a validator sweeps the finished train (`audit.sh` exits 0 when every merge is clean, 1 when a line needs explaining, 2 on a usage error) |
 | `deploy_policy: ask \| auto-when-green` | the Deploy block of `ORCHESTRATION.md`: whether the seat asks you before every deploy (default) or deploys a green, audited train on its own and tells you after |
 | `scripts/gate-throttle.sh` · `scripts/quiet-mode.sh` | run heavy commands through N machine-wide slots plus a priority slot (`gate_slots`); a second slot only while 3 GB of memory is available (`GATE_MIN_FREE_MB`); `--log <file>` writes the gate's log with the tested commit first and its exit code last; first come, first served, load-aware (tasks stuck in D state are not load), ONE slot per worktree (exit 3; `GATE_ALLOW_SECOND_SLOT=1` is the seat's escape), the priority list re-read on every poll, a TERM/HUP stops the command's whole process tree, and the command gets `GATE_WORKERS` (CPUs / slots, at least 2); **deploy mode**: while a priority gate runs, new normal gates wait and every other running gate's process tree is confined (taskset, reversible, nothing signaled) to the first 25% of the CPUs (`GATE_DEPLOY_OTHERS_PCT`, at least 2), each process getting its own mask back on exit, on a dead owner and at the next start; `gate_reuse_check:` / `GATE_REUSE_CHECK` asks first whether the tree already has a green record (a hit exits 0 without queueing) · quiet mode holds every new run while you use the machine (`status` also says whether deploy mode is on) |
@@ -103,14 +101,14 @@ Run from inside the repo:
 
 ```bash
 claude plugin marketplace add Artekka/orcastration-kit   # or a local path
-claude plugin install orchestration-kit@artekka-kits --scope project   # or --scope local
+claude plugin install orcastration-kit@artekka-kits --scope project   # or --scope local
 ```
 
 Even when installed more widely, its hooks stay silent unless the repo carries
 the opt-in marker `docs/orchestration/.kit-hooks` (created by `kit-init`); the worktree guard
 additionally needs `worktrees: enforced`.
 
-Then, in each project: run `/orchestration-kit:kit-init` once (it copies the scripts into
+Then, in each project: run `/orcastration-kit:kit-init` once (it copies the scripts into
 `scripts/`), then `bash scripts/start-team.sh`. Step by step: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
 
 Per-project (self-describing repo — teammates/machines get the plugin offered
@@ -123,7 +121,7 @@ automatically) — add to the project's `.claude/settings.json`:
       "source": { "source": "github", "repo": "Artekka/orcastration-kit" }
     }
   },
-  "enabledPlugins": { "orchestration-kit@artekka-kits": true }
+  "enabledPlugins": { "orcastration-kit@artekka-kits": true }
 }
 ```
 
@@ -131,17 +129,50 @@ automatically) — add to the project's `.claude/settings.json`:
 
 ```bash
 claude plugin marketplace update artekka-kits
-claude plugin update orchestration-kit
+claude plugin update orcastration-kit
 ```
 
 Read `CHANGELOG.md` for what changed. New lessons/hardenings = minor bump. A breaking
 board-format/protocol change = major bump with a migration note. After upgrading, re-run
-`/orchestration-kit:kit-init` in a project to be offered the template deltas (managed
+`/orcastration-kit:kit-init` in a project to be offered the template deltas (managed
 markers keep your customizations safe).
+
+## Upgrading from 0.16
+
+0.17.0 renames the plugin id from `orchestration-kit` to `orcastration-kit`, so the product, the repo and the id
+are spelled the same way. The marketplace carries a `renames` map, so Claude Code moves an existing install
+to the new id by itself and rewrites the `enabledPlugins` key in your user, project and local settings.
+Because the marketplace is a git repo, the new id needs one install, once:
+
+```bash
+claude plugin marketplace update artekka-kits
+/plugin install orcastration-kit@artekka-kits      # in a session; or: claude plugin install orcastration-kit@artekka-kits --scope project
+```
+
+Then restart the sessions and type `/orcastration-kit:<skill>` from then on (the old `/orchestration-kit:` prefix stops working).
+
+If your Claude Code is too old to know the `renames` map (the old id reports "not found in marketplace"), do it by hand:
+
+```bash
+claude plugin uninstall orchestration-kit --scope project
+claude plugin install orcastration-kit@artekka-kits --scope project
+```
+
+and in `.claude/settings.json` change the key `"orchestration-kit@artekka-kits"` under `enabledPlugins` to `"orcastration-kit@artekka-kits"`.
+Settings an admin manages are not rewritten for you; ask the admin to change that key.
+
+The state folder moves with the id: the scripts now use `~/.orcastration-kit/`. When only the 0.16 folder `~/.orchestration-kit/` exists,
+the first script to run makes the new name a link to it and says so in one line, so tabs that started on 0.16 keep their
+recycle hand-offs. Project CLAUDE.md sections that carry the 0.16 marker are still recognized by `kit-init`, which offers the
+new marker in its delta.
+
+In each project adopted on 0.16, run `/orcastration-kit:kit-init` once more: the launch scripts it copied into `scripts/`
+still start sessions with the old command prefix, and kit-init offers to refresh them (it asks first, because they may carry
+local edits).
 
 ## The workflow in one paragraph
 
-The seat takes the board with an `ORCHESTRATOR ACTIVE` banner; siblings `/orchestration-kit:orient` and send
+The seat takes the board with an `ORCHESTRATOR ACTIVE` banner; siblings `/orcastration-kit:orient` and send
 READY. `git fetch origin && git rebase origin/main` → read `docs/orchestration/AGENT_BOARD.md`
 → the seat assigns a row (message + board, disjoint file fences) → the sibling builds in its
 **own worktree** (never `git add -A`, never `git stash`) → a **different sibling session**
@@ -152,6 +183,8 @@ row claim, in wave trains. Full sessions retro, reply "retro complete", and are 
 Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
+
+v0.17.0: the plugin id is `orcastration-kit`, spelled like the product; see Upgrading from 0.16 above for the one install step.
 
 v0.16.3: the title reads Orcastration Kit and the README carries the banner; the plugin id is unchanged.
 
@@ -183,7 +216,7 @@ v0.7.0: recycling in place. A recycled session now restarts in the SAME terminal
 every tab the kit opens), with a fresh context, an explicit model and its own account. A session started by hand moves over at
 its next recycle. See "Recycling in place" below.
 v0.6.0: a model per lane (`--model` / `--effort` on both launch scripts, always passed, never inherited),
-lean builder starts (`/orchestration-kit:orient --brief <ROW>` from a brief file), per-window context marks
+lean builder starts (`/orcastration-kit:orient --brief <ROW>` from a brief file), per-window context marks
 (120K/150K on a 200K window), optional multi-account teams, and a note on keeping `CLAUDE.md` slim.
 v0.5.0: solo mode as the starting path, a git guard hook (on in team mode, off solo), the `falsify` skill, a
 context-fill statusline, MIT LICENSE, tests (`bash tests/run.sh`), a glossary, and the worked
@@ -222,12 +255,12 @@ bash scripts/tmux-session.sh --install-command orca --seat Orca --model 'opus[1m
 
 `start-team.sh` and `recycle-sibling.sh` open each tab running `scripts/sibling-shell.sh <Name>`, which runs `claude` as its child. To
 recycle, `recycle-sibling.sh <Name>` leaves the wrapper a small hand-off file (model, effort, permission mode, account, prompt) under
-`~/.orchestration-kit/sessions/`, SIGTERMs only the old `claude`, and the wrapper starts the fresh one in the same tab. Same tab, no
+`~/.orcastration-kit/sessions/`, SIGTERMs only the old `claude`, and the wrapper starts the fresh one in the same tab. Same tab, no
 stray windows, and nothing the old context held is lost, because a recycle only runs after the session replied "retro complete".
 It opens a new tab instead (running the wrapper, so that session recycles in place next time) when there is no old process, the old
 one was started by hand, you pass `--new-tab`, the machine has no `setsid` (macOS) and the seat is recycling itself, or the in-place
 attempt times out (60 s; `RECYCLE_INPLACE_TIMEOUT`). The seat can recycle itself in place: the script prints a log path
-(`~/.orchestration-kit/sessions/<Name>.recycle.log`), hands the work to a detached copy of itself and exits, and the copy ends the seat's
+(`~/.orcastration-kit/sessions/<Name>.recycle.log`), hands the work to a detached copy of itself and exits, and the copy ends the seat's
 session about 2 s later (`RECYCLE_DETACH_DELAY`) so the seat's last command finishes first. `--dry-run` prints `mode: in-place` or `mode: new-tab`, and `detach: yes|no` for a self-recycle. `LAUNCH_NO_WRAPPER=1` opens tabs with a bare
 `claude` as before.
 
@@ -301,7 +334,7 @@ bash scripts/deploy.sh --install-root /mnt/c/Apps/OrcastrationStation
 - **Windows with WSL only, for now.** The window expects the bridge at `~/.local/share/observatory/bin/observatory-bridge` in the default WSL distro. The bridge itself starts directly on Linux, but there is no native Linux window build or installer yet (planned for 0.17.0).
 - Pages older than `cutoff_days` do not appear in the pages list. Raise it to see older ones, at some cost in startup time.
 
-**Choosing it in setup.** `/orchestration-kit:kit-init` asks once: interface = CLI (the default; nothing changes) or the Station. The answer is stored as `interface: cli | station` in the team block of `ORCHESTRATION.md`. Choosing the Station prints the install steps above and runs nothing.
+**Choosing it in setup.** `/orcastration-kit:kit-init` asks once: interface = CLI (the default; nothing changes) or the Station. The answer is stored as `interface: cli | station` in the team block of `ORCHESTRATION.md`. Choosing the Station prints the install steps above and runs nothing.
 
 ## Assumed plugins (user-level — documented, never copied)
 

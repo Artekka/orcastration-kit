@@ -55,7 +55,7 @@ impl PathCtx<'_> {
 }
 
 /// The seat name when neither the app (`--seats` / `OBSERVATORY_SEATS`) nor the bridge config
-/// names any: the orchestration-kit's own default seat.
+/// names any: the orcastration-kit's own default seat.
 pub const DEFAULT_SEATS: &str = "Orca";
 
 /// Which agent names are seats. [`Seats::default`] defers to the bridge: the `seats` its `hello`

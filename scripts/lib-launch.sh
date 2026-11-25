@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# lib-launch.sh — shared launcher for start-team.sh and recycle-sibling.sh (orchestration-kit).
+# lib-launch.sh — shared launcher for start-team.sh and recycle-sibling.sh (orcastration-kit).
 # Sourced, never run. One copy of the launch logic so the two scripts can't drift.
 # Written for bash 3.2+ (macOS /bin/bash): no associative arrays, no ${x,,}, no empty-array expansion.
 #
@@ -485,7 +485,7 @@ _launch_print_argv() { printf '%q' "${LAUNCH_ARGV[0]}"; printf ' %q' "${LAUNCH_A
 # (model, effort, mode, account, prompt), SIGTERMs only the old claude, and the wrapper starts the fresh
 # one in the SAME tab. Anything else (no old process, an old one started by hand, --new-tab, a timeout)
 # opens a new tab that runs the wrapper, so a hand-started session moves over at its next recycle.
-launch_state_dir() { printf '%s' "${SIBLING_STATE_DIR:-$HOME/.orchestration-kit/sessions}"; }
+launch_state_dir() { printf '%s' "${SIBLING_STATE_DIR:-$(kit_home)/sessions}"; }   # kit_home: lib-kit-home.sh, via lib-model-tag.sh
 launch_wrapper() { printf '%s/sibling-shell.sh' "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; }
 
 # True when a tab's command should run the wrapper rather than a bare claude. Not for: the test

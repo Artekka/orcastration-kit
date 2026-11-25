@@ -1,6 +1,6 @@
 ---
 name: feedback_multisession_board_orchestration_default
-description: Run substantial work through the multi-session claimable AGENT_BOARD workflow (orchestration-kit) by default
+description: Run substantial work through the multi-session claimable AGENT_BOARD workflow (orcastration-kit) by default
 metadata:
   type: feedback
 ---
@@ -18,4 +18,4 @@ file collision; the board made claims, fences and status visible across sessions
   file), claim rows by a committed + pushed edit, build in your own worktree, get a
   sibling-session verification before reconcile, reconcile one at a time, deploy via the slot.
 - Never `git stash` in a worktree (stash refs are shared across worktrees).
-- The orchestration-kit plugin carries the whole workflow; its CHANGELOG tracks the version.
+- The orcastration-kit plugin carries the whole workflow; its CHANGELOG tracks the version.

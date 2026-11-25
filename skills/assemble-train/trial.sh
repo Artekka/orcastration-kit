@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# trial.sh (orchestration-kit, assemble-train): simulate merging a rider onto a base without touching any ref.
+# trial.sh (orcastration-kit, assemble-train): simulate merging a rider onto a base without touching any ref.
 # Run as:  B=<base commit> R=<rider commit> bash trial.sh      (in the train's repo)
 # Named variables only: the skill loader replaces positional tokens in a rendered skill with its arguments.
 # Prints: the merge result (RC=0 clean, 1 conflict, with git's conflict messages), then for every file the

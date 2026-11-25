@@ -1,8 +1,33 @@
-# Changelog — orchestration-kit
+# Changelog — orcastration-kit
 
 Newest first.
 
 ## Unreleased
+
+## 0.17.0 — 2026-11-25
+
+- **Changed: the plugin id is `orcastration-kit`** (was `orchestration-kit`), spelled like the product, the repo and the logo:
+  the install command, the `enabledPlugins` key, the `/orcastration-kit:<skill>` prefix, the launch prompts and the
+  scripts' state folder `~/.orcastration-kit/`. The 0.16.3 README note about two spellings is gone.
+- **Added: a `renames` map in the marketplace** (`orchestration-kit` → `orcastration-kit`): Claude Code moves an existing install
+  to the new id and rewrites the settings keys itself. Append-only history; `claude plugin validate .` checks it.
+- **Added: `scripts/lib-kit-home.sh`**, the one rule for the state folder (ctx-guard.py carries it in python): when only
+  `~/.orchestration-kit/` exists, `~/.orcastration-kit` becomes a link to it in one step and one line says so, so tabs started on
+  0.16 keep their recycle hand-offs; both folders = the new one plus one warning; env overrides still win.
+- **Changed: `kit-init` and `bootstrap.sh`** recognize a CLAUDE.md section carrying the 0.16 marker and write the new one.
+
+### Upgrading from 0.16
+
+```bash
+claude plugin marketplace update artekka-kits
+/plugin install orcastration-kit@artekka-kits      # once, in a session (or: claude plugin install orcastration-kit@artekka-kits --scope project)
+```
+
+Restart the sessions; use `/orcastration-kit:<skill>` from then on. A Claude Code too old for `renames`:
+`claude plugin uninstall orchestration-kit --scope project`, then the install above, and change the `enabledPlugins` key
+`"orchestration-kit@artekka-kits"` to `"orcastration-kit@artekka-kits"` in `.claude/settings.json`.
+Then run `/orcastration-kit:kit-init` once in each project adopted on 0.16: it offers to refresh the copied launch scripts,
+whose default prompt still carries the old prefix.
 
 ## 0.16.3 — 2026-11-25
 

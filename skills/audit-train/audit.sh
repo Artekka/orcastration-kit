@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# audit.sh (orchestration-kit, audit-train): sweep the first-parent commits BASE..TIP of a train, oldest first.
+# audit.sh (orcastration-kit, audit-train): sweep the first-parent commits BASE..TIP of a train, oldest first.
 # Run as:  BASE=<train base> TIP=<train tip> [APPROVED=<file of approved rider SHAs, one per line>] bash audit.sh
 # (in the train's repo). Named variables only: the skill loader eats positional parameters.
 #   MERGE <sha> p2=<rider> [approved=YES|NO] mt_rc=<0 clean|1 conflict> tree_eq=<YES|NO> :: <subject>

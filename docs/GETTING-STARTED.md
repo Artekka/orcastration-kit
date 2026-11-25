@@ -17,7 +17,7 @@ Want the big picture first? [`HOW-IT-WORKS.md`](../HOW-IT-WORKS.md) explains the
   with Claude Code's **built-in** SendMessage / ListAgents tools (nothing to install); they are
   newer features, so an old version may not have them. **Tested on Claude Code 2.1.296.** The kit
   relies on: cross-session SendMessage / ListAgents, plugin skills that run a command before the
-  skill text loads (`/orchestration-kit:orient-brief`), and hooks that add context
+  skill text loads (`/orcastration-kit:orient-brief`), and hooks that add context
   (PostToolUse / UserPromptSubmit, for the context guard).
 - **python3** (context measurement and the context guard) and **flock** (the gate throttle; on
   macOS `brew install flock`; without it the throttle warns and runs your gate unthrottled).
@@ -67,7 +67,7 @@ In a terminal (on Windows: a WSL terminal), **from inside the repo you want to u
 ```bash
 cd ~/projects/myapp
 claude plugin marketplace add Artekka/orcastration-kit
-claude plugin install orchestration-kit@artekka-kits --scope project
+claude plugin install orcastration-kit@artekka-kits --scope project
 ```
 
 `--scope project` turns the kit on for **this repo only** — your other projects are
@@ -91,7 +91,7 @@ On macOS or Linux: `cd ~/projects/myapp && claude`.
 In that Claude session run:
 
 ```
-/orchestration-kit:kit-init
+/orcastration-kit:kit-init
 ```
 
 It creates the board, your project settings, the status doc and log, and the launch scripts,
@@ -197,17 +197,17 @@ nobody gets pinged.
 
 | Piece | What it is |
 |---|---|
-| `/orchestration-kit:orchestrate` | The seat's loop — plans, assigns, verifies, merges, deploys, recycles |
-| `/orchestration-kit:orient` | A fresh session catches up and tells the seat it's READY |
-| `/orchestration-kit:board` | Claiming, updating and archiving board rows |
-| `/orchestration-kit:orient-brief` | Lean start for a builder: the row's brief and the seat banner arrive already loaded (`/orchestration-kit:orient-brief <ROW>`) |
-| `/orchestration-kit:assemble-train` · `/orchestration-kit:audit-train` | Land approved rows onto a train branch one merge at a time with a dry run · a validator checks the finished train before it ships |
+| `/orcastration-kit:orchestrate` | The seat's loop — plans, assigns, verifies, merges, deploys, recycles |
+| `/orcastration-kit:orient` | A fresh session catches up and tells the seat it's READY |
+| `/orcastration-kit:board` | Claiming, updating and archiving board rows |
+| `/orcastration-kit:orient-brief` | Lean start for a builder: the row's brief and the seat banner arrive already loaded (`/orcastration-kit:orient-brief <ROW>`) |
+| `/orcastration-kit:assemble-train` · `/orcastration-kit:audit-train` | Land approved rows onto a train branch one merge at a time with a dry run · a validator checks the finished train before it ships |
 | Status HUD (optional plugin) | A band above the prompt showing every session's context fill, model and activity. `kit-init` asks once (default: no); `/hud band`, `/hud pane`, `/hud off`, `/hud quiet` switch it. Host load meters work on Linux and WSL only |
-| `/orchestration-kit:falsify` | Prove a new test or guard can actually fail (mutation check) before trusting it |
-| `/orchestration-kit:reconcile` | Merging one finished worktree onto main and re-running the gate |
-| `/orchestration-kit:retro` | Closing a session: lessons saved, board updated, work committed |
-| `/orchestration-kit:verify-feature` | Subagent verification — fallback when no sibling is free to verify |
-| `/orchestration-kit:post-feature` · `/orchestration-kit:kit-init` · `/orchestration-kit:bootstrap-project` | Per-feature checklist · repo setup · new-project setup |
+| `/orcastration-kit:falsify` | Prove a new test or guard can actually fail (mutation check) before trusting it |
+| `/orcastration-kit:reconcile` | Merging one finished worktree onto main and re-running the gate |
+| `/orcastration-kit:retro` | Closing a session: lessons saved, board updated, work committed |
+| `/orcastration-kit:verify-feature` | Subagent verification — fallback when no sibling is free to verify |
+| `/orcastration-kit:post-feature` · `/orcastration-kit:kit-init` · `/orcastration-kit:bootstrap-project` | Per-feature checklist · repo setup · new-project setup |
 | SessionStart hook (automatic) | Every fresh session in a repo with a board is told to orient and report to the seat. Silent in other repos |
 | Worktree guard (PreToolUse hook) | Only with `worktrees: enforced`: blocks edits in the main checkout except board/log/status files. Silent otherwise |
 | Git guard (PreToolUse hook on Bash) | Only with `git_guard: on`: refuses `git stash`, `git add -A` / `.`, `git commit -a`, `git pull --rebase` and tells Claude the safe command. Silent otherwise |
@@ -240,8 +240,8 @@ Long sessions degrade as their context fills. The kit replaces them cleanly inst
    prints `mode: in-place` or `mode: new-tab`; `--new-tab` forces the new window.
 4. The seat recycles itself the same way after writing a handover note on the board. If the
    script can't run, the seat asks you to close that window and relaunch it with
-   `claude --name <Name> --model <model> /orchestration-kit:orient` (siblings) or
-   `claude --name <SeatName> --model 'opus[1m]' /orchestration-kit:orchestrate` (seat). A bare `/clear`
+   `claude --name <Name> --model <model> /orcastration-kit:orient` (siblings) or
+   `claude --name <SeatName> --model 'opus[1m]' /orcastration-kit:orchestrate` (seat). A bare `/clear`
    keeps the terminal's OLD model; if you do `/clear`, run `/model <model>` first.
 
 ### Model per lane
@@ -265,7 +265,7 @@ builds and every verification are sessions. Details: the orchestrate skill, "Mod
 ### Lean start for a builder
 
 The seat writes a **brief file** per row (`docs/orchestration/briefs/<ROW>.md`, from
-`templates/briefs/_TEMPLATE.md`) and the builder starts with `/orchestration-kit:orient-brief <ROW>`
+`templates/briefs/_TEMPLATE.md`) and the builder starts with `/orcastration-kit:orient-brief <ROW>`
 (the brief and the board banner arrive already injected into the skill text, so there is nothing to read first):
 the brief + the board banner, then READY. A full orient reads a whole project to learn one row; the
 brief is the row. Keep `CLAUDE.md` slim too (`docs/orchestration/CLAUDE-slimness.md`): it is re-read on every
@@ -323,9 +323,9 @@ and it will make the change for you. For example:
 - **Opening a session by hand** (no automatic windows, e.g. native Windows without WSL): one terminal per session,
   in the repo:
   ```
-  claude --name Orca --model 'opus[1m]' /orchestration-kit:orchestrate    # add --permission-mode auto etc. after the name
-  claude --name Sib1 --model 'sonnet[1m]' /orchestration-kit:orient
-  claude --name Sib2 --model 'sonnet[1m]' /orchestration-kit:orient
+  claude --name Orca --model 'opus[1m]' /orcastration-kit:orchestrate    # add --permission-mode auto etc. after the name
+  claude --name Sib1 --model 'sonnet[1m]' /orcastration-kit:orient
+  claude --name Sib2 --model 'sonnet[1m]' /orcastration-kit:orient
   ```
   Always pass `--model` (the lane's model, "Model per lane" above): a session started without it runs on
   whatever the account default is, and a bare `/clear` in an old terminal keeps that terminal's model, so relaunch with `--model`.
@@ -334,7 +334,8 @@ and it will make the change for you. For example:
 - **A dedicated validator:** add a sibling that only verifies and never builds, and name it
   in ORCHESTRATION.md → Validator seat. It is independent of every row by construction.
 - **Upgrading the plugin:** `claude plugin marketplace update artekka-kits`, then
-  `claude plugin update orchestration-kit@artekka-kits`, restart sessions, and re-run
-  `/orchestration-kit:kit-init` (it only adds what's missing).
+  `claude plugin update orcastration-kit@artekka-kits`, restart sessions, and re-run
+  `/orcastration-kit:kit-init` (it only adds what's missing). Coming from 0.16 (the old plugin id): follow
+  "Upgrading from 0.16" in the README first; it is one install step.
 - Further reading: `skills/orchestrate/SKILL.md` (the seat's loop) and `docs/LESSONS.md`
   (why each rule exists).

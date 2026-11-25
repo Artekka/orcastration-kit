@@ -6,7 +6,7 @@
   "description": "Artekka's reusable Claude Code kits. This repo is both the marketplace and two plugins: the orchestration kit and the optional status HUD.",
   "plugins": [
     {
-      "name": "orchestration-kit",
+      "name": "orcastration-kit",
       "source": "./",
       "description": "Multi-session claimable agent board + verification workflow.",
       "category": "workflow",
@@ -15,7 +15,7 @@
         "multi-session",
         "worktree"
       ],
-      "version": "0.16.3"
+      "version": "0.17.0"
     },
     {
       "name": "status-hud",
@@ -28,5 +28,8 @@
         "hud"
       ]
     }
-  ]
+  ],
+  "renames": {
+    "orchestration-kit": "orcastration-kit"
+  }
 }

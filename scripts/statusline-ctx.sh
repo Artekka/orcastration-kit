@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code statusline (orchestration-kit, optional): the session's REAL context fill against
+# Claude Code statusline (orcastration-kit, optional): the session's REAL context fill against
 # the kit's marks — self-report at the PROMPT mark, hand the terminal over by the HANDOVER mark.
 #
 #   ctx 212K · prompt 350K · handover 400K          (green: fine)
