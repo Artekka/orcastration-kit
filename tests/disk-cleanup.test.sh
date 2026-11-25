@@ -65,6 +65,12 @@ sandbox; tree s5e307/a 1; echo dirty > "$TREE/new.txt"
 out="$(rw --prefix s5e307/)"
 has "a dirty tree is kept with the reason" "kept" "$out"; has "dirty reason" "uncommitted or untracked" "$out"; [ -d "$TREE" ] && ok || bad "a dirty tree was removed"
 
+# an untracked node_modules SYMLINK (a link to a shared install) is not work: the tree goes, the link with it, the install stays
+sandbox; tree s5e307/a 1; mkdir "$SB/shared-nm"; echo keep > "$SB/shared-nm/f"; ln -s "$SB/shared-nm" "$TREE/node_modules"
+out="$(rw --prefix s5e307/)"
+has "a tree whose only extra is a node_modules symlink is removed" "retro-worktrees: removed" "$out"; [ ! -d "$TREE" ] && ok || bad "the tree with a node_modules link is still there"
+[ "$(cat "$SB/shared-nm/f")" = keep ] && ok || bad "the link's target was touched"
+
 # keep rule: an IGNORED file that is not rebuildable output (a secrets file such as .env) keeps an otherwise merged, clean, idle tree
 sandbox; printf '.env\n' >> "$SB/work/.git/info/exclude"; tree s5e307/a 1; echo 'TOKEN=x' > "$TREE/.env"; find "$TREE" -type f -not -path '*/.git/*' -exec touch -d '3 hours ago' {} +
 out="$(rw --prefix s5e307/)"

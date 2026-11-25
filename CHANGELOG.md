@@ -4,6 +4,24 @@ Newest first.
 
 ## Unreleased
 
+## 0.15.1 — 2026-11-24
+
+The merge script and the throttle take the fixes their source project made after the first port.
+
+- **Fixed: `seat-merge.sh` refuses committed conflict markers**, listed with file and line, before the format check (new `lib-conflict-markers.sh`). A `=======` line counts only between `<<<<<<<` and `>>>>>>>`; markdown is scanned; path prefixes can be exempted with `marker_exempt:` lines in the `seat_merge:` block, read before the merge so a branch cannot exempt itself.
+- **Fixed: TERM, INT and HUP end a `seat-merge.sh` run at once** (exit 143, 130, 129) and stop the running install or check. The install and every check now run as a background job the script waits on, with the traps on only across it, so a signal is no longer held until a foreground child ends.
+- **Fixed: a refused `seat-merge.sh` run keeps its check log** (`SEAT_MERGE_LOG_DIR`, default under the runtime dir); the path and the last failure lines go to stderr. A green run keeps nothing.
+- **Fixed: every origin fetch and push in `seat-merge.sh` retries a transient connection or auth denial** (new `lib-git-retry.sh`, `GIT_NET_TRIES`, `GIT_NET_BACKOFF_S`), and never retries a rejection by the remote, so a lost race still takes the redo path.
+- **Fixed: `seat-merge.sh` needs HEAD on origin/main at the start.** A re-run after a red now refuses with the printed reset instead of reading config from the refused branch's tree; a local commit in the merge worktree is refused too.
+- **Fixed: a lock held by a killed merge's child is named, not mistaken for another merge.** The refusal names the orphan pid and the `kill` command that frees it; a live `seat-merge.sh` holder still gets the old message.
+- **Fixed: stage times come from the monotonic clock** (new `lib-mono-clock.sh`), so a clock that steps back prints 0, never a negative span. The merge prints `checks took Ns`.
+- **Added: after a pushed merge the main checkout is fast-forwarded** (`sync-main-checkout.sh`); a failure there never fails the merge.
+- **Fixed: removing a merged builder worktree (`seat-merge.sh`, `retro-worktrees.sh`)** treats an untracked `node_modules` symlink as rebuildable and unlinks it (never its target) before `git worktree remove`; python bytecode counts as rebuildable output; a cone sparse worktree no longer keeps itself forever because of its hidden files outside the set (a present file there, or any other skip-worktree or assume-unchanged tag, still keeps it).
+- **Fixed: `gate-throttle.sh` installs its signal traps before it takes its ticket**, so a TERM while joining the line exits 143 and leaves no ticket and no half-made ticket (test seam `KIT_THROTTLE_TICKET_GAP`).
+- **Fixed: a priority-list line ending in `/` also matches the tree itself**, not only the folders inside it. The old rule was pinned by a test; that pin now says the opposite.
+- **Fixed: deploy mode sizes the confined share from the kernel's online CPU list**, not the caller's `nproc`, which follows the caller's CPU mask and `OMP_NUM_THREADS` (a release gate under `taskset -c 0-7` confined the others to 2 of 28 CPUs; with `OMP_NUM_THREADS=2` it confined nothing). A missing or malformed list falls back to `nproc --all` with one stderr line (`KIT_CPU_ONLINE_FILE` is the test seam).
+- **Not ported, on purpose:** the typecheck-after-merge stage (the `check:` lines of the `seat_merge:` block already run any command on the merged tree, for example a `typecheck | *.ts | <command>` line); the docs-push yield and guard-round waits, the hosted-page date bump, the old-host scan, the generated-bundle conflict resolver, the remote guard stage and the vitest pool settings of the merge script; the sim and pages pools, the process sandbox and the one-command gate entry of the throttle; the lane marker, launch log and remote-host notes of `recycle-sibling.sh` (the launch timeout kill and the model guard are already in 0.15.0); every `pending-work.sh` change (they read one project's board and hub shapes); detached-worktree removal and the masters-sparse set of the worktree check (they need the disk sweep, which the kit does not have yet).
+
 ## 0.15.0 — 2026-11-24
 
 Recycling and launching check the model first, and a recycle signals only the process it named.

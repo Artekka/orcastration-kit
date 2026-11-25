@@ -151,7 +151,9 @@ The seat merges a READ-passed branch with `bash scripts/seat-merge.sh <branch> <
 - `check`: repeatable, `name | globs | command`. `globs` are matched against the paths the merge changes (`docs/*` a directory, `*` every merge). A red check is rerun once alone; red twice refuses. **Recommended: one `check:` line with globs `*` that runs your fast guards, so no merge reaches main without them**; add narrower lines for the slower suites a path should trigger.
 - `allowed_paths`: path prefixes (default `docs/orchestration/ docs/timeline/build-log.md docs/AI_CONTEXT.md`). When the push loses a race to commits that touch only these, the same merge is redone and pushed without re-running the checks (at most 3 times). Any other path refuses.
 - `yield_max_s` / `yield_poll_s`: the merge waits (at most `yield_max_s`, default 3600, polling every `yield_poll_s`, default 5) while another session holds a "waiting pusher" ticket, so a retrying push is not starved.
+- `marker_exempt`: repeatable, a path prefix the committed-conflict-marker scan skips (default none; a doc that quotes markers on purpose). The scan runs on every merge before the format check and refuses a merged tree that holds markers. It is read before the merge, so a branch cannot exempt its own markers.
 - `idle_minutes`: the builder's worktree is removed after a merge only if nothing in it changed this recently (default 30).
+- `SEAT_MERGE_LOG_DIR` (env only): where a refused run keeps its check log; defaults to `logs/` under the runtime dir.
 - `SEAT_MERGE_RUNTIME_DIR` (env only): where the lock and tickets live; defaults to `KIT_RUNTIME_DIR`, else `~/.orchestration-kit/runtime`.
 
 ```
@@ -164,6 +166,7 @@ seat_merge:
   yield_max_s:    3600
   yield_poll_s:   5
   idle_minutes:   30
+  marker_exempt:  docs/quoted-markers/
 ```
 
 Keep comments out of the block: a comment line ends it, and a trailing comment becomes part of the value.

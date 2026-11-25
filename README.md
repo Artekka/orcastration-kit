@@ -146,6 +146,8 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
+v0.15.1: the merge script and the throttle take the fixes of the project they came from: committed conflict markers are refused, a signal ends a merge run at once, fetches and pushes retry transient denials, an orphan holding the lock is named, and a priority line ending in `/` matches its own tree.
+
 v0.15.0: recycling checks the model before it touches anything: one shared guard (`lib-model-tag.sh`) refuses a model name the CLI would only reject at the first prompt, and a recycle signals only a process that is still the session it named.
 
 v0.14.0: three seat-poll tools: `bottleneck-watch.sh` (flags a merge, gate or idle main past its time budget, and a session stuck on a permission prompt), `main-checkout-sync.sh` (fast-forwards the shared checkout; a dirty file the incoming commits do not touch never stops it, one they touch does and the skip line names it) and a context window read from the session's own launch (`ctx-fill.py` needs no `--window` for your own session).

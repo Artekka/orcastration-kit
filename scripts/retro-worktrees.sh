@@ -44,7 +44,7 @@ handle() {  # $1 = path, $2 = branch
   if [ -n "$why" ]; then echo "retro-worktrees: kept $path: $why"; kept=$((kept + 1)); return; fi
   path=$(cd "$path" && pwd -P)
   if [ "$dry" = 1 ]; then echo "retro-worktrees: would remove $path"; removed=$((removed + 1)); return; fi
-  if err=$(git worktree remove "$path" 2>&1); then echo "retro-worktrees: removed $path"; removed=$((removed + 1))
+  if err=$(worktree_remove_clean "$path" 2>&1); then echo "retro-worktrees: removed $path"; removed=$((removed + 1))
   else echo "retro-worktrees: kept $path: git refused to remove it ($(printf '%s' "$err" | head -1))"; kept=$((kept + 1)); fi
 }
 

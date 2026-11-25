@@ -52,3 +52,46 @@ waiting_tickets() {
     fi
   done
 }
+
+# seat_merge_lock_holders <lockfile>: the pids with an open fd on the lock, one per line (one find over /proc/*/fd; another
+# user's processes are not readable, so the list may be empty for a held lock: the caller then treats it as held).
+# Why: `flock -n` says only THAT a lock is held. A killed seat-merge leaves its children (a test run) holding the inherited lock
+# fd, so a later run was refused naming a merge that no longer existed. A lock counts as held by a merge only when one of its
+# holders is a live seat-merge.sh or a descendant of one.
+seat_merge_lock_holders() {
+  local want
+  want=$(readlink -f -- "$1") || return 0
+  want=$(printf '%s' "$want" | sed 's/[][*?\\]/\\&/g')  # -lname takes a glob: escape glob characters in the path
+  find /proc/[0-9]*/fd -maxdepth 1 -lname "$want" 2>/dev/null | cut -d/ -f3 | sort -un
+}
+# seat_merge_argv_is <argv...>: is the script seat-merge.sh? Read from the ARGV, never from the command line as text: true when
+# argv[0] is named so (a stand-in started with exec -a) or when the first non-option argument of the interpreter is
+# (`bash [-x] <path>/seat-merge.sh`); the body after `-c` and every later argument are words, not the script.
+seat_merge_argv_is() {
+  [ "${1##*/}" = "seat-merge.sh" ] && return 0
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --) shift; [ "${1##*/}" = "seat-merge.sh" ]; return ;;
+      -o | -O) shift 2>/dev/null || return 1; shift 2>/dev/null || return 1 ;;  # an option with a value
+      -[a-zA-Z]*c* | -c) return 1 ;;  # -c / -ec: the next word is a command string, not a script
+      -*) shift ;;
+      *) [ "${1##*/}" = "seat-merge.sh" ]; return ;;
+    esac
+  done
+  return 1
+}
+# seat_merge_in_tree <pid>: is this process, or an ancestor, a live seat-merge.sh? The parent pid is field 4 of /proc/<pid>/stat,
+# read after the LAST ") " (the comm field may hold spaces and parens). A killed merge's child has been reparented to init or a
+# subreaper, so its chain no longer passes through a seat-merge.sh.
+seat_merge_in_tree() {
+  local p=$1 n=0 argv
+  while [ -n "$p" ] && [ "$p" -gt 1 ] && [ "$n" -lt 64 ]; do
+    argv=()
+    { mapfile -d '' -t argv <"/proc/$p/cmdline"; } 2>/dev/null || argv=()
+    [ "${#argv[@]}" -gt 0 ] && seat_merge_argv_is "${argv[@]}" && return 0
+    p=$(sed -n 's/.*) //p' "/proc/$p/stat" 2>/dev/null | awk '{print $2}')
+    n=$((n + 1))
+  done
+  return 1
+}

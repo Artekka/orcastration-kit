@@ -130,7 +130,8 @@ refresh_prio() {
       # (inside this directory) is kept, which realpath would drop.
       slash=""; case "$p" in */) slash="/" ;; esac
       p="$(realpath -m -P -- "$p" 2>/dev/null || printf '%s' "$p")${slash}"
-      case "$here" in "$p"*) prio=1 ;; esac
+      # Compare "$here/": pwd -P has no trailing slash, so a line ending in "/" would otherwise never name the tree itself.
+      case "$here/" in "$p"*) prio=1 ;; esac
     done < "$RT/gate-priority.txt"
   fi
   # One line per CHANGE (never per poll): tests and operators can wait on it instead of guessing poll timing.
@@ -209,6 +210,16 @@ second_slot_holder() {  # prints "<pid> <running|waiting>" of a live throttle fr
   return 0
 }
 
+# Test seam: hold the script at one named stop of the ticket path, so a test can send a signal exactly there. $KIT_THROTTLE_TICKET_GAP
+# is a path prefix. At stop <s> the script acts ONLY when "<prefix>.<s>.go" is a FIFO (the test makes it): it touches
+# "<prefix>.<s>.mid", then blocks opening the FIFO until the test opens the other end or signals it. bash runs a trap at once while
+# blocked in that open. Inert otherwise: a value set by accident with no FIFO beside it does nothing at all.
+ticket_gap() {  # <stop>
+  local p="${KIT_THROTTLE_TICKET_GAP:-}"
+  [ -n "$p" ] && [ -p "$p.$1.go" ] || return 0
+  : >"$p.$1.mid"
+  read -r _ <"$p.$1.go" || true
+}
 my_ticket=""
 take_ticket() {
   local n held
@@ -226,7 +237,7 @@ take_ticket() {
   my_ticket="$(printf '%010d.%d' "$n" "$$")"
   # line 1: the waiter's dir (for status), line 2: its start time (liveness). Written whole, then renamed
   # into place, so a reader never sees a ticket without its start time and takes it for dead.
-  printf '%s\n%s\n' "$(pwd -P)" "$(proc_start $$)" > "$qdir/.new.$$" && mv -f "$qdir/.new.$$" "$qdir/$my_ticket"
+  printf '%s\n%s\n' "$(pwd -P)" "$(proc_start $$)" > "$qdir/.new.$$" && ticket_gap tmp && mv -f "$qdir/.new.$$" "$qdir/$my_ticket"
   exec 8>&-
 }
 drop_ticket() { [ -n "$my_ticket" ] && rm -f "${qdir:?}/${my_ticket:?}"; my_ticket=""; }
@@ -406,9 +417,27 @@ dm_stale_check() {
   dm_restore
   rm -f "$dm_active"
 }
+# ONE source for the host's CPU count when confining the others: the kernel's online list, never nproc, which honors the CALLER's
+# affinity and OMP_NUM_THREADS (a release gate run under `taskset -c 0-7` confined the others to 2 of 28 CPUs; with
+# OMP_NUM_THREADS=2 it confined nothing). $KIT_CPU_ONLINE_FILE is a test seam (inert unset). A missing, empty or malformed list (not
+# "a-b,c" with a <= b) falls back LOUDLY to nproc --all, which ignores affinity and OMP_*, and is never empty.
+dm_online_cpus() {
+  local f="${KIT_CPU_ONLINE_FILE:-/sys/devices/system/cpu/online}" l="" part ok=1
+  l="$(head -n 1 "$f" 2>/dev/null | tr -d '[:space:]')"
+  if [[ "$l" =~ ^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$ ]]; then
+    for part in ${l//,/ }; do [ "${part%-*}" -le "${part#*-}" ] || ok=0; done
+  else
+    ok=0
+  fi
+  if [ "$ok" = 1 ]; then echo "$l"; return 0; fi
+  echo "gate-throttle: deploy mode: the online CPU list $f is missing, empty or malformed ('${l:0:40}'); using nproc --all" >&2
+  echo "0-$(( $(nproc --all 2>/dev/null || echo 1) - 1 ))"
+}
+# <cpu list> -> how many CPUs it names
+dm_cpu_count() { local n=0 part; for part in ${1//,/ }; do n=$(( n + 10#${part#*-} - 10#${part%-*} + 1 )); done; echo "$n"; }
 dm_others_cpulist() {
   local n k
-  n="$(nproc 2>/dev/null || echo 4)"
+  n="$(dm_cpu_count "$(dm_online_cpus)")"
   k=$(( (n * dm_pct + 99) / 100 ))
   [ "$k" -lt 2 ] && k=2
   [ "$k" -ge "$n" ] && return 1   # nothing to take away on a 1-2 CPU host
@@ -486,6 +515,7 @@ dm_leave() {
 }
 on_exit() {
   drop_ticket
+  rm -f "${qdir:?}/.new.$$"   # a signal between take_ticket's write and its rename leaves this half-made ticket
   rm -f "${rdir:?}/$$"
   dm_leave
 }
@@ -518,11 +548,16 @@ running_normal() {  # how many normal-slot commands are running now (live pid, n
   echo "$n"
 }
 mem_told=0
-take_ticket
+# The traps go in BEFORE the ticket is taken. They used to follow it, and a TERM in between took the default action: bash died of
+# the signal (no exit 143) and left its ticket in the line until the next waiter swept it. With no ticket yet, on_exit has nothing
+# to drop and on_signal no child to stop, so installing them early costs nothing.
 trap on_exit EXIT
 trap 'on_signal 143' TERM
 trap 'on_signal 130' INT
 trap 'on_signal 129' HUP
+ticket_gap pre     # test seam: traps in, no ticket yet
+take_ticket
+ticket_gap ticket  # test seam: the ticket is in the line
 load_told=0
 while :; do
   cands=""

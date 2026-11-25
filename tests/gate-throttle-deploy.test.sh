@@ -305,5 +305,22 @@ if [ "$NPROC" -ge 4 ] && command -v python3 >/dev/null 2>&1; then
   until_ 15 gone "/proc/$PS" && ok || bad "INT: the payload (pid $PS) is still running after the INT"
 else echo "gate-throttle-deploy: INT test skipped (< 4 CPUs or no python3)"; fi
 
+# ── 14. the confined share comes from the kernel's ONLINE CPU list, never from the caller's nproc ──
+# A release gate run under `taskset -c 0-7` (or with OMP_NUM_THREADS=2) used to size the others' share from its own nproc: it
+# confined them to 2 of 28 CPUs, or confined nothing. KIT_CPU_ONLINE_FILE is the seam: "0-7" at 50% must confine to 4 CPUs.
+if [ "$NPROC" -ge 8 ]; then
+  echo "0-7" > "$TMP/online"
+  reset; normal A GATE_DEPLOY_OTHERS_PCT=50; before="$(mask "$NS")"; prio GATE_DEPLOY_OTHERS_PCT=50 KIT_CPU_ONLINE_FILE="$TMP/online" OMP_NUM_THREADS=2
+  until_ 10 fileset "$ACTIVE"; until_ 10 differs "$NS" "$before" || bad "the online list with OMP_NUM_THREADS=2 never confined"
+  eq "50% of an 8-CPU online list = 4 CPUs, whatever the caller's nproc says" 4 "$(popcount "$(mask "$NS")")"
+  kill -TERM "$PS"
+  # a malformed list falls back loudly to nproc --all and still confines
+  echo "7-0,x" > "$TMP/online"
+  reset; normal A GATE_DEPLOY_OTHERS_PCT=50; before="$(mask "$NS")"; : > "$TMP/err"; prio GATE_DEPLOY_OTHERS_PCT=50 KIT_CPU_ONLINE_FILE="$TMP/online"
+  until_ 10 fileset "$ACTIVE"; until_ 10 differs "$NS" "$before" || bad "a malformed online list never confined"
+  has "a malformed online list is said, once, on stderr" "is missing, empty or malformed" "$(cat "$TMP/err")"
+  kill -TERM "$PS"
+else echo "gate-throttle-deploy: online-list test skipped (< 8 CPUs)"; fi
+
 echo "gate-throttle-deploy: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

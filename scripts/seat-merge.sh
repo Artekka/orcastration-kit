@@ -21,6 +21,12 @@
 # origin/main → remove the builder's worktree when it is provably idle. Never forces: a lost race is a refusal, re-run it.
 # Red or conflict → nothing is pushed. A conflict is aborted; after a red the merged HEAD stays detached for inspection (the
 # last line says so and how to reset it).
+# Also: every origin fetch and push retries a transient connection or auth denial (lib-git-retry.sh), and never a rejection by
+# the remote; HEAD must sit on origin/main at the start, so a re-run after a red needs the printed reset first (a stale merge
+# worktree would otherwise feed the next run its own refused tree); committed conflict markers in the merged tree are listed and
+# refused before the format check; the install and every check run as a background job the script waits on, so TERM, INT or
+# HUP to the script ends the run at once (exit 128+n) and ends the job; a refused run keeps its check log; stage times come from
+# the monotonic clock; after a pushed merge the main checkout is fast-forwarded (scripts/sync-main-checkout.sh).
 #
 # CONFIG (a hook is optional; the environment variable wins over the config file):
 #   When: the config is read BEFORE the merge, from the ORCHESTRATION.md this worktree has checked out (not from the merged
@@ -43,8 +49,10 @@
 #                   When the push loses a race to commits that touch ONLY these paths, the SAME merge is redone onto the
 #                   new origin/main and pushed without re-running the checks (at most 3 times). Env SEAT_MERGE_ALLOWED_PATHS.
 #     yield_max_s / yield_poll_s: see YIELD below (defaults 3600 / 5). Env SEAT_MERGE_YIELD_MAX_S / SEAT_MERGE_YIELD_POLL_S.
+#     marker_exempt: repeatable: a path prefix the conflict-marker scan skips (default none). Env SEAT_MERGE_MARKER_EXEMPT
+#                   (newline-separated).
 #     idle_minutes: a builder worktree with a file changed this recently is kept (default 30). Env SEAT_MERGE_IDLE_MINUTES.
-# Env only: SEAT_MERGE_REPO (the directory to run in; a test seam), SEAT_MERGE_RUNTIME_DIR (default KIT_RUNTIME_DIR, the
+# Env only: SEAT_MERGE_LOG_DIR (where a refused run keeps its check log), SEAT_MERGE_REPO (the directory to run in; a test seam), SEAT_MERGE_RUNTIME_DIR (default KIT_RUNTIME_DIR, the
 #   runtime dir gate-throttle.sh and quiet-mode.sh share, else $HOME/.orchestration-kit/runtime; the lock and the tickets
 #   live there, never inside the worktree),
 #   SEAT_MERGE_ALLOW_SHARED_CHECKOUT=1 (skip the linked-worktree check; for tests that use plain clones).
@@ -65,6 +73,56 @@ SEAT_MERGE_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$SEAT_MERGE_LIB/lib-builder-worktree.sh"
 # shellcheck source=lib-waiting-tickets.sh
 . "$SEAT_MERGE_LIB/lib-waiting-tickets.sh"
+# shellcheck source=lib-git-retry.sh
+. "$SEAT_MERGE_LIB/lib-git-retry.sh"
+# shellcheck source=lib-conflict-markers.sh
+. "$SEAT_MERGE_LIB/lib-conflict-markers.sh"
+# shellcheck source=lib-mono-clock.sh
+. "$SEAT_MERGE_LIB/lib-mono-clock.sh"
+
+# One EXIT trap for the temp file, the running job and the kept log. There is NO TERM/INT/HUP trap here: they exist only around
+# the job that runs the install and the checks (signals_on / signals_off below), so a signal to the pid ends every other step at
+# once. bash defers a trapped signal until a FOREGROUND child ends, so a trap left on would slow a kill during a git step.
+glog="" job="" merge_ok="" checks_started=""
+seat_merge_signals_on() { trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM; }
+seat_merge_signals_off() { trap - HUP INT TERM; }
+# Runs "$@" as a background job writing to $glog, and waits for it: its pid is $job (the EXIT cleanup ends it), its status is the
+# return value. `wait` returns at once on a trapped signal, which a foreground child would defer. The job's output is redirected
+# HERE, not at the call: a redirect on the call is still open when a trapped signal runs the EXIT cleanup, and the cleanup's own
+# messages would land in the log instead of on stderr.
+seat_merge_bg_wait() {
+  local rc
+  "$@" >"$glog" 2>&1 &
+  job=$!
+  wait "$job"
+  rc=$?
+  job=""
+  return "$rc"
+}
+# Ends the running job: its direct children (a check's own processes) and the job itself. A process a check put in the
+# BACKGROUND itself survives; that is stated, not fixed.
+seat_merge_end_job() {
+  [ -n "$job" ] || return 0
+  pkill -TERM -P "$job" 2>/dev/null
+  kill -TERM "$job" 2>/dev/null
+  return 0
+}
+# A refused run keeps its check log (the temp file is removed at exit, so a red could not be classified afterwards). The trigger
+# is "the merge did not finish" (merge_ok), NOT the exit status: on TERM/INT/HUP bash runs the EXIT trap with $?=0. A green
+# run keeps nothing. The folder is SEAT_MERGE_LOG_DIR (default <runtime>/seat-merge/logs); its path and the last failure lines
+# go to stderr.
+keep_check_log() {
+  [ "$merge_ok" != 1 ] && [ -n "$checks_started" ] && [ -s "${glog:-}" ] || return 0
+  local dir dest
+  dir="${SEAT_MERGE_LOG_DIR:-$RT/seat-merge/logs}"
+  mkdir -p "$dir" 2>/dev/null || { echo "seat-merge: WARNING: could not create $dir; the check log was not kept" >&2; return 0; }
+  # tr before cut: cut's trailing newline is then the last character, which $( ) strips
+  dest="$dir/$(printf '%s' "${branch:-run}-${merged:-nomerge}" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-80)-$(date +%H%M%S)-$$.log"
+  cp -- "$glog" "$dest" 2>/dev/null || { echo "seat-merge: WARNING: could not copy the check log to $dest; it was not kept" >&2; return 0; }
+  { echo "seat-merge: check log kept: $dest"; grep -E 'FAIL|[Ff]ailed|[Aa]ssert|expected|not ok' "$glog" | tail -40; } >&2
+}
+cleanup() { seat_merge_end_job; keep_check_log; rm -f "${glog:-}"; }
+trap 'cleanup' EXIT
 
 cd "${SEAT_MERGE_REPO:-.}" || exit 2
 wt=$(git rev-parse --show-toplevel) || exit 2
@@ -86,6 +144,9 @@ FORMAT_CMD="${SEAT_MERGE_FORMAT_CMD:-$(conf_one format_cmd)}"
 INSTALL_CMD="${SEAT_MERGE_INSTALL_CMD:-$(conf_one install_cmd)}"
 CHECKS="${SEAT_MERGE_CHECKS:-$(conf_get check)}"
 ALLOWED_PATHS="${SEAT_MERGE_ALLOWED_PATHS:-$(conf_one allowed_paths)}"
+# Path prefixes the conflict-marker scan skips (files that hold markers on purpose, such as a doc that quotes them). One per
+# `marker_exempt:` line, or newline-separated in the env variable.
+MARKER_EXEMPT="${SEAT_MERGE_MARKER_EXEMPT:-$(conf_get marker_exempt)}"
 [ -n "$ALLOWED_PATHS" ] || ALLOWED_PATHS="docs/orchestration/ docs/timeline/build-log.md docs/AI_CONTEXT.md"
 yield_max="${SEAT_MERGE_YIELD_MAX_S:-$(conf_one yield_max_s)}"; yield_max="${yield_max:-3600}"
 yield_poll="${SEAT_MERGE_YIELD_POLL_S:-$(conf_one yield_poll_s)}"; yield_poll="${yield_poll:-5}"
@@ -132,6 +193,23 @@ done
 # <> opens read-write WITHOUT truncating, so a refused second run cannot erase the live holder's pid.
 exec 8<>"$lockfile" || exit 2
 if ! flock -n 8; then
+  # A killed seat-merge leaves its child (a test run) holding this lock. Still refused (that child may still write in the
+  # worktree), but an orphan is named with the command that frees it, not reported as another run. This run's own fd 8 is on the
+  # lock too, so $$ is left out of the holders. No visible holder (another user's process): the usual message.
+  live=0 orphans=""
+  # 8>&-: the command substitution's subshell (and its find) would inherit fd 8 and list itself as a holder.
+  for p in $(seat_merge_lock_holders "$lockfile" 8>&-); do
+    [ "$p" = "$$" ] && continue
+    [ -e "/proc/$p" ] || continue  # exited since the listing: no holder
+    if seat_merge_in_tree "$p"; then live=1; break; fi
+    orphans+="$p "
+  done
+  if [ "$live" = 0 ] && [ -n "$orphans" ]; then
+    for p in $orphans; do
+      echo "seat-merge: REFUSED — the lock for $wt is held only by orphan pid $p ($(tr '\0' ' ' 2>/dev/null <"/proc/$p/cmdline" | cut -c1-160)), not by a live seat-merge.sh (a killed merge's child). Free it with: kill $p, then run again." >&2
+    done
+    exit 1
+  fi
   echo "seat-merge: REFUSED — another seat-merge is running in $wt (pid $(tr -dc '0-9' <"$lockfile"))" >&2
   exit 1
 fi
@@ -146,7 +224,15 @@ fi
 # Tracked changes only: an untracked file cannot change a merge, and `git merge` itself refuses to overwrite one.
 [ -z "$(git status --porcelain --untracked-files=no)" ] || die "the tree has tracked changes (dirty). Commit them or use a clean merge worktree."
 
-git fetch origin || { sleep 2; git fetch origin; } || die "fetch failed"
+git_net seat-merge fetch origin || die "fetch failed"
+
+# HEAD must be on origin/main before anything reads from this tree. A format or check red leaves the worktree on its UNPUSHED
+# merge; the next run would then read config and scripts from the refused branch's tree. After the fetch: a HEAD pushed since the
+# last fetch is fine, and so is an older main. A conflict aborts back to main, so it needs no reset.
+if ! git merge-base --is-ancestor HEAD origin/main; then
+  stuck=$(git rev-parse --short=9 HEAD)
+  die "HEAD $stuck is not on origin/main: this worktree still sits on a refused merge or a local commit. Nothing was touched. In a builder worktree do NOT reset: unpushed commits on a detached HEAD are lost; use a merge worktree. Otherwise reset it, then re-run: cd \"$wt\" && git checkout --detach origin/main"
+fi
 
 tip=$(git rev-parse -q --verify "refs/remotes/origin/$branch^{commit}") || die "no origin/$branch (only origin/<branch> is ever merged, never a local branch of that name). Push it first."
 want=$(git rev-parse -q --verify "$expected^{commit}") || die "expected sha '$expected' is not a commit here"
@@ -160,6 +246,9 @@ fi
 echo "seat-merge: merging origin/$branch ${tip:0:9} \"$subject\""
 
 git checkout -q --detach origin/main || die "cannot detach at origin/main"
+# The conflict-marker exempt list was read above from THIS tree's config (origin/main, before the merge), never from the merged
+# tree, so a branch cannot exempt its own markers.
+CONFLICT_MARKERS_EXEMPT_TEXT="$MARKER_EXEMPT"; export CONFLICT_MARKERS_EXEMPT_TEXT
 if ! mout=$(git merge --no-ff -q -m "$msg" "$tip" 2>&1); then
   git merge --abort >/dev/null 2>&1
   if grep -q 'untracked working tree files' <<<"$mout"; then
@@ -172,6 +261,23 @@ merged=$(git rev-parse HEAD)
 reset_hint() {
   echo "seat-merge: this worktree is detached on an UNPUSHED merge (${merged:0:9}); never push it by hand. Reset it: cd \"$wt\" && git checkout --detach origin/main"
 }
+guard_refuse() {
+  {
+    echo "seat-merge: REFUSED. $1 NOT pushed."
+    echo "Fix it ON THE BRANCH (in its own worktree), commit, push, re-READ the new tip, then run seat-merge.sh again."
+    reset_hint
+  } >&2
+  exit 1
+}
+
+# ---- committed conflict markers, listed up front, BEFORE the format check (a file with markers usually fails the formatter first
+# and would hide the cause). The scan reads the MERGED tree (this worktree is at it). rc 2 = git itself failed: refuse, never "none".
+markers_out=$(conflict_markers_report "$wt"); markers_rc=$?
+if [ "$markers_rc" != 0 ]; then
+  printf '%s\n' "$markers_out" >&2
+  if [ "$markers_rc" = 1 ]; then guard_refuse "the merged tree has committed conflict markers (listed above)."; fi
+  guard_refuse "the conflict-marker scan could not run (above)."
+fi
 
 # ---- the format check, on the merged tree
 if [ -n "$FORMAT_CMD" ]; then
@@ -190,17 +296,9 @@ else
 fi
 
 # ---- the configured checks, on the merged tree
-guard_refuse() {
-  {
-    echo "seat-merge: REFUSED. $1 NOT pushed."
-    echo "Fix it ON THE BRANCH (in its own worktree), commit, push, re-READ the new tip, then run seat-merge.sh again."
-    reset_hint
-  } >&2
-  exit 1
-}
 # The net diff of the merge (merged^1..merged) is the tree under test.
 touched=$(git -c core.quotePath=false diff --no-renames --name-only "$merged^1" "$merged")
-glog=$(mktemp "${TMPDIR:-/tmp}/seat-merge-check-XXXXXX") && trap 'rm -f "$glog"' EXIT
+glog=$(mktemp "${TMPDIR:-/tmp}/seat-merge-check-XXXXXX") || guard_refuse "cannot make a temp file for the check log."
 touched_matches() {  # <globs>: does any changed path match any pattern? (a pattern's * matches any characters, '/' included)
   local g p rc=1
   set -f   # the patterns are matched below, never expanded against the current directory
@@ -233,19 +331,25 @@ for i in "${!names[@]}"; do
   if touched_matches "${globs[$i]}"; then selected+=("$i"); fi
 done
 if [ "${#selected[@]}" -gt 0 ]; then
+  checks_started=1
+  checks_t0=$(mono_now)
+  # Each command is a background job the script waits on, with the signal traps on only across it (see the top of this file).
+  seat_merge_signals_on
   if [ -n "$INSTALL_CMD" ]; then
     # A stale install in the merge worktree would give a false green after a dependency change.
-    bash -c "$INSTALL_CMD" >"$glog" 2>&1 || { tail -5 "$glog" >&2; guard_refuse "the install before the checks failed ($INSTALL_CMD)."; }
+    seat_merge_bg_wait bash -c "$INSTALL_CMD" || { seat_merge_signals_off; tail -5 "$glog" >&2; guard_refuse "the install before the checks failed ($INSTALL_CMD)."; }
   fi
   export SEAT_MERGE_TOUCHED="$touched" SEAT_MERGE_MERGED="$merged"
   for i in "${selected[@]}"; do
     export SEAT_MERGE_CHECK="${names[$i]}"
-    if ! bash -c "${cmds[$i]}" >"$glog" 2>&1; then
+    if ! seat_merge_bg_wait bash -c "${cmds[$i]}"; then
       echo "seat-merge: check '${names[$i]}' was red; rerunning once, alone"
-      bash -c "${cmds[$i]}" >"$glog" 2>&1 || { tail -20 "$glog" >&2; guard_refuse "the check '${names[$i]}' is red on the merged tree (twice)."; }
+      seat_merge_bg_wait bash -c "${cmds[$i]}" || { seat_merge_signals_off; tail -20 "$glog" >&2; guard_refuse "the check '${names[$i]}' is red on the merged tree (twice)."; }
     fi
     echo "seat-merge: check '${names[$i]}' green"
   done
+  seat_merge_signals_off
+  echo "seat-merge: checks took $(mono_elapsed "$checks_t0")s"
 elif [ "${#names[@]}" -eq 0 ]; then
   echo "seat-merge: no checks configured (add check: lines to the seat_merge: block); only the format check ran"
 else
@@ -282,8 +386,8 @@ push_refuse() {  # $1 = why. Nothing was pushed.
   exit 1
 }
 checked=$merged; base=$(git rev-parse "$merged^1"); tries=0
-until git push origin "$merged":main; do
-  git fetch origin || { sleep 2; git fetch origin; } || push_refuse "fetch failed after the rejected push."
+until git_net seat-merge push origin "$merged":main; do
+  git_net seat-merge fetch origin || push_refuse "fetch failed after the rejected push."
   [ "$(git rev-parse origin/main)" != "$(git rev-parse "$merged^1")" ] || push_refuse "origin/main did not move, so this is not a lost race."
   tries=$((tries + 1))
   [ "$tries" -le 3 ] || push_refuse "origin/main moved again on each of 3 retries; run seat-merge.sh again."
@@ -323,12 +427,16 @@ cleanup_builder_worktree() {  # $1 = branch
   if [ -n "$why" ]; then echo "seat-merge: kept builder worktree $path: $why"; return 0; fi
   path=$(cd "$path" && pwd -P)
   local idle="${SEAT_MERGE_IDLE_MINUTES:-30}" err
-  if err=$(git worktree remove "$path" 2>&1); then echo "seat-merge: removed builder worktree $path (clean: no tracked, untracked or non-rebuildable ignored file; no commit beyond origin/main; no file changed in $idle min; no process cwd inside)"
+  if err=$(worktree_remove_clean "$path" 2>&1); then echo "seat-merge: removed builder worktree $path (clean: no tracked, untracked or non-rebuildable ignored file; no commit beyond origin/main; no file changed in $idle min; no process cwd inside)"
   else echo "seat-merge: kept builder worktree $path: git refused to remove it ($(printf '%s' "$err" | head -1))"; fi
 }
 if git branch -r --contains "$merged" | grep -qE '^[[:space:]]*origin/main$'; then
+  merge_ok=1
   echo "seat-merge: pushed ${merged} (origin/main contains it) · ${retries}"
   cleanup_builder_worktree "$branch" || true
+  # Move the main checkout to the new origin/main (never fails a merge that is already pushed). This script refuses to run in the
+  # shared checkout, so the fast-forward never rewrites the file bash is reading.
+  bash "$SEAT_MERGE_LIB/sync-main-checkout.sh" || true
 else
   echo "seat-merge: pushed ${merged} but origin/main does not list it" >&2
   exit 1

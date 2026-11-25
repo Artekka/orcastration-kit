@@ -84,13 +84,17 @@ bg A "$TMP/a"; waitfor "start A"
 printf '%s\n' "$TMP/link" > "$KIT_RUNTIME_DIR/gate-priority.txt"
 bg P "$TMP/real"; waitfor "start P" 5 && ok || bad "a priority line through a symlink did not match the real dir"
 release A; release P; waitfor "end P"
-# a trailing "/" means "inside this directory", not the directory itself
+# a trailing "/" names the directory itself AND everything inside it (pwd -P has no trailing slash, so the list line is compared to "$here/")
 reset
 bg A "$TMP/a"; waitfor "start A"
 printf '%s\n' "$TMP/d/" > "$KIT_RUNTIME_DIR/gate-priority.txt"
 bg S "$TMP/d/sub"; waitfor "start S" 5 && ok || bad "a trailing-slash priority line did not cover a subdirectory"
-bg D "$TMP/d"; sleep 0.5
-! grep -qx "start D" "$LOG" && ok || bad "a trailing-slash priority line also covered the directory itself"
+release S; waitfor "end S"   # the priority slot is free again: D can only start through the list line
+bg D "$TMP/d"; waitfor "start D" 5 && ok || bad "a trailing-slash priority line did not cover the directory itself"
+# a sibling that only shares the name prefix is not covered
+mkdir -p "$TMP/dx"; bg X "$TMP/dx"; sleep 0.5
+! grep -qx "start X" "$LOG" && ok || bad "a trailing-slash priority line covered a sibling that only shares its name prefix"
+release X
 release A; release S; release D; waitfor "end D"
 
 # ── 4. ONE slot per worktree ──────────────────────────────────────────────────
@@ -310,6 +314,27 @@ else
   echo "gate-throttle-port: 8e skipped (no user+pid namespaces)"
 fi
 
+
+# ── 9. a TERM while still joining the line exits 143 and leaves no ticket, no half-made ticket ──
+# The seam (KIT_THROTTLE_TICKET_GAP) holds the script at a named stop: pre = traps in, no ticket yet; tmp = ticket written to
+# .new.<pid>, not renamed; ticket = ticket in the line. The test sees "<prefix>.<stop>.mid" appear, then sends TERM.
+for stop in pre tmp ticket; do
+  reset; mkdir -p "$TMP/gap"; rm -f "$TMP/gap/g".*; mkfifo "$TMP/gap/g.$stop.go"
+  (cd "$TMP/a" && exec env KIT_THROTTLE_TICKET_GAP="$TMP/gap/g" bash "$GT" true 2>>"$TMP/err") & tp=$!; PIDS+=($tp)
+  i=0; while [ ! -e "$TMP/gap/g.$stop.mid" ] && [ "$i" -lt 100 ]; do i=$((i+1)); sleep 0.05; done
+  [ -e "$TMP/gap/g.$stop.mid" ] && ok || bad "9 $stop: the script never reached the stop"
+  held_t="$(ls "$KIT_RUNTIME_DIR/queue" 2>/dev/null | grep -cE '^[0-9]{10}\.')"; held_n="$(ls -A "$KIT_RUNTIME_DIR/queue" 2>/dev/null | grep -c '^\.new\.')"
+  case "$stop" in pre) eq "9 pre: no ticket yet" "00" "$held_t$held_n" ;; tmp) eq "9 tmp: only the half-made ticket" "01" "$held_t$held_n" ;; ticket) eq "9 ticket: one ticket" "10" "$held_t$held_n" ;; esac
+  kill -TERM "$tp"; wait "$tp" 2>/dev/null; rc=$?
+  eq "9 $stop: TERM exits 143" 143 "$rc"
+  eq "9 $stop: no ticket left" 0 "$(ls "$KIT_RUNTIME_DIR/queue" 2>/dev/null | grep -cE '^[0-9]{10}\.')"
+  eq "9 $stop: no half-made ticket left" 0 "$(ls -A "$KIT_RUNTIME_DIR/queue" 2>/dev/null | grep -c '^\.new\.')"
+done
+# the seam is inert without its FIFO (a plain file at .go changes nothing)
+reset; mkdir -p "$TMP/gap"; : > "$TMP/gap/h.ticket.go"
+out="$(cd "$TMP/a" && KIT_THROTTLE_TICKET_GAP="$TMP/gap/h" timeout 20 bash "$GT" bash -c 'exit 7' 2>/dev/null; echo "rc=$?")"
+has "9 the seam is inert without a FIFO: the payload ran, its code passed through" "rc=7" "$out"
+[ ! -e "$TMP/gap/h.ticket.mid" ] && ok || bad "9 a plain file at .go took a stop"
 
 echo "gate-throttle-port: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

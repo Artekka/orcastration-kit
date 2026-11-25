@@ -59,7 +59,7 @@ eq "T2 merge message" "merge: feat" "$(git -C "$SB/origin.git" log -1 --format=%
 
 # 3. only origin/<branch> is ever merged: a stale local branch of the same name in the merge clone is ignored
 sandbox; branch feat src/b.txt new
-G -C "$SB/merge" checkout -q -b feat; echo evil > "$SB/merge/src/evil.txt"; G -C "$SB/merge" add -A; G -C "$SB/merge" commit -q -m "local only"
+G -C "$SB/merge" checkout -q -b feat; echo evil > "$SB/merge/src/evil.txt"; G -C "$SB/merge" add -A; G -C "$SB/merge" commit -q -m "local only"; G -C "$SB/merge" checkout -q main
 sm -- feat "$BSHA" "merge: feat"
 eq "T3 exit 0" 0 "$RC"; eq "T3 the local-only commit never reached main" "" "$(git -C "$SB/origin.git" ls-tree -r --name-only main | grep evil || true)"
 eq "T3 the pushed file did" src/b.txt "$(git -C "$SB/origin.git" ls-tree -r --name-only main | grep 'b.txt')"
@@ -88,7 +88,8 @@ sandbox; branch feat src/b.txt new; before=$(omain)
 sm SEAT_MERGE_FORMAT_CMD='echo "[warn] src/b.txt"; echo "[warn] Code style issues found"; exit 1' -- feat "$BSHA" "m"
 eq "T7 exit 1" 1 "$RC"; has "T7 refused" "The format check failed on the merged tree. NOT pushed." "$ERR"; has "T7 lists the file" "Files: src/b.txt" "$ERR"; has "T7 reset hint" "git checkout --detach origin/main" "$ERR"
 eq "T7 main untouched" "$before" "$(omain)"; eq "T7 worktree detached on the merge" "" "$(git -C "$SB/merge" symbolic-ref -q HEAD || true)"
-# the format command sees the merged tree
+# the format command sees the merged tree (after the red above the worktree needs the printed reset first)
+G -C "$SB/merge" checkout -q --detach origin/main
 sm SEAT_MERGE_FORMAT_CMD='test -f src/b.txt' -- feat "$BSHA" "m"; eq "T7 the check ran on the merged tree" 0 "$RC"
 # no format check configured = a note, not a failure
 sandbox; branch feat src/b.txt new; sm SEAT_MERGE_FORMAT_CMD= -- feat "$BSHA" "m"; eq "T7 no format check: exit 0" 0 "$RC"; has "T7 says skipped" "no format check configured" "$OUT"
@@ -115,6 +116,7 @@ sandbox; branch feat src/b.txt new; before=$(omain)
 sm SEAT_MERGE_CHECKS="flaky | * | [ -f $SB/n ] || { touch $SB/n; exit 1; }" -- feat "$BSHA" "m"; eq "T9 red once = rerun, then green" 0 "$RC"; has "T9 says it reran" "was red; rerunning once" "$OUT"
 sandbox; branch feat src/b.txt new; before=$(omain)
 sm SEAT_MERGE_CHECKS="broken | * | echo boom; exit 1" -- feat "$BSHA" "m"; eq "T9 red twice refuses" 1 "$RC"; has "T9 names the check" "the check 'broken' is red on the merged tree (twice)" "$ERR"; eq "T9 main untouched" "$before" "$(omain)"
+G -C "$SB/merge" checkout -q --detach origin/main   # the red above left the worktree on its merge
 sm SEAT_MERGE_CHECKS="no-pipes-here" -- feat "$BSHA" "m"; eq "T9 a malformed check line refuses" 1 "$RC"; has "T9 malformed text" "malformed" "$ERR"
 sandbox; branch feat src/b.txt new; sm -- feat "$BSHA" "m"; has "T9 no checks configured is said, not silent" "no checks configured" "$OUT"
 
@@ -147,6 +149,7 @@ RC=0; env HOME="$SB/home" SEAT_MERGE_REPO="$SB/merge" SEAT_MERGE_RUNTIME_DIR="$S
 eq "T12 second run refused" 1 "$RC"; has "T12 names the holder pid" "another seat-merge is running" "$(cat "$SB/err2")"; has "T12 with its pid" "(pid $holder)" "$(cat "$SB/err2")"
 kill "$(cat "$SB/fmtpid")" 2>/dev/null; wait "$first" 2>/dev/null
 eq "T12 the first run ended refused (format red), not pushed" 1 "$(cat "$SB/first.rc" 2>/dev/null)"
+G -C "$SB/merge" checkout -q --detach origin/main
 sm -- feat "$BSHA" "m"; eq "T12 a dead holder's lock file never blocks" 0 "$RC"
 
 # 13. yield to a waiting ticket, bounded
@@ -229,11 +232,11 @@ has "T19 the header says the config is read before the merge" "read BEFORE the m
 # 20. templates/ORCHESTRATION.md documents the seat_merge: block: every hook, a recommended `*` check, and the block parses
 T="$ROOT/templates/ORCHESTRATION.md"
 tb="$(awk '/^seat_merge:[[:space:]]*$/{on=1;print;next} on&&/^[[:space:]]+[a-z_]+:/{print;next} on{exit}' "$T")"
-for k in format_cmd install_cmd check allowed_paths yield_max_s yield_poll_s idle_minutes; do
+for k in format_cmd install_cmd check allowed_paths yield_max_s yield_poll_s idle_minutes marker_exempt; do
   has "T20 template seat_merge: block carries $k" "  $k:" "$tb"
 done
 has "T20 the recommended check runs on every merge (globs *)" "| * |" "$tb"
-for k in format_cmd install_cmd allowed_paths yield_max_s yield_poll_s idle_minutes SEAT_MERGE_RUNTIME_DIR; do
+for k in format_cmd install_cmd allowed_paths yield_max_s yield_poll_s idle_minutes marker_exempt SEAT_MERGE_LOG_DIR SEAT_MERGE_RUNTIME_DIR; do
   has "T20 the template prose explains $k" "$k" "$(cat "$T")"
 done
 sandbox; branch feat src/b.txt new
@@ -241,6 +244,139 @@ mkdir -p "$SB/merge/docs/orchestration"
 sed -E 's/<[^>]*>/true/g' "$T" > "$SB/merge/docs/orchestration/ORCHESTRATION.md"
 sm SEAT_MERGE_FORMAT_CMD= SEAT_MERGE_CHECKS= SEAT_MERGE_ALLOWED_PATHS= -- feat "$BSHA" "m"
 eq "T20 the template's block runs as written (placeholders filled)" 0 "$RC"; has "T20 its * check ran" "check '" "$OUT"
+
+
+# ---- ported fixes (kit 0.15.1) ----
+reset_wt() { G -C "$SB/merge" checkout -q --detach origin/main; }
+lockfile_of() { printf '%s/rt/seat-merge/%s.lock' "$SB" "$(printf %s "$(cd "$SB/merge" && git rev-parse --show-toplevel)" | sha256sum | cut -c1-16)"; }
+M7='<<<<<<<'; M8='======='; M9='>>>>>>>'
+
+# 21. committed conflict markers in the merged tree are listed and refused BEFORE the format check; nothing is pushed
+sandbox; branch feat src/b.txt "$(printf 'x\n%s HEAD\nmine\n%s\ntheirs\n%s other\n' "$M7" "$M8" "$M9")"; before=$(omain)
+sm SEAT_MERGE_FORMAT_CMD="touch $SB/fmt-ran" -- feat "$BSHA" "m"
+eq "T21 exit 1" 1 "$RC"; has "T21 says markers" "committed conflict markers" "$ERR"; has "T21 lists file and line" "src/b.txt:2: $M7 HEAD" "$ERR"
+eq "T21 refused before the format check" no "$([ -e "$SB/fmt-ran" ] && echo yes || echo no)"; eq "T21 main untouched" "$before" "$(omain)"; has "T21 reset hint" "git checkout --detach origin/main" "$ERR"
+# a lone ======= (a setext underline) is not a conflict
+sandbox; branch feat src/b.txt "$(printf 'Title\n%s\nbody\n' "$M8")"; sm -- feat "$BSHA" "m"; eq "T21 a lone rule line merges" 0 "$RC"
+# markdown is scanned; an exempt prefix (config line or env) is skipped
+sandbox; branch feat docs/n.md "$(printf '%s a\nb\n%s\nc\n%s z\n' "$M7" "$M8" "$M9")"; sm -- feat "$BSHA" "m"; eq "T21 markdown is scanned" 1 "$RC"; reset_wt
+sm SEAT_MERGE_MARKER_EXEMPT=$'# quoted on purpose\ndocs/n.md' -- feat "$BSHA" "m"; eq "T21 an exempt prefix is skipped" 0 "$RC"
+# the exempt list comes from the tree BEFORE the merge: a branch that adds its own exemption does not get it
+sandbox; mkdir -p "$SB/builder/docs/orchestration"; printf 'seat_merge:\n  check: ok | docs/none/* | true\n' > "$SB/builder/docs/orchestration/ORCHESTRATION.md"
+G -C "$SB/builder" add -A; G -C "$SB/builder" commit -qm conf; G -C "$SB/builder" push -q origin main; G -C "$SB/merge" pull -q
+G -C "$SB/builder" fetch -q origin; G -C "$SB/builder" checkout -q -B feat origin/main
+printf 'seat_merge:\n  marker_exempt: src/\n  check: ok | docs/none/* | true\n' > "$SB/builder/docs/orchestration/ORCHESTRATION.md"; mkdir -p "$SB/builder/src"; printf '%s a\nb\n%s\nc\n%s z\n' "$M7" "$M8" "$M9" > "$SB/builder/src/q.txt"
+G -C "$SB/builder" add -A; G -C "$SB/builder" commit -qm "feat: self-exempt"; G -C "$SB/builder" push -q -f origin feat; BSHA=$(git -C "$SB/builder" rev-parse HEAD)
+sm -- feat "$BSHA" "m"; eq "T21 a branch cannot exempt its own markers" 1 "$RC"; has "T21 names the file" "src/q.txt" "$ERR"
+
+# 22. TERM, INT and HUP end the run at once as 128+n, end the running check, and keep the check log
+for sg in TERM:143 INT:130 HUP:129; do
+  name=${sg%%:*}; want=${sg##*:}
+  sandbox; branch feat src/b.txt new; before=$(omain)
+  ( env HOME="$SB/home" PATH="$SB/bin:$PATH" SEAT_MERGE_REPO="$SB/merge" SEAT_MERGE_RUNTIME_DIR="$SB/rt" SEAT_MERGE_ALLOW_SHARED_CHECKOUT=1 SEAT_MERGE_FORMAT_CMD=true \
+      SEAT_MERGE_CHECKS="slow | * | echo 'FAIL-line from the check'; echo \$\$ > $SB/chk.pid; sleep 60" \
+      python3 -c 'import os, signal, sys; signal.signal(signal.SIGINT, signal.SIG_DFL); os.execvp("bash", ["bash"] + sys.argv[1:])' "$SM" feat "$BSHA" "m" >"$SB/out" 2>"$SB/err" </dev/null; echo $? > "$SB/rc" ) & smpid=$!; PIDS+=("$smpid")
+  # (a background job of a non-interactive shell starts with SIGINT ignored, and an ignored signal cannot be trapped: the launcher above restores it)
+  for _ in $(seq 1 50); do [ -s "$SB/chk.pid" ] && break; sleep 0.1; done
+  chkpid=$(cat "$SB/chk.pid" 2>/dev/null)
+  # the subshell's child is the script: signal the script itself, not the subshell
+  scr=$(pgrep -P "$smpid" -f seat-merge.sh | head -n1); [ -n "$scr" ] || scr=$smpid
+  kill -s "$name" "$scr"; t0=$SECONDS; wait "$smpid" 2>/dev/null
+  eq "T22 $name exits $want" "$want" "$(cat "$SB/rc")"; [ $((SECONDS - t0)) -le 5 ] && ok || bad "T22 $name took over 5 s to end the run"
+  sleep 0.3; eq "T22 $name: the check is gone" no "$(kill -0 "$chkpid" 2>/dev/null && echo yes || echo no)"
+  has "T22 $name: the log is kept" "check log kept:" "$(cat "$SB/err")"; has "T22 $name: its failure line is shown" "FAIL-line from the check" "$(cat "$SB/err")"
+  eq "T22 $name: main untouched" "$before" "$(omain)"
+done
+
+# 23. every origin fetch and push retries a TRANSIENT denial, never a rejection by the remote
+sandbox; branch feat src/b.txt new; real_git=$(command -v git)
+cat > "$SB/bin/git" <<EOF
+#!/usr/bin/env bash
+case "\$1" in fetch|push) n=\$(cat "$SB/n.\$1" 2>/dev/null || echo 0); echo \$((n+1)) > "$SB/n.\$1"
+  lim=0; [ "\$1" = fetch ] && lim=\${FAIL_fetch:-0}; [ "\$1" = push ] && lim=\${FAIL_push:-0}
+  if [ "\$n" -lt "\$lim" ]; then echo "git@host: Permission denied (publickey)." >&2; echo "fatal: Could not read from remote repository." >&2; exit 128; fi ;; esac
+exec "$real_git" "\$@"
+EOF
+chmod +x "$SB/bin/git"
+sm GIT_NET_BACKOFF_S=0 FAIL_fetch=2 FAIL_push=1 -- feat "$BSHA" "m"
+eq "T23 exit 0 after transient denials" 0 "$RC"; has "T23 says it retried the fetch" "transient git failure, retry 1/7" "$ERR"; eq "T23 the push ran twice (one denial)" 2 "$(cat "$SB/n.push")"
+# all denied: gives up, the caller's refusal runs, nothing pushed
+sandbox; branch feat src/b.txt new; cp "$SB/../$(basename "$SB")/bin/git" "$SB/bin/git" 2>/dev/null
+cat > "$SB/bin/git" <<EOF
+#!/usr/bin/env bash
+case "\$1" in fetch) echo "ssh: connect to host h port 22: Connection timed out" >&2; exit 128 ;; esac
+exec "$real_git" "\$@"
+EOF
+chmod +x "$SB/bin/git"; before=$(omain)
+sm GIT_NET_BACKOFF_S=0 GIT_NET_TRIES=3 -- feat "$BSHA" "m"; eq "T23 gives up: exit 1" 1 "$RC"; has "T23 says gave up" "gave up after 3 tries" "$ERR"; has "T23 the refusal runs" "fetch failed" "$ERR"; eq "T23 main untouched" "$before" "$(omain)"
+# a rejection by the remote is never retried (one push call, then the plain refusal)
+sandbox; branch feat src/b.txt new
+cat > "$SB/bin/git" <<EOF
+#!/usr/bin/env bash
+[ "\$1" = push ] && echo x >> "$SB/pushes"
+exec "$real_git" "\$@"
+EOF
+chmod +x "$SB/bin/git"; printf '#!/bin/sh\necho "remote: denied by hook" >&2\nexit 1\n' > "$SB/origin.git/hooks/pre-receive"; chmod +x "$SB/origin.git/hooks/pre-receive"
+sm GIT_NET_BACKOFF_S=0 -- feat "$BSHA" "m"; eq "T23 rejected push: exit 1" 1 "$RC"; eq "T23 rejected push ran once" 1 "$(wc -l < "$SB/pushes")"; hasnt "T23 no retry line" "transient" "$ERR"
+
+# 24. HEAD must be on origin/main at the start: a re-run after a red needs the printed reset first
+sandbox; branch feat src/b.txt new; before=$(omain)
+sm SEAT_MERGE_CHECKS="red | * | exit 1" -- feat "$BSHA" "m"; eq "T24 the first run is red" 1 "$RC"
+sm -- feat "$BSHA" "m"; eq "T24 a re-run without the reset is refused" 1 "$RC"; has "T24 says HEAD is not on origin/main" "is not on origin/main" "$ERR"; has "T24 prints the reset" "git checkout --detach origin/main" "$ERR"; eq "T24 main untouched" "$before" "$(omain)"
+reset_wt; sm -- feat "$BSHA" "m"; eq "T24 after the reset it merges" 0 "$RC"
+# a local commit on the merge worktree is refused too, and nothing is touched
+sandbox; branch feat src/b.txt new; echo local > "$SB/merge/src/loc.txt"; G -C "$SB/merge" add src/loc.txt; G -C "$SB/merge" commit -qm "local commit"; h0=$(git -C "$SB/merge" rev-parse HEAD)
+sm -- feat "$BSHA" "m"; eq "T24 local commit: refused" 1 "$RC"; eq "T24 HEAD untouched" "$h0" "$(git -C "$SB/merge" rev-parse HEAD)"
+
+# 25. stage time comes from the monotonic clock ($MONO_CLOCK_FILE is the seam), never $SECONDS
+sandbox; branch feat src/b.txt new; echo "100.00 5.00" > "$SB/mono"
+sm MONO_CLOCK_FILE="$SB/mono" SEAT_MERGE_CHECKS="clk | * | echo 107.60 1.0 > $SB/mono" -- feat "$BSHA" "m"
+eq "T25 exit 0" 0 "$RC"; has "T25 the check time is the clock's span" "checks took 7s" "$OUT"
+sandbox; branch feat src/b.txt new; echo "100.00 5.00" > "$SB/mono"
+sm MONO_CLOCK_FILE="$SB/mono" SEAT_MERGE_CHECKS="clk | * | echo 90.00 1.0 > $SB/mono" -- feat "$BSHA" "m"; has "T25 a clock that went back prints 0, not a negative" "checks took 0s" "$OUT"
+
+# 26. an orphan holding the lock is named with the command that clears it; a live seat-merge is still "another seat-merge"
+sandbox; branch feat src/b.txt new; mkdir -p "$SB/rt/seat-merge"; lk=$(lockfile_of)
+bash -c 'exec 8<>"$0"; flock -n 8 || exit 9; exec sleep 120' "$lk" & orph=$!; PIDS+=("$orph"); sleep 0.3
+sm -- feat "$BSHA" "m"; eq "T26 orphan: exit 1" 1 "$RC"; has "T26 names the orphan pid" "held only by orphan pid $orph" "$ERR"; has "T26 gives the clearing command" "kill $orph" "$ERR"
+kill "$orph" 2>/dev/null; wait "$orph" 2>/dev/null
+bash -c 'exec 8<>"$0"; flock -n 8 || exit 9; exec -a seat-merge.sh sleep 120' "$lk" & live=$!; PIDS+=("$live"); sleep 0.3
+sm -- feat "$BSHA" "m"; eq "T26 live holder: exit 1" 1 "$RC"; has "T26 live holder: another seat-merge" "another seat-merge is running" "$ERR"; hasnt "T26 not called an orphan" "orphan" "$ERR"
+
+# 27. after a pushed merge the main checkout is moved on (sync-main-checkout.sh runs; it never fails the merge)
+sandbox; branch feat src/b.txt new; sm -- feat "$BSHA" "m"
+eq "T27 exit 0" 0 "$RC"; has "T27 the sync line is printed" "main-checkout:" "$OUT"
+
+
+# 28. the builder-worktree removal check: an untracked node_modules SYMLINK is rebuildable (and unlinked, never its target),
+#     python bytecode is rebuildable output, and a cone sparse tree's hidden files outside its set do not keep it forever
+. "$ROOT/scripts/lib-builder-worktree.sh"
+bw_new() {  # <name>: a clean builder worktree on its own branch at origin/main; sets W
+  sandbox; G -C "$SB/merge" fetch -q; W="$SB/$1"; G -C "$SB/merge" worktree add -q "$W" -b "br-$1" origin/main
+}
+blocker() { ( cd "$SB/merge" && SEAT_MERGE_IDLE_MINUTES=0 worktree_removal_blocker "$W" "br-$1" "" ); }
+bw_new a; mkdir "$SB/realnm"; echo keep > "$SB/realnm/x"; ln -s "$SB/realnm" "$W/node_modules"
+eq "T28 an untracked node_modules symlink is not work" "" "$(blocker a)"
+( cd "$SB/merge" && worktree_remove_clean "$W" ) >/dev/null 2>&1; eq "T28 remove_clean removes the tree" no "$([ -d "$W" ] && echo yes || echo no)"; eq "T28 the link's target is untouched" keep "$(cat "$SB/realnm/x")"
+bw_new b; mkdir "$W/node_modules"; echo mine > "$W/node_modules/x"
+has "T28 a real untracked node_modules directory is work" "uncommitted or untracked" "$(blocker b)"
+bw_new c; ln -s "$SB/rl" "$W/node_modules"; echo wip > "$W/notes.txt"
+( cd "$SB/merge" && worktree_remove_clean "$W" ) >"$SB/o" 2>&1; rc=$?; eq "T28 remove_clean refuses another untracked file" 1 "$rc"; has "T28 says which" "notes.txt" "$(cat "$SB/o")"; eq "T28 and unlinks nothing" yes "$([ -L "$W/node_modules" ] && echo yes || echo no)"
+bw_new d; printf '__pycache__/\nsecret.env\n' >> "$SB/merge/.git/info/exclude"; mkdir -p "$W/src/__pycache__"; : > "$W/src/__pycache__/m.pyc"
+eq "T28 ignored python bytecode is rebuildable output" "" "$(blocker d)"
+: > "$W/secret.env"; has "T28 another ignored file keeps the tree" "ignored file that is not rebuildable output (secret.env)" "$(blocker d)"
+bw_new e; G -C "$W" sparse-checkout init --cone; G -C "$W" sparse-checkout set src
+eq "T28 a cone tree: hidden files outside its set do not keep it" "" "$(blocker e)"
+G -C "$W" update-index --assume-unchanged src/a.txt; has "T28 a lowercase assume-unchanged tag keeps it, sparse or not" "skip-worktree or assume-unchanged file (h src/a.txt)" "$(blocker e)"
+G -C "$W" update-index --no-assume-unchanged src/a.txt
+# with sparse.expectFilesOutsideOfPatterns a PRESENT file outside the set keeps its S bit and status hides it: that may be work
+G -C "$W" config sparse.expectFilesOutsideOfPatterns true; mkdir -p "$W/docs/orchestration"; echo work > "$W/docs/orchestration/BOARD.md"
+has "T28 a present file outside the set is kept" "skip-worktree or assume-unchanged file (S docs/orchestration/BOARD.md)" "$(blocker e)"
+bw_new f; G -C "$W" update-index --skip-worktree src/a.txt; has "T28 a non-sparse tree keeps a skip-worktree file" "skip-worktree or assume-unchanged file" "$(blocker f)"
+
+# 29. the merged row's builder worktree with only a node_modules symlink extra is removed by seat-merge itself
+sandbox; branch feat src/b.txt new; G -C "$SB/merge" fetch -q; G -C "$SB/merge" worktree add -q "$SB/bw" -b feat origin/feat; mkdir "$SB/shared-nm"; ln -s "$SB/shared-nm" "$SB/bw/node_modules"
+sm SEAT_MERGE_IDLE_MINUTES=0 -- feat "$BSHA" "m"; has "T29 removed the worktree that held a node_modules link" "removed builder worktree" "$OUT"; eq "T29 it is gone" no "$([ -d "$SB/bw" ] && echo yes || echo no)"; eq "T29 the install behind the link stays" yes "$([ -d "$SB/shared-nm" ] && echo yes || echo no)"
 
 echo "seat-merge: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
