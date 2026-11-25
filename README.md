@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/orcastration-kit-logo.png" alt="Orcastration Kit logo: an orca leaping from a wave beside a gear" width="520"></p>
+
 # orchestration-kit
 
 Run **several Claude Code sessions on one repo at the same time** without file collisions,
@@ -146,6 +148,8 @@ row claim, in wave trains. Full sessions retro, reply "retro complete", and are 
 Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
+
+v0.16.2: the Orcastration Kit logo at the top of this README.
 
 v0.16.1: the merge script and the throttle take the fixes of the project they came from: committed conflict markers are refused, a signal ends a merge run at once, fetches and pushes retry transient denials, an orphan holding the lock is named, and a priority line ending in `/` matches its own tree.
 

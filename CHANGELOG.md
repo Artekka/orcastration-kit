@@ -4,6 +4,10 @@ Newest first.
 
 ## Unreleased
 
+## 0.16.2 — 2026-11-25
+
+- **Added: the Orcastration Kit logo** (`assets/orcastration-kit-logo.png`), shown at the top of the README. No script, skill or hook changed.
+
 ## 0.16.1 — 2026-11-24
 
 The merge script and the throttle take the fixes their source project made after the first port.
