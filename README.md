@@ -195,6 +195,8 @@ Every rule traces to a paid-for incident — see `docs/LESSONS.md`.
 
 ## What's new
 
+v0.18.0: the kit now removes idle merged worktrees and old build output by itself, dry run first; see Disk sweep below to turn it off.
+
 v0.17.0: the plugin id is `orcastration-kit`, spelled like the product; see Upgrading from 0.16 above for the one install step.
 
 v0.16.3: the title reads Orcastration Kit and the README carries the banner; the plugin id is unchanged.
@@ -244,6 +246,43 @@ A team that builds, tests and deploys all day fills a disk: worktrees nobody rem
 | `scripts/gate-disk-guard.sh` (`gate-throttle.sh` runs it before it queues) | nothing: it REFUSES to start a gate when free space is under the minimum | the disk as it was. The minimum is `KIT_GATE_MIN_FREE_GB`, or `gate_min_free_gb:` in the team block, default 20 GB; `0` turns it off; `KIT_GATE_DISK_PATH` picks the disk (default `/`). |
 
 Try them without changing anything: `bash scripts/retro-worktrees.sh --prefix s5e307/ --dry-run` prints `would remove N, kept M` with the reason for every tree it keeps, and `bash scripts/docker-cache-cap.sh --dry-run` prints the command it would run. `bootstrap.sh` and the `kit-init` skill copy all three scripts (and the worktree safety check that `retro-worktrees.sh` and `seat-merge.sh` share).
+
+## Disk sweep
+
+Since 0.18.0 the kit cleans up after itself. In a kit project (one with `docs/orchestration/.kit-hooks`), the SessionStart hook
+starts `scripts/disk-sweep-cron.sh` in the background at most once a day, and `gate-disk-guard.sh` starts it early when free
+space is under the floor (`KIT_SWEEP_FLOOR_GB`, or `disk_sweep_floor_gb:` in the team block, default 50 GB). It runs at low
+priority, one sweep per machine at a time, and never makes a session start wait. A running gate does not stop it: its keep
+rules protect anything in use.
+
+- **The first run on a machine is a dry run.** The next session start shows its report. From the second run it removes.
+- **Turn it off:** `bash <kit>/scripts/disk-sweep.sh --off` (on again: `--on`; `--status` shows which).
+- **Run it by hand:** `bash <kit>/scripts/disk-sweep.sh [--repo DIR]` is a dry run; add `--apply` to remove, `--urgent` for
+  shorter ages (automatic at 85% used).
+
+| It removes | It keeps |
+|---|---|
+| a worktree merged into origin's default branch, clean, untouched 2 days (urgent: 1) | the main checkout and the tree it runs in; a locked tree (`git worktree lock`); a tree an open board line names; a tree a running process uses (its folder, an open file, a command line); a tree a Docker compose project uses; a file changed inside the age; a file git ignores that is not build output (a `.env`, for example) |
+| an unmerged worktree, clean, untouched 14 days, when origin has the SAME tip (the branch stays) | a tip origin lacks or that differs from origin's |
+| a detached worktree on a commit no remote has, untouched 14 days, after `refs/kit-sweep-keep/<folder>` is written and read back | |
+| a worktree with unsaved work, untouched 14 days, AFTER its work is saved and read back (`changes.patch`, `files.tar`, `info.txt` with the undo steps, under `~/.orcastration-kit/disk-sweep/saved/`; removed after 30 days) | a tree with a hidden edit (skip-worktree, assume-unchanged) or whose save fails: listed under "needs a decision" |
+| ignored `node_modules` copied by npm or yarn, and ignored build output found by content (`index.html` + `assets/`), inside idle worktrees | pnpm's hard-linked `node_modules`; tracked folders |
+| `playwright-artifacts-*`, `playwright_chromiumdev_profile-*`, `.org.chromium.Chromium.*` in the temp folder, untouched 6 h | anything a process holds |
+| Docker build cache over max(20 GB, 1.5 x the largest image), at most 40% of free space; the freed number is Docker's own | images, volumes, containers (never `docker system prune`) |
+| with `KIT_SWEEP_SCRATCH` set: `node_modules`, build output and browser profiles inside a scratch folder untouched 7 days (a line goes to `PURGED.txt` first) | a folder holding `.keep`; git checkouts |
+
+**Where the report goes:** `~/.orcastration-kit/disk-sweep/reports/<repo>-<id>/<date>-<time>.txt` (`-dry-run.txt` for a dry
+run; `KIT_SWEEP_REPORT_DIR` overrides it). Its first lines: free space before and after, freed per class, kept per reason, what
+needs a decision, the saved bundles. The scheduled runs log to `~/.orcastration-kit/disk-sweep/cron.log`.
+
+**Why node_modules matters:** pnpm hard-links every package file to one store, so a worktree's install costs almost nothing
+(measured: 0.4 MB of unshared files for a six-package set). npm and yarn copy every file into every worktree (56 MB for the
+same set; often 0.3 to 1.5 GB for a real project). On npm or yarn the install is often a worktree's largest cost.
+
+Config: `KIT_SWEEP_SCRATCH`, `KIT_SWEEP_TMP` (default `$TMPDIR`, else `/tmp`), `KIT_SWEEP_DOCKER`, `KIT_SWEEP_CACHE_CAP` (GB),
+`KIT_SWEEP_URGENT_PCT`, `KIT_SWEEP_PROTECTED` (a colon list never touched), `KIT_SWEEP_REPORT_DIR`, `KIT_SWEEP_SAVE_DIR`,
+`KIT_SWEEP_FLOOR_GB`, `KIT_SWEEP_AUTO=0` (no automatic start). Works on Linux, WSL and macOS (no `ionice`, `setsid` or `flock`
+needed; bash 3.2+).
 
 ## If you use tmux
 

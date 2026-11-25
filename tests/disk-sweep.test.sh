@@ -98,7 +98,7 @@ has "with no --repo the current repo is swept" "would remove $a" "$out"
 sandbox; tree s1/a 1 1; a="$TREE"
 out="$(ds -- --apply)"; has "a file changed inside the age (2 days) keeps a merged tree" "kept $a" "$out"; there "a fresh merged tree stays" "$a"
 out="$(ds -- --apply --urgent)"; gone "--urgent shortens the age to 1 day" "$a"
-sandbox; tree s1/a 1 1.5; a="$TREE"
+sandbox; tree s1/a 1; a="$TREE"; find "$a" -exec touch -h -d '36 hours ago' {} +   # touch cannot parse "1.5 days"
 out="$(ds FAKE_PCT=90 -- --apply)"; has "85% used or more turns urgent on by itself" "urgent" "$out"; gone "the automatic urgent run removed a 1.5-day tree" "$a"
 # the ignored-file check: an ignored file that is not rebuildable output (.env) keeps a merged, clean, idle tree (not 14 days idle)
 sandbox; printf '.env\n' >> "$SB/work/.git/info/exclude"; tree s1/a 1; a="$TREE"; echo 'TOKEN=x' > "$a/.env"; age "$a" 3
@@ -109,7 +109,7 @@ out="$(ds -- --apply)"; has "an untracked file keeps a 3-day tree" "uncommitted 
 sandbox; tree s1/a 1; a="$TREE"
 ( cd "$a" && exec sleep 60 ) & HOLDERS+=($!); h=$!; sleep 0.3
 out="$(ds -- --apply)"; kill "$h" 2>/dev/null; wait "$h" 2>/dev/null
-has "a live process with its cwd inside keeps the tree" "live process" "$out"; there "the tree with a live process stays" "$a"
+has "a live process with its cwd inside keeps the tree" "process" "$out"; there "the tree with a live process stays" "$a"
 sandbox; tree s1/a 1; a="$TREE"
 sleep 60 < "$a/README.md" & HOLDERS+=($!); h=$!; sleep 0.3
 out="$(ds -- --apply)"; kill "$h" 2>/dev/null; wait "$h" 2>/dev/null
@@ -123,6 +123,7 @@ there "the main checkout is never removed" "$SB/work/README.md"
 # board: a board line names the branch (an open row) keeps it; a done line does not; no board = one "skipped" line
 sandbox; tree s1/a 1; a="$TREE"; tree s1/b 1; b="$TREE"
 out="$(ds)"; has "no board: one skipped line" "skipped: no board" "$out"
+G -C "$SB/work" fetch -q origin; G -C "$SB/work" merge -q --ff-only origin/main   # the merged trees moved origin/main on
 mkdir -p "$SB/work/docs/orchestration"
 printf '# board\n🔨 **ROW-1 CLAIMED** builder on s1/a\n✅ **ROW-2 DONE** merged from s1/b\n' > "$SB/work/docs/orchestration/AGENT_BOARD.md"
 G -C "$SB/work" add docs; G -C "$SB/work" commit -q -m board; G -C "$SB/work" push -q origin main; G -C "$SB/work" fetch -q origin
@@ -244,7 +245,8 @@ case "$c" in *"worktree remove --force"*|*"worktree remove -f"*) bad "a sweep sc
 case "$c" in *"branch -D"*) bad "a sweep script runs git branch -D" ;; *) ok ;; esac
 case "$c" in *"system prune"*|*"volume rm"*|*"volume prune"*|*" rmi "*|*"image rm"*|*"image prune"*) bad "a sweep script touches Docker images or volumes" ;; *) ok ;; esac
 if grep -n '/home/' "${SWEEP_FILES[@]}" >/dev/null 2>&1; then bad "a sweep script has a /home/ literal"; else ok; fi
-if grep -in 'einherjar' "${SWEEP_FILES[@]}" >/dev/null 2>&1; then bad "a sweep script names a project"; else ok; fi
+pw="$(printf 'ein%s' herjar)"   # the source project's name, built so this file does not carry it
+if grep -in "$pw" "${SWEEP_FILES[@]}" >/dev/null 2>&1; then bad "a sweep script names a project"; else ok; fi
 [ -x "$DS" ] && [ -x "$DW" ] && ok || bad "the sweep scripts are not executable"
 # a git shim on PATH records every `worktree remove`
 sandbox; tree s1/a 1; REAL_GIT="$(command -v git)"; mkdir -p "$SB/shim"
@@ -261,11 +263,12 @@ out="$(HOME="$SB/home" bash "$DS" --on 2>&1)"; gone "--on removes the off file" 
 
 # ── L. the wrapper: first run is a dry run, one sweep at a time, stamp at start, unknown free space = no sweep, low priority ─────
 KH() { echo "$SB/home/.orcastration-kit"; }
+STAMP() { echo "$(KH)/disk-sweep/last/$(basename "$SB/work")-$(printf '%s' "$SB/work" | cksum | awk '{print $1 % 100000}')"; }
 dw() { (cd "$SB/work" && env HOME="$SB/home" KIT_SWEEP_TMP="$SB/tmp" KIT_SWEEP_DOCKER="$NODOCKER" KIT_SWEEP_DF="$FDF" KIT_SWEEP_REPORT_DIR="$SB/reports" "$@" bash "$DW" --repo "$SB/work" 2>&1; echo "rc=$?"); }
 sandbox; tree s1/a 1; a="$TREE"
 out="$(dw)"; has "the first run on a machine is a dry run" "first run on this machine: dry run" "$out"; there "the first run removed nothing" "$a"
 there "the first run left a report for the next session start" "$(KH)/disk-sweep/unseen-report"
-there "the stamp is written" "$(KH)/disk-sweep.last"
+there "the stamp is written (one per project)" "$(STAMP)"
 out="$(dw)"; gone "the second run applies" "$a"
 # a fake sweep: records its args and its nice value, sleeps, exits with $FAKE_RC
 FS="$TMP/fakesweep"
@@ -279,7 +282,7 @@ FSW
 chmod +x "$FS"
 sandbox; L="$SB/sweep.log"
 out="$(dw KIT_SWEEP_CRON_SWEEP="$FS" FAKE_SWEEP_LOG="$L" FAKE_RC=1)"; has "a failed sweep is logged FAILED" "FAILED" "$out"
-there "the stamp is written at the start even when the sweep fails (no loop)" "$(KH)/disk-sweep.last"
+there "the stamp is written at the start even when the sweep fails (no loop)" "$(STAMP)"
 case "$(cat "$L")" in *"nice=19"*) ok ;; *) command -v nice >/dev/null 2>&1 && bad "the sweep does not run at low priority: $(cat "$L")" || ok ;; esac
 sandbox; L="$SB/sweep.log"
 ( dw KIT_SWEEP_CRON_SWEEP="$FS" FAKE_SWEEP_LOG="$L" FAKE_SLEEP=3 >/dev/null ) & first=$!; sleep 1
@@ -311,15 +314,22 @@ has "the hook keeps its orient message" "orcastration-kit:orient" "$out"; has "t
 has "the hook names the off command" "--off" "$out"
 has "the hook launched a sweep (no stamp yet)" "$SB/work" "$(cat "$SB/launch.log" 2>/dev/null)"
 [ $((t1 - t0)) -le 3 ] && ok || bad "the hook took $((t1 - t0)) s (it must never wait)"
-mkdir -p "$(KH)"; date +%s > "$(KH)/disk-sweep.last"; : > "$SB/launch.log"
-out="$(hk)"; eq "a fresh stamp and room on disk: no launch" "" "$(cat "$SB/launch.log")"
-out="$(hk FAKE_FREE_GB=30)"; has "under the floor (50 GB): a launch even with a fresh stamp" "$SB/work" "$(cat "$SB/launch.log")"
-: > "$SB/launch.log"; touch "$(KH)/disk-sweep.off"; rm -f "$(KH)/disk-sweep.last"
+mkdir -p "$(dirname "$(STAMP)")"; echo $(( $(date +%s) - 7200 )) > "$(STAMP)"; : > "$SB/launch.log"
+out="$(hk)"; eq "a stamp 2 hours old and room on disk: no launch" "" "$(cat "$SB/launch.log")"
+out="$(hk FAKE_FREE_GB=30)"; has "under the floor (50 GB): a launch with a stamp only 2 hours old" "$SB/work" "$(cat "$SB/launch.log")"
+date +%s > "$(STAMP)"; : > "$SB/launch.log"
+out="$(hk FAKE_FREE_GB=30)"; eq "under the floor, but a sweep started under an hour ago: no launch (no loop)" "" "$(cat "$SB/launch.log")"
+: > "$SB/launch.log"; touch "$(KH)/disk-sweep.off"; rm -f "$(STAMP)"
 out="$(hk)"; eq "off: no launch" "" "$(cat "$SB/launch.log")"; rm -f "$(KH)/disk-sweep.off"
-mkdir -p "$(KH)/disk-sweep"; printf '%s\n' "$SB/reports/2026-11-25-dry-run.txt" > "$(KH)/disk-sweep/unseen-report"; date +%s > "$(KH)/disk-sweep.last"
+mkdir -p "$(KH)/disk-sweep"; printf '%s\n' "$SB/reports/2026-11-25-dry-run.txt" > "$(KH)/disk-sweep/unseen-report"; date +%s > "$(STAMP)"
 out="$(hk)"; json_ok "$out"; yes_ "the report message is valid JSON" $?
 has "the next session start shows the first report" "2026-11-25-dry-run.txt" "$out"; has "the report message is shown to the user" "systemMessage" "$out"
 gone "the report is shown once" "$(KH)/disk-sweep/unseen-report"
+# the stamp is per project: a fresh sweep of one project does not hold back another project's
+H1="$SB/home"; sandbox; optin; mkdir -p "$(dirname "$(STAMP)")"; date +%s > "$(STAMP)"; : > "$SB/launch.log"
+other="$SB/work2"; git clone -q "$SB/origin.git" "$other" 2>/dev/null; mkdir -p "$other/docs/orchestration"; : > "$other/docs/orchestration/.kit-hooks"
+out="$(cd "$other" && printf '{}' | env HOME="$SB/home" CLAUDE_PROJECT_DIR="$other" KIT_SWEEP_DF="$FDF" KIT_SWEEP_LAUNCH="$FL" FAKE_LAUNCH_LOG="$SB/launch.log" bash "$HOOK" 2>&1)"
+has "another project with no stamp of its own still gets its sweep" "$other" "$(cat "$SB/launch.log")"
 sandbox; out="$(hk)"; eq "a repo that did not opt in: no output" "" "$out"; eq "... and no launch" "" "$(cat "$SB/launch.log" 2>/dev/null)"
 out="$(hk KIT_SWEEP_AUTO=0)"; eq "KIT_SWEEP_AUTO=0 never launches" "" "$(cat "$SB/launch.log" 2>/dev/null)"
 # ten sessions starting together start ONE sweep (the real launcher and wrapper, a fake sweep)
@@ -342,7 +352,7 @@ eq "the guard in a repo that did not opt in starts nothing" "" "$(cat "$SB/launc
 
 # ── N. docs and version pins ───────────────────────────────────────────────────────────────────────────────────────────────────
 grep -q '"version": "0.18.0"' "$ROOT/.claude-plugin/plugin.json" && ok || bad "plugin.json is not 0.18.0"
-first="$(grep -m1 -A3 '^## ' "$ROOT/CHANGELOG.md")"
+first="$(grep -m1 -A3 '^## [0-9]' "$ROOT/CHANGELOG.md")"
 has "the CHANGELOG's newest entry is 0.18.0" "0.18.0" "$first"
 has "the CHANGELOG's first line says what the kit removes by itself" "removes idle merged worktrees" "$first"
 has "the CHANGELOG's first line says dry run first" "dry run" "$first"; has "the CHANGELOG's first line says how to turn it off" "--off" "$first"

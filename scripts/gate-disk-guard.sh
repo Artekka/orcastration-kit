@@ -19,6 +19,14 @@ path="${KIT_GATE_DISK_PATH:-/}"
 avail_kb=$("${KIT_DF_BIN:-df}" -Pk "$path" 2>/dev/null | awk 'NR==2 {print $4}')
 [[ "$avail_kb" =~ ^[0-9]+$ ]] || { echo "disk guard: could not read free space; continuing" >&2; exit 0; }
 free_gb=$((avail_kb / 1024 / 1024))
+# Under the disk sweep's floor (KIT_SWEEP_FLOOR_GB, default 50) in a kit-adopted repo: start the background disk sweep early.
+# It never waits and never changes this guard's answer (Art, 11-25: warn and sweep early, never refuse a worktree).
+LIBDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+if [ -f "$LIBDIR/lib-disk-sweep-launch.sh" ] && [ -f "$LIBDIR/lib-kit-home.sh" ]; then
+  ( . "$LIBDIR/lib-kit-home.sh" && . "$LIBDIR/lib-disk-sweep-launch.sh" && top=$(git rev-parse --show-toplevel 2>/dev/null) \
+      && disk_sweep_launch_if_due "$top" floor \
+      && echo "disk guard: ${free_gb} GB free is under the disk sweep floor; a background disk sweep started (its report: ~/.orcastration-kit/disk-sweep/)" ) 2>/dev/null || true
+fi
 if [ "$free_gb" -lt "$min" ]; then
   echo "⛔ GATE REFUSED: only ${free_gb} GB free on ${path} (need ${min}). Free some space (scripts/retro-worktrees.sh, scripts/docker-cache-cap.sh), or lower KIT_GATE_MIN_FREE_GB, then try again."
   exit 1

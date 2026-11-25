@@ -4,6 +4,22 @@ Newest first.
 
 ## Unreleased
 
+## 0.18.0 — 2026-11-25
+
+- **Added: the kit now removes idle merged worktrees and old build output by itself, dry run first; turn it off with `bash <kit>/scripts/disk-sweep.sh --off`.**
+  Once a day, when a session starts in a kit project, a background sweep at low priority frees disk space. Its first run on
+  your machine is a dry run that removes nothing: the next session start shows you its report. From the second run it removes:
+  worktrees merged 2 days ago and untouched since; unmerged worktrees untouched for 14 days whose branch origin already has
+  (the branch stays); node_modules folders copied by npm or yarn in idle worktrees (pnpm's shared files are left alone); saved
+  build output (an `index.html` beside an `assets` folder, whatever the folder is called); old headless-browser folders in the
+  temp folder; Docker build cache over its cap. A worktree with unsaved work, untouched for 14 days, is first saved (a patch
+  plus a tar of its new files, read back) and then removed; anything it cannot save is listed in the report instead. It never
+  forces a removal, never deletes a branch, and never touches a Docker image or volume. Every run writes a report under
+  `~/.orcastration-kit/disk-sweep/`. Run it yourself any time: `bash <kit>/scripts/disk-sweep.sh` (a dry run; `--apply` removes).
+  Details: README "Disk sweep".
+- **Changed: `gate-disk-guard.sh`** also starts the background sweep when free space is under 50 GB. Its 20 GB gate refusal is
+  unchanged.
+
 ## 0.17.0 — 2026-11-25
 
 - **Changed: the plugin id is `orcastration-kit`** (was `orchestration-kit`), spelled like the product, the repo and the logo:

@@ -2,9 +2,12 @@
 # The one removal-safety check shared by scripts/seat-merge.sh (a merged row's builder worktree) and any retro step that
 # retires merged worktrees. Source it; it defines functions only.
 #
-# worktree_removal_blocker <path> <branch> <exempt-worktree>
+# worktree_removal_blocker <path> <branch> <exempt-worktree> [detached]
 #   Prints ONE reason (no "kept" prefix) when the tree must NOT be removed, and nothing when it may be. Returns 0 either way.
 #   <exempt-worktree> is a tree that is never removed (the caller's own); pass "" for none. Run it inside the repo.
+#   detached: the literal word "detached" skips only the "commits not on origin/main" check, for a caller (scripts/disk-sweep.sh)
+#   that proves another way that origin has every commit (the same tip on origin, or a keep ref written first). Any other value
+#   (or none) keeps the check.
 #   The order is the safety order: every check fails closed (a git or find error keeps the tree).
 #   `git worktree remove` deletes IGNORED files a plain status omits, hence the ignored / skip-worktree / ahead / recent checks.
 #
@@ -22,7 +25,7 @@ _bw_nm_link() {  # $1 = tree path, $2 = one porcelain line
   [ -L "$1/$e" ]
 }
 worktree_removal_blocker() {
-  local path=$1 br=$2 exempt=${3:-} first line st dirty ign hidden ahead idle recent cwdlink target sdirs cls kind rest
+  local path=$1 br=$2 exempt=${3:-} detached=${4:-} first line st dirty ign hidden ahead idle recent cwdlink target sdirs cls kind rest
   first=$(git worktree list --porcelain | sed -n '1s/^worktree //p')
   if [ ! -d "$path" ]; then echo "its directory is gone (git worktree prune removes the entry)"; return 0; fi
   path=$(cd "$path" && pwd -P)
@@ -87,7 +90,9 @@ worktree_removal_blocker() {
   else hidden=$(printf '%s\n' "$hidden" | head -1); fi
   if [ -n "$hidden" ]; then echo "it has a skip-worktree or assume-unchanged file ($hidden)"; return 0; fi
   # commits on the local branch that origin/main lacks would be stranded on a branch nobody looks at.
-  ahead=$(git rev-list --count "origin/main..refs/heads/$br" 2>/dev/null || echo "?")
+  if [ "$detached" != detached ]; then
+    ahead=$(git rev-list --count "origin/main..refs/heads/$br" 2>/dev/null || echo "?")
+  else ahead=0; fi
   if [ "$ahead" != 0 ]; then echo "branch $br has $ahead commit(s) not on origin/main"; return 0; fi
   # a live session has no cwd in its worktree between two commands, so the process scan below can miss it. A file
   # changed in the last $idle minutes (default 30) means someone is working there. Dependency and build output is skipped.
