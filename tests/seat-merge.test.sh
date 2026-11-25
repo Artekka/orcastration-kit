@@ -246,7 +246,7 @@ sm SEAT_MERGE_FORMAT_CMD= SEAT_MERGE_CHECKS= SEAT_MERGE_ALLOWED_PATHS= -- feat "
 eq "T20 the template's block runs as written (placeholders filled)" 0 "$RC"; has "T20 its * check ran" "check '" "$OUT"
 
 
-# ---- ported fixes (kit 0.15.1) ----
+# ---- ported fixes (kit 0.16.1) ----
 reset_wt() { G -C "$SB/merge" checkout -q --detach origin/main; }
 lockfile_of() { printf '%s/rt/seat-merge/%s.lock' "$SB" "$(printf %s "$(cd "$SB/merge" && git rev-parse --show-toplevel)" | sha256sum | cut -c1-16)"; }
 M7='<<<<<<<'; M8='======='; M9='>>>>>>>'
