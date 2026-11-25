@@ -58,7 +58,7 @@ pin "README upgrade: the one install step" README.md "/plugin install orcastrati
 pin "README upgrade: the old-Claude-Code fallback" README.md "claude plugin uninstall $OLD --scope project"
 pin "CHANGELOG upgrade block" CHANGELOG.md "Upgrading from 0.16"
 # kit-init only creates missing files, so launch scripts copied on 0.16 keep the old prefix: kit-init must offer the refresh
-pin "kit-init detects 0.16 launch scripts" skills/kit-init/SKILL.md "grep -lF '/$OLD:' scripts/*.sh"
+pin "kit-refresh detects the 0.16 prefix and folder" scripts/kit-refresh.sh 'grep -qF -e "$OLD_PREFIX" -e "$OLD_FOLDER"'
 pin "kit-init runs the refresh" skills/kit-init/SKILL.md 'bash "$K/scripts/kit-refresh.sh" --apply'
 pin "kit-init refresh dry run first" skills/kit-init/SKILL.md 'bash "$K/scripts/kit-refresh.sh"`'
 # the written limit of the one-folder rule (713b r2), in the README and the CHANGELOG

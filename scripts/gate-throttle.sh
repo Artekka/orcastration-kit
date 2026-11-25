@@ -92,6 +92,11 @@ _guard="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/gate-disk-guard.sh"
 if [ -f "$_guard" ]; then bash "$_guard" || exit 1; fi
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib-kit-home.sh" || { echo "gate-throttle: lib-kit-home.sh is missing beside this script" >&2; exit 64; }
 if [ -n "${KIT_RUNTIME_DIR:-}" ]; then RT="$KIT_RUNTIME_DIR"; else RT="$(kit_home)" || exit 1; RT="$RT/runtime"; fi   # kit_home said why
+# Two real state folders (kit_home_two_folders): 0.16 copies of this script throttle in the other one, so there are two
+# slot sets. Said on EVERY start until it is fixed; the new folder is used.
+if [ -z "${KIT_RUNTIME_DIR:-}" ] && kit_home_two_folders; then
+  echo "gate-throttle: WARNING two state folders: ~/.orcastration-kit (used) and the 0.16 one; 0.16 copies of this script keep a second set of slots there. Fix: run /orcastration-kit:kit-init in each project (it refreshes the copied scripts), then move what you need out of the 0.16 folder and delete it." >&2
+fi
 FLOCK="${KIT_FLOCK_BIN:-flock}"
 if ! command -v "$FLOCK" >/dev/null 2>&1; then
   echo "gate-throttle: flock not found (Linux: util-linux; macOS: brew install flock); running UNTHROTTLED" >&2

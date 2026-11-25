@@ -26,6 +26,14 @@ Newest first.
   `start-team.sh` check the state folder first (a dry run too, with no change on disk), so a broken one opens no tab.
   Known limit: two scripts healing the same link at the same instant can remove each other's fresh link once; the next
   call links it again and no file is lost.
+- **Changed: a fresh install makes ~/.orcastration-kit and links the 0.16 name to it**, and every call makes that link
+  again when it is missing (a failed link only warns), because a project's 0.16 copy of gate-throttle.sh, quiet-mode.sh or
+  seat-merge.sh would otherwise make a second real folder: a second set of throttle slots. A 0.16 path that is a file or a
+  broken link stops every script (no change on disk). With two real folders, gate-throttle warns on every start and names
+  the fix; the new folder is used. The rule: one folder unless the 0.16 name's link is deleted while a 0.16 copy runs first, or HOME cannot hold links; kit-init's refresh closes it.
+- **Added: `scripts/kit-refresh.sh`**, which kit-init runs to list and replace a project's script copies made on 0.16 (the
+  launch scripts and the three that write to the state folder). It replaces only copies the project's git tracks with no
+  uncommitted change, so `git diff` shows the refresh and `git checkout` undoes it; the rest are listed with the reason.
 - **Fixed: the docs check's sweep for the 0.16 id** allows it only in the named places (history, the upgrade sections, the
   renames map, the recorded Station fixture, kit-init's upgrade lines, the state-folder code). A line that merely mentions
   "0.16" no longer passes.

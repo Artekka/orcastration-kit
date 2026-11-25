@@ -3,8 +3,10 @@
 # script that keeps state (gate-throttle, quiet-mode, seat-merge, lib-launch, lib-model-tag, sibling-shell).
 # hooks/ctx-guard.py carries the same rule in python; tests/kit-home.test.sh pins both.
 #
-#   kit_home   prints ~/.orcastration-kit (it does not create it; callers mkdir what they need), or prints one line on
-#              stderr and returns 1 when that path cannot be a folder. Callers stop on that non-zero status.
+#   kit_home   prints ~/.orcastration-kit, or prints one line on stderr and returns 1 when the state folder cannot be
+#              used (callers stop on that non-zero status). On a fresh install it makes the folder and links the 0.16
+#              name to it; on every call it makes that link again when it is missing.
+#   kit_home_check / kit_home_two_folders   read-only verdicts (see each function).
 #
 # Why a link and not a move (0.17.0 renamed the plugin id from the 0.16 spelling): every open tab runs a
 # sibling-shell.sh loop that fixed its state folder when it started, and kit-init copied the scripts into each
@@ -26,21 +28,35 @@
 # callers before they call kit_home, so an override never migrates anything.
 
 # kit_home_check: the same verdict as kit_home, with NO change on disk (dry runs and launchers call it before they
-# touch anything). 0 = kit_home will work (nothing there, a folder, or a dangling link it can heal); else one line, 1.
+# touch anything). 0 = kit_home will work; else one line and 1. Broken: the new name is not a folder (and not a dangling
+# link kit_home can heal), or the 0.16 path exists but is not a folder (a file, a dangling link): kit_home would have to
+# remove or replace something it does not own.
 kit_home_check() {
-  local new="$HOME/.orcastration-kit" old="$HOME/.orchestration-kit"   # the 0.16 folder name
-  if [ -L "$new" ] && [ ! -e "$new" ]; then
-    { [ -d "$old" ] || [ ! -e "$old" ]; } && return 0
-  elif [ ! -e "$new" ] || [ -d "$new" ]; then
-    return 0
+  local new="$HOME/.orcastration-kit" oldname=".orchestration-kit"   # the 0.16 folder name
+  local old="$HOME/$oldname"
+  if { [ -e "$old" ] || [ -L "$old" ]; } && [ ! -d "$old" ]; then
+    echo "orcastration-kit: the 0.16 folder path ~/$oldname is not a folder (a file or a broken link); move it away, then run this again" >&2
+    return 1
   fi
-  echo "orcastration-kit: ~/.orcastration-kit is not a folder (a file or a broken link); move it away, then run this again" >&2
-  return 1
+  if [ -L "$new" ] && [ ! -e "$new" ]; then return 0; fi
+  if [ -e "$new" ] && [ ! -d "$new" ]; then
+    echo "orcastration-kit: ~/.orcastration-kit is not a folder (a file or a broken link); move it away, then run this again" >&2
+    return 1
+  fi
+  return 0
+}
+
+# kit_home_two_folders: 0 when both names are real, different folders (the C shape: someone made the new one by hand, or a
+# 0.16 copy of a script ran while the 0.16 name's link was missing). No merge: the new one is used; callers warn.
+kit_home_two_folders() {
+  local new="$HOME/.orcastration-kit" old="$HOME/.orchestration-kit"   # the 0.16 folder name
+  [ -d "$new" ] && [ -d "$old" ] && [ "$(cd "$new" 2>/dev/null && pwd -P)" != "$(cd "$old" 2>/dev/null && pwd -P)" ]
 }
 
 kit_home() {
   local new="$HOME/.orcastration-kit" oldname=".orchestration-kit"   # the 0.16 folder name
   local old="$HOME/$oldname" gone
+  kit_home_check || return 1   # a broken shape: one line, nothing on disk changes
   if [ -L "$new" ] && [ ! -e "$new" ]; then
     gone="$(readlink "$new" 2>/dev/null)"
     # Re-checked right before rm: only a link whose target is still missing is removed (rm without -r never removes a folder).
@@ -48,9 +64,8 @@ kit_home() {
     mkdir -p "$old" 2>/dev/null           # gone (or never there): made again, so both names stay one folder
     ln -s "$oldname" "$new" 2>/dev/null   # EEXIST = a racing twin healed it first; the check below decides
     echo "orcastration-kit: ~/.orcastration-kit was a link to a missing folder ($gone); it links to the 0.16 folder ~/$oldname again" >&2
-  elif [ -e "$new" ] || [ -L "$new" ]; then
-    if [ -d "$old" ] && [ -d "$new" ] && [ ! -e "$new/.kit-home-both-warned" ] \
-       && [ "$(cd "$new" 2>/dev/null && pwd -P)" != "$(cd "$old" 2>/dev/null && pwd -P)" ]; then
+  elif [ -e "$new" ]; then
+    if kit_home_two_folders && [ ! -e "$new/.kit-home-both-warned" ]; then
       echo "orcastration-kit: both ~/.orcastration-kit and the 0.16 folder ~/$oldname exist; using ~/.orcastration-kit (move anything you still need from the old one, then delete it)" >&2
       : > "$new/.kit-home-both-warned" 2>/dev/null
     fi
@@ -58,6 +73,17 @@ kit_home() {
     if ln -s "$oldname" "$new" 2>/dev/null; then
       echo "orcastration-kit: state folder is now ~/.orcastration-kit (a link to the 0.16 folder ~/$oldname, so tabs started on 0.16 keep working)" >&2
     fi
+  else
+    # A fresh install: the new name is the real folder, and the 0.16 name links to it (below), so a 0.16 copy of a script
+    # that runs later (its own mkdir -p on the 0.16 path) lands in this same folder instead of making a second one.
+    mkdir -p "$new" 2>/dev/null \
+      && echo "orcastration-kit: made the state folder ~/.orcastration-kit; the 0.16 folder name ~/$oldname links to it, so 0.16 copies of the scripts share it" >&2
+  fi
+  # Re-link on every call: a real new folder and nothing at the 0.16 path -> the 0.16 name links to it again (it may have
+  # been deleted). A failed link is not fatal (HOME cannot hold links): say so, keep working.
+  if [ -d "$new" ] && [ ! -L "$new" ] && [ ! -e "$old" ] && [ ! -L "$old" ]; then
+    ln -s ".orcastration-kit" "$old" 2>/dev/null \
+      || echo "orcastration-kit: could not link the 0.16 folder name ~/$oldname to ~/.orcastration-kit; a 0.16 copy of a script would make its own folder (run /orcastration-kit:kit-init in each project to refresh the copies)" >&2
   fi
   # Something at the new name that is not a folder cannot hold state: say so and fail (it is left as it is).
   if { [ -e "$new" ] || [ -L "$new" ]; } && [ ! -d "$new" ]; then

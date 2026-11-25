@@ -166,7 +166,9 @@ Settings an admin manages are not rewritten for you; ask the admin to change tha
 
 The state folder moves with the id: the scripts now use `~/.orcastration-kit/`. When only the 0.16 folder `~/.orchestration-kit/` exists,
 the first script to run makes the new name a link to it and says so in one line, so tabs that started on 0.16 keep their
-recycle hand-offs. Project CLAUDE.md sections that carry the 0.16 marker are still recognized by `kit-init`, which offers the
+recycle hand-offs. On a fresh install the new folder is the real one and the 0.16 name links to it, so a 0.16 copy of a
+script in some project still lands in the same folder. The rule is: one folder unless the 0.16 name's link is deleted while a 0.16 copy runs first, or HOME cannot hold links; kit-init's refresh closes it
+(it replaces the copied scripts that still use the 0.16 folder). Project CLAUDE.md sections that carry the 0.16 marker are still recognized by `kit-init`, which offers the
 new marker in its delta.
 
 In each project adopted on 0.16, run `/orcastration-kit:kit-init` once more: the launch scripts it copied into `scripts/`
