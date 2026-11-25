@@ -19,10 +19,12 @@
 #   - the project's git tracks it with no uncommitted change, so `git diff` shows the refresh and `git checkout` undoes it.
 # A copy that differs but names nothing from 0.16 (a project's edit on 0.17) is never touched (DIFFERS).
 # Every write (REFRESH and CREATE) is one safe write: a temp file in scripts/, the mode set, then `mv -f` onto the name;
-# a failed write is LEFT (could not replace) and no temp file stays behind.
+# a failed write is LEFT (could not replace) and no temp file stays behind. A dangling link at a library name is LEFT.
+# CDPATH is unset first, so `cd scripts` always enters this project's scripts/.
 # Git's repo-discovery variables (GIT_DIR, GIT_WORK_TREE, ...) are unset first: a caller's shell may carry them, and the
 # project's own git must decide what is tracked (unset, not refused: kit-init runs this in the user's shell).
-# Limits (README): a bind mount is not seen; do not edit scripts/ while it runs; case-folding file systems: exact names
+# Limits (README): a bind mount is not seen; do not edit scripts/ while it runs (nor put a folder or link at a name
+# between the check and the move); case-folding file systems: exact names
 # only; a read-only copy is found by the shell's -w test, which root always passes.
 # Exit: 0 = done (or nothing to do) · 3 = something was left (or scripts/ is not a real project folder) · 64 = usage.
 # Maintainers: after a new 0.16.x tag (there will be none) regenerate the list: bash scripts/kit-refresh.sh --print-known
@@ -42,6 +44,7 @@
 # start-team.sh b6f3303aa8dbf7a1104627b8ebeab029ac4b29c2
 # END known-0.16
 set -u
+unset CDPATH   # a caller's CDPATH would steer `cd scripts` into another folder's scripts/
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_CEILING_DIRECTORIES GIT_DISCOVERY_ACROSS_FILESYSTEM
 APPLY=0
 FILES="start-team.sh recycle-sibling.sh sibling-shell.sh lib-launch.sh lib-model-tag.sh gate-throttle.sh quiet-mode.sh seat-merge.sh"
@@ -127,7 +130,10 @@ for f in $FILES; do
 done
 if [ "$APPLY" = 1 ] && [ "$refreshed" -gt 0 ]; then
   for l in $LIBS; do
-    [ -e "$l" ] || [ -L "$l" ] && continue
+    [ -e "$l" ] && continue
+    if [ -L "$l" ]; then   # a dangling link: never written through, and the refreshed scripts would source nothing
+      echo "LEFT   scripts/$l (a dangling link at a library name; the refreshed scripts source it: remove the link, then copy $K/scripts/$l by hand)"; left=$((left + 1)); continue
+    fi
     if safe_write "$K/scripts/$l" "$l" "$MODE_FILE"; then
       echo "CREATE  scripts/$l"; created="$created scripts/$l"
     else

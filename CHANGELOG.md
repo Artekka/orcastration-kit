@@ -38,10 +38,10 @@ Newest first.
   rest are listed with the reason and the manual step. Libraries it creates are new untracked files (delete to undo).
   The project is the folder it runs from, and `scripts/` must be a real folder there (not a link), else nothing changes.
   The content check is byte-exact (no git filters, so a CRLF copy is left); a hard-linked or read-only copy is left; git
-  variables from the caller's shell (GIT_DIR, GIT_WORK_TREE, ...) are ignored; every write goes to a temp file in
+  variables and CDPATH from the caller's shell are ignored; a dangling link at a library name is left; every write goes to a temp file in
   `scripts/` and is moved onto the name, and a failed write is left with its reason. Written limits:
   - kit-refresh limit: a bind mount at or above scripts/ is not seen (it compares paths only).
-  - kit-refresh limit: do not edit scripts/ while it runs; an edit made between its check and its write is lost.
+  - kit-refresh limit: do not edit scripts/ while it runs; an edit made between its check and its write is lost, and a folder or link put at a name between its check and its move is LEFT (a folder, or a link to one) or replaced (any other link).
   - kit-refresh limit: on a case-folding file system (macOS, Windows) it knows only the exact file names; rename a copy whose name differs in case first.
   - kit-refresh limit: a read-only copy in a writable scripts/ is LEFT by the shell's `-w` test, which root always passes.
 - **Fixed: the docs check's sweep for the 0.16 id** allows it only in the named places (history, the upgrade sections, the
