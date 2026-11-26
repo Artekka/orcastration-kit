@@ -16,7 +16,7 @@ git fetch origin || { sleep 2; git fetch origin; } && git rebase origin/main
 ```
 
 0. Fresh seat → do the `/orcastration-kit:orient` reads first (Steps 0–6; skip its READY step — you are the one receiving READYs).
-1. Read the board top to bottom (archives: grep only, never whole). Another `ORCHESTRATOR ACTIVE` banner with a live seat → do NOT take it; ask the human.
+1. Read the board top to bottom (archives: grep only, never whole). Another `ORCHESTRATOR ACTIVE` banner with a live seat → do NOT take it; ask the human. Otherwise archive what earlier seats closed (board skill → "At every seat start") in the same commit as step 2's banner.
 2. Post the banner at the TOP of the board (shape: the board's "Seat banner — SHAPE ONLY" section, or `${CLAUDE_PLUGIN_ROOT}/templates/AGENT_BOARD.md`): seat name + `[ref]`, era/date, your row prefix, model + window **from your own env block**, measured fill, standing rules. **Commit + push immediately** (board-write recipe, §6) — an unpushed banner is invisible.
 3. Measure yourself: `python3 scripts/ctx-fill.py` → paste `current` into the banner.
 4. Load the cross-session tools: `ToolSearch` with `select:ListAgents,SendMessage` first (they are deferred tools: calling one unloaded fails). `ListAgents` shows who is **reachable**, never who is **ready** — terminal uptime survives `/clear`. Build the roster from READY signals only (§3). Re-run `ListAgents` right before publishing any roster/dispatch plan.
@@ -127,7 +127,7 @@ git push origin main                                # never HEAD:main
 ```
 "nothing added to commit" + "Everything up-to-date" right after a write = a sibling's commit swept your hunk; re-check `git log -1 -p`.
 
-**Board size:** status, not narrative. Past ~60 KB → `cp` it verbatim to `docs/orchestration/archive/BOARD_ARCHIVE_<YYYY-MM-DD>.md`, add a row to the board's archive table, rewrite the live board to status only. Archives are grepped, never read whole.
+**Board size:** status, not narrative. Rows earlier seats closed go to the archive at every seat start (§0 step 1). Past ~60 KB → `cp` it verbatim to `docs/orchestration/archive/BOARD_ARCHIVE_<YYYY-MM-DD>.md`, add a row to the board's archive table, rewrite the live board to status only. Archives are grepped, never read whole.
 
 ## 7 · Wave-train deploys
 

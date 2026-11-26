@@ -29,11 +29,13 @@ git show "origin/$branch:docs/orchestration/briefs/$row.md" 2>/dev/null \
 
 echo
 echo "=== BOARD BANNER ==="
-# From the live ORCHESTRATOR ACTIVE heading (never a superseded one) to the next `## `. Regex-only awk:
+# From the live ORCHESTRATOR ACTIVE heading (never a superseded one) to the next heading of any depth (`## `,
+# `### ` …), and at most 6000 characters: a board that keeps old rows or older seats' handover notes under
+# the banner would otherwise hand every builder that history as if it were current. Regex-only awk:
 # no dollar-digit tokens anywhere near a skill.
 board="$(git show "origin/$branch:docs/orchestration/AGENT_BOARD.md" 2>/dev/null || cat docs/orchestration/AGENT_BOARD.md 2>/dev/null)"
 banner="$(printf '%s\n' "$board" \
-  | awk '/^## /{ if (on) exit; if (/ORCHESTRATOR ACTIVE/ && !/[Ss][Uu][Pp][Ee][Rr][Ss][Ee][Dd][Ee][Dd]/) on=1 } on' \
+  | awk '/^##+ /{ if (on) exit; if (/ORCHESTRATOR ACTIVE/ && !/[Ss][Uu][Pp][Ee][Rr][Ss][Ee][Dd][Ee][Dd]/) on=1 } on { n += length + 1; if (n > 6000) { print "[banner cut at 6000 characters; the rest is on the board]"; exit } print }' \
   | head -60)"
 if [ -n "$banner" ]; then
   printf '%s\n' "$banner"

@@ -118,6 +118,13 @@ if [ -n "$board" ]; then
   has "a superseded header above the live banner is skipped" "row Z9-1 → Sib1" "$out"
   hasnt "the superseded section above is not printed" "old row X8-1" "$out"
   hasnt "the section after the banner is not printed" "row Q-1" "$out"
+  # ...and history kept under the banner as `### ` subsections (older seats' notes, old rows) is not printed.
+  printf '%s\n' "# Board" "## 🎛 ORCHESTRATOR ACTIVE — **era-9 · Zed \`[abc123]\`**" "row Z9-1 → Sib1" \
+    "### Previous seat — Old" "old handover note" "### Backlog rows" "| X-0 | MERGED |" > "$TMP/deep-board.md"
+  out="$(bash -c "cat '$TMP/deep-board.md' | $pipeline" 2>&1)"
+  has "a banner with history under it still prints its own rows" "row Z9-1 → Sib1" "$out"
+  hasnt "an older seat's note under the banner is not printed" "old handover note" "$out"
+  hasnt "old rows under the banner are not printed" "X-0" "$out"
 fi
 
 # ---- F3: READY names the seat + era the builder saw ---------------------------------------------

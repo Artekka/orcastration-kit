@@ -86,6 +86,25 @@ run "$LONE" Z-1; [ "$RC" = 0 ] && ok || bad "no origin: exit $RC"
 has "no origin: says the fetch failed" "FETCH FAILED" "$OUT"; has "no origin: local brief" "lone brief" "$OUT"
 has "no origin: local board banner" "era-1 · Lone" "$OUT"
 
+# 6b. history kept UNDER the banner (older seats' handover notes, old rows as `### ` subsections) is not
+#     served, and a banner made of very long lines is cut by characters (60 lines of 1,500-character rows
+#     would otherwise hand the builder ~90K characters of old status as if it were current)
+DEEP="$TMP/deep"; git init -q -b main "$DEEP"; mkdir -p "$DEEP/docs/orchestration/briefs"
+printf 'deep brief\n' > "$DEEP/docs/orchestration/briefs/D-1.md"
+printf '%s\n' "## 🎛 ORCHESTRATOR ACTIVE — **era-4 · Deep**" "- live line" "### Previous seat — Old" "- old handover note" \
+  "### Backlog rows" "| D-0 | MERGED | old row |" "## Protocol" > "$DEEP/docs/orchestration/AGENT_BOARD.md"
+run "$DEEP" D-1; [ "$RC" = 0 ] && ok || bad "deep board: exit $RC"
+has "deep board: the live banner" "era-4 · Deep" "$OUT"; has "deep board: the banner's own lines" "- live line" "$OUT"
+hasnt "deep board: an older seat's handover note under the banner is not served" "old handover note" "$OUT"
+hasnt "deep board: old rows under the banner are not served" "old row" "$OUT"
+long="$(printf 'x%.0s' $(seq 1 1500))"
+{ echo "## 🎛 ORCHESTRATOR ACTIVE — **era-5 · Long**"; for i in $(seq 1 20); do echo "- row $i $long"; done; echo "## Protocol"; } \
+  > "$DEEP/docs/orchestration/AGENT_BOARD.md"
+run "$DEEP" D-1; banner_part="${OUT#*=== BOARD BANNER ===}"
+has "long banner: still shows the banner" "era-5 · Long" "$banner_part"
+has "long banner: says it was cut" "banner cut at 6000 characters" "$banner_part"
+[ "${#banner_part}" -le 6300 ] && ok || bad "long banner: ${#banner_part} characters served, want at most ~6000"
+
 # 7. outside a git repo: NO BRIEF, exit 0
 mkdir -p "$TMP/plain"; run "$TMP/plain" S3-1; [ "$RC" = 0 ] && ok || bad "outside git: exit $RC"
 has "outside git says so" "not inside a git repository" "$OUT"

@@ -5,8 +5,9 @@
 > work. Every edit is committed AND pushed at once (`/orcastration-kit:board` → shared-checkout recipe).
 >
 > **This board carries STATUS, not narrative.** Briefs go to builders by message; write-ups,
-> verdict transcripts and post-mortems go to the log, and the board links to them. Past
-> ~60 KB it is archived verbatim (table below) and rewritten to status only.
+> verdict transcripts and post-mortems go to the log, and the board links to them. At every
+> seat start, rows earlier seats closed are archived verbatim (table below); past ~60 KB the
+> whole board is archived and rewritten to status only.
 >
 > Project-specific values (gate, deploy, change classes, validator, locked areas) live in
 > `ORCHESTRATION.md` next to this file — the protocol below is generic.
