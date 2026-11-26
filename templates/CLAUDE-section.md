@@ -32,7 +32,9 @@ Protocol table lives in the board file; project specifics in `docs/orchestration
    DERIVED its verdict or only consistency-checked. The verifier reports; it never fixes.
 8. **Reconcile one row at a time**; push merges immediately; quote on-main SHAs only.
 9. **Deploys and log numbers are exclusive slots** — claimed in writing BEFORE running.
-10. **Locked items** (ORCHESTRATION.md → Locked) need the human's sign-off.
+10. **Locked items** (ORCHESTRATION.md → Locked) need the human's sign-off. **Secret stores**
+    (ORCHESTRATION.md → Secrets, `never_read:`) are never read, searched or named in a command; a key the
+    work needs is the human's to supply.
 
 ### Orchestrator-led mode
 

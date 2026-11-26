@@ -63,7 +63,7 @@ Each piece has the same three parts.
 
 **Why it exists:** One session's `git add -A` once swept another session's uncommitted edit into its own commit, and the history stopped answering "which row did this".
 
-**The knob:** `worktrees` (`advised` | `enforced`) and `git_guard` (`off` | `on`) in the team block; the hooks `hooks/worktree-guard.sh` and `hooks/git-guard.sh`. Hooks are opt-in per repo through the `docs/orchestration/.kit-hooks` marker.
+**The knob:** `worktrees` (`advised` | `enforced`) and `git_guard` (`off` | `on`) in the team block, and the `never_read:` list under Secrets (key stores a session is refused: `hooks/secrets-guard.sh`) with its optional `allow_read:` list (single files the human lets through by exact path); the hooks `hooks/worktree-guard.sh` and `hooks/git-guard.sh`. Hooks are opt-in per repo through the `docs/orchestration/.kit-hooks` marker.
 
 ### Tests first, the gate and the throttle
 
