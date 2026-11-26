@@ -27,11 +27,14 @@ export async function quietAvailable(c: Config, cwd: string, exists: (p: string)
 
 export type ToggleResult = { ran: boolean; wanted: boolean; ok: boolean; detail?: string }
 
-/** Runs the configured on/off command for the OPPOSITE of the current state; returns the state asked for. */
-export async function toggleQuietMode(io: Io, c: Config, current: boolean | null): Promise<ToggleResult> {
+/**
+ * Runs the configured on/off command for the OPPOSITE of the current state, in the session's directory (`cwd`); returns
+ * the state asked for. A command that cannot start there (the directory is gone) is a failed press like any other.
+ */
+export async function toggleQuietMode(io: Io, c: Config, current: boolean | null, cwd = ''): Promise<ToggleResult> {
   const wanted = current !== true
   if (!canToggle(c)) return { ran: false, wanted, ok: false }
-  const r = await io.run(sh(wanted ? c.quietOnCmd : c.quietOffCmd), 30_000)
+  const r = await io.run(sh(wanted ? c.quietOnCmd : c.quietOffCmd), 30_000, cwd || undefined)
   if (r.exitCode === 0) return { ran: true, wanted, ok: true }
   // A missing script or a shell error speaks on stderr; stdout wins when both have something.
   const firstLine = (t: string): string | undefined => t.split('\n').map(l => l.trim()).find(l => l !== '')
