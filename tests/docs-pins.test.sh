@@ -158,5 +158,7 @@ for sc in pending-work.sh bottleneck-watch.sh main-checkout-sync.sh; do
   pin "orchestrate poll names $sc" $O "bash scripts/$sc"
   [ -f "$ROOT/scripts/$sc" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL the poll names scripts/$sc but it does not ship"; }
 done
+pin "falsify: mutate the guarded value itself" skills/falsify/SKILL.md "| **Mutate the guarded value itself** —"
+pin "falsify: a refusal case is refused for its own reason" skills/falsify/SKILL.md "**A refusal case is refused for its own reason.** It asserts the message names the bad input"
 echo "docs-pins: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
