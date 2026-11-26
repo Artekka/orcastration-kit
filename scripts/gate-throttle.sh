@@ -9,6 +9,14 @@
 #            with "SHA <full commit>" and "started <HH:MM:SS> dirty=<changed paths>" read at that moment
 #            (not while waiting: a commit made in the queue would make the log name the wrong code) and
 #            ends with "exit <code>". The slot line stays on stderr.
+#            A tree with any changed or untracked path is REFUSED (exit 65, the log says why, the command
+#            does not run): gate evidence must name a committed tree. A plain run (no --log) is not checked.
+#            A tree that CHANGED during the run (another commit, or any changed or untracked path at the end)
+#            makes the run VOID (exit 66, the log says why): someone edited the tree the gate was testing.
+# Killed while queued: a TERM, INT or HUP before the slot is held (an outer `timeout` counts the wait) prints
+#            "KILLED WHILE QUEUED after <N>s: the command never ran" on stderr and in the --log file, and exits
+#            143 (130 on INT, 129 on HUP). Without it an empty log and timeout's 124 read like a real timeout. Bound the work inside the
+#            gate (its own time limits), never the wait.
 #
 # Slots:     `gate_slots:` in the team block of docs/orchestration/ORCHESTRATION.md (default 2);
 #            GATE_SLOTS overrides it.
@@ -68,14 +76,32 @@ fi
 # The command, logged when --log was given: commit and dirty count first, read now, exit code last.
 run() {
   [ -z "$log" ] && { "$@"; return $?; }
-  local rc
+  local rc dirty
+  dirty="$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "${dirty:-0}" != 0 ]; then
+    { echo "SHA $(git rev-parse HEAD 2>/dev/null || echo none)"
+      echo "REFUSED dirty=$dirty: commit (or ignore) every changed and untracked path first; gate evidence names a committed tree"
+      echo "exit 65"; } > "$log"
+    echo "gate-throttle: REFUSED: $dirty uncommitted or untracked path(s); --log is gate evidence, commit first" >&2
+    return 65
+  fi
+  local sha after_sha after_dirty
+  sha="$(git rev-parse HEAD 2>/dev/null || echo none)"
   {
-    echo "SHA $(git rev-parse HEAD 2>/dev/null || echo none)"
+    echo "SHA $sha"
     echo "started $(date +%H:%M:%S) dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
     "$@"; rc=$?
+    after_sha="$(git rev-parse HEAD 2>/dev/null || echo none)"
+    after_dirty="$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "$after_sha" != "$sha" ] || [ "${after_dirty:-0}" != 0 ]; then
+      echo "VOID: the tree changed during the run (HEAD $sha -> $after_sha, dirty=$after_dirty at the end; command exit $rc): this run proves nothing; rerun on a tree nobody edits"
+      git status --porcelain 2>/dev/null | head -n 10
+      rc=66
+    fi
     echo "exit $rc"
-    return $rc
   } > "$log" 2>&1
+  [ "$rc" = 66 ] && echo "gate-throttle: VOID: the tree changed during the run (see $log); rerun on a tree nobody edits" >&2
+  return $rc
 }
 # The script has no other --flags of its own. A leading --word is a typo (`--status` once was queued as a COMMAND and held a ticket),
 # so refuse before anything is created.
@@ -355,11 +381,16 @@ stop_tree() {  # <root pid>
   done
   return 0
 }
-launching=0 pending_sig=""
+launching=0 pending_sig="" slot_held=0 queued_since="$(date +%s)"
 on_signal() {  # <exit code>
   # Between `"$@" &` and `child=$!` the child exists but is not recorded yet; stopping now would find nothing and leave the
   # tree running. Remember the signal; the launch code replays it once `child` is set.
   if [ "$launching" = 1 ] && [ -z "$child" ]; then pending_sig="$1"; return; fi
+  if [ "$slot_held" = 0 ]; then  # still in the line: the command never ran, and the record says so
+    local waited=$(( $(date +%s) - queued_since ))
+    echo "gate-throttle: KILLED WHILE QUEUED after ${waited}s: the command never ran (a timeout around the queue counts the wait); not a test result" >&2
+    [ -z "$log" ] || printf 'KILLED WHILE QUEUED after %ss: the command never ran; not a test result\nexit %s\n' "$waited" "$1" >> "$log"
+  fi
   trap '' TERM INT HUP   # a second signal must not re-enter while the tree is being stopped
   [ -z "$child" ] || stop_tree "$child"
   exit "$1"
@@ -604,7 +635,7 @@ while :; do
       # Line 3: prio=1 for a gate in the priority slot or on the priority list (deploy mode never confines those).
       printf '%s\t%s\t%s\n%s\nprio=%s\n' "$i" "$(pwd -P)" "$*" "$(proc_start $$)" "$([ "$i" = prio ] && echo 1 || echo "$prio")" > "$rdir/$$"
       [ "$i" = prio ] && dm_enter
-      drop_ticket
+      drop_ticket; slot_held=1   # from here a signal is the command's own result, not a queue kill
       echo "gate-throttle: slot $i acquired $(date +%H:%M:%S) in $(pwd -P)" >&2
       workers_decide; export GATE_WORKERS
       echo "gate-throttle: GATE_WORKERS=$GATE_WORKERS ($WORKERS_WHY)" >&2
@@ -623,5 +654,5 @@ while :; do
     fi
     exec 9>&-
   done
-  sleep "$poll"
+  sleep "$poll" & wait $!   # a signal while waiting is handled now, not after the sleep
 done

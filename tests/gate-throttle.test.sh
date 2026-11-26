@@ -171,14 +171,35 @@ has "no flock: still runs the command" "ran" "$out"; has "no flock: says it is u
 reset; export GATE_SLOTS=1
 L="$TMP/repo-log"; git init -q -b main "$L"
 git -C "$L" -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m one
-: > "$L/untracked"
 err="$(cd "$L" && timeout 20 bash "$GT" --log "$TMP/gate.log" bash -c 'echo to-out; echo to-err >&2; exit 7' 2>&1 >/dev/null)"; rc=$?
 [ "$rc" -eq 7 ] && ok || bad "--log: exit code not passed through (got $rc)"
 [ "$(sed -n 1p "$TMP/gate.log")" = "SHA $(git -C "$L" rev-parse HEAD)" ] && ok || bad "--log: line 1 is not the commit: $(sed -n 1p "$TMP/gate.log")"
-sed -n 2p "$TMP/gate.log" | grep -Eq '^started [0-9]{2}:[0-9]{2}:[0-9]{2} dirty=1$' && ok || bad "--log: line 2 is not 'started HH:MM:SS dirty=1': $(sed -n 2p "$TMP/gate.log")"
+sed -n 2p "$TMP/gate.log" | grep -Eq '^started [0-9]{2}:[0-9]{2}:[0-9]{2} dirty=0$' && ok || bad "--log: line 2 is not 'started HH:MM:SS dirty=0': $(sed -n 2p "$TMP/gate.log")"
 has "--log: stdout in the log" "to-out" "$(cat "$TMP/gate.log")"; has "--log: stderr in the log" "to-err" "$(cat "$TMP/gate.log")"
 [ "$(tail -n 1 "$TMP/gate.log")" = "exit 7" ] && ok || bad "--log: last line is not 'exit 7': $(tail -n 1 "$TMP/gate.log")"
 has "--log: the slot line stays on stderr" "slot 1 acquired" "$err"; hasnt "--log: the slot line is not in the log" "acquired" "$(cat "$TMP/gate.log")"
+
+# 11a. --log on a tree with uncommitted or untracked paths is refused: gate evidence must name a committed tree
+: > "$L/untracked"
+err="$(cd "$L" && timeout 20 bash "$GT" --log "$TMP/dirty.log" bash -c 'echo dirty-ran' 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -eq 65 ] && ok || bad "--log dirty: want exit 65, got $rc"
+hasnt "--log dirty: the command did not run" "dirty-ran" "$(cat "$TMP/dirty.log")"
+has "--log dirty: the log says why" "REFUSED dirty=1" "$(cat "$TMP/dirty.log")"; has "--log dirty: stderr says why" "REFUSED" "$err"
+(cd "$L" && timeout 20 bash "$GT" bash -c 'echo plain-ran' 2>/dev/null) | grep -q plain-ran && ok || bad "a plain run (no --log) on a dirty tree still runs"
+rm -f "$L/untracked"
+
+# 11a2. --log: a tree that changes DURING the run makes it void (exit 66): an edit or a commit while the gate runs
+err="$(cd "$L" && timeout 20 bash "$GT" --log "$TMP/void.log" bash -c 'echo mid > probe.txt; exit 0' 2>&1 >/dev/null)"; rc=$?
+[ "$rc" -eq 66 ] && ok || bad "--log changed tree: want exit 66, got $rc"
+has "--log changed tree: the log says VOID" "VOID: the tree changed during the run" "$(cat "$TMP/void.log")"
+has "--log changed tree: the log names the path" "probe.txt" "$(cat "$TMP/void.log")"
+[ "$(tail -n 1 "$TMP/void.log")" = "exit 66" ] && ok || bad "--log changed tree: last line is not 'exit 66'"
+has "--log changed tree: stderr says VOID" "VOID" "$err"
+rm -f "$L/probe.txt"
+(cd "$L" && timeout 20 bash "$GT" --log "$TMP/void2.log" bash -c 'git -c user.name=t -c user.email=t@example.com commit -q --allow-empty -m mid' 2>/dev/null); rc=$?
+[ "$rc" -eq 66 ] && ok || bad "--log commit during the run: want exit 66, got $rc"
+(cd "$L" && timeout 20 bash "$GT" --log "$TMP/void3.log" bash -c 'exit 3' 2>/dev/null); rc=$?
+[ "$rc" -eq 3 ] && ok || bad "--log unchanged tree: the command's own exit code passes through (got $rc)"
 
 # 11b. --log reads the commit when the slot is taken, not while waiting: a commit made in the queue is the one logged
 reset; export GATE_SLOTS=1
@@ -213,6 +234,20 @@ reset; meminfo 3072; two_run "exactly the floor (3072 MB)" together
 reset; rm -f "$TMP/meminfo"; two_run "unreadable meminfo" together
 reset; meminfo 1000; GATE_MIN_FREE_MB=500 two_run "knob GATE_MIN_FREE_MB=500 with 1000 MB" together
 reset; unset KIT_MEMINFO_FILE
+
+# Killed while queued: an outer timeout that fires before the slot is held leaves a record that the command
+# never ran (before: an empty --log and exit 124, read as a real timeout). Killed after the slot: no such line.
+reset
+GATE_SLOTS=1 bg QA; waitfor "start QA" 5
+(cd "$TMP" && GATE_SLOTS=1 timeout 2 bash "$GT" --log "$TMP/q.log" bash -c 'echo queued-ran >> "$LOG"' 2>"$TMP/qerr"); qrc=$?
+[ "$qrc" -eq 124 ] && ok || bad "killed in the queue: want timeout's 124, got $qrc"
+has "the --log says the command never ran" "KILLED WHILE QUEUED after" "$(cat "$TMP/q.log" 2>/dev/null)"
+has "stderr says it too" "KILLED WHILE QUEUED" "$(cat "$TMP/qerr")"
+! grep -qx queued-ran "$LOG" && ok || bad "the queued command ran"
+release QA; waitfor "end QA" 5
+(cd "$TMP" && GATE_SLOTS=1 timeout 1 bash "$GT" --log "$TMP/r.log" bash -c 'echo slot-ran >> "$LOG"; sleep 5' 2>/dev/null)
+grep -qx slot-ran "$LOG" && ok || bad "the command did not start once the slot was free"
+hasnt "a run killed after taking the slot is not called queued" "QUEUED" "$(cat "$TMP/r.log" 2>/dev/null)"
 
 echo "gate-throttle: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
