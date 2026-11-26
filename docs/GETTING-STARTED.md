@@ -156,6 +156,9 @@ are harmless alone damage other sessions' work in a shared repo:
 | `git add -A` / `--all` / `.` / `-u` with no paths | Stages other sessions' uncommitted files | `git add <explicit paths>` |
 | `git commit -a` / `--all` | Same, at commit time | `git add <paths> && git commit` |
 | `git pull --rebase` | Races on the shared `.git/FETCH_HEAD` | `git fetch origin && git rebase origin/main` |
+| `git push -f` / `--force` / `--force-with-lease` / `--mirror` / `+branch` | Rewrites a branch other sessions pulled, reviewed or built on | push as a new branch (`HEAD:<branch>-r2`), or merge `origin/main` and push normally |
+| `<cmd>; git commit` | `;` commits even when the gate before it failed | `<cmd> && git commit` |
+| `git reset --soft origin/<branch>` | Once that branch moved, the next commit silently reverts its newer commits | `git reset --soft $(git merge-base HEAD origin/main)`, then read `git show --stat` |
 
 It only reads Claude's Bash commands (quoted text and commit messages that merely *mention* these
 are fine); you can still run anything yourself in your own terminal. Change it with "turn on the
@@ -210,7 +213,7 @@ nobody gets pinged.
 | `/orcastration-kit:post-feature` · `/orcastration-kit:kit-init` · `/orcastration-kit:bootstrap-project` | Per-feature checklist · repo setup · new-project setup |
 | SessionStart hook (automatic) | Every fresh session in a repo with a board is told to orient and report to the seat. Silent in other repos |
 | Worktree guard (PreToolUse hook) | Only with `worktrees: enforced`: blocks edits in the main checkout except board/log/status files. Silent otherwise |
-| Git guard (PreToolUse hook on Bash) | Only with `git_guard: on`: refuses `git stash`, `git add -A` / `.`, `git commit -a`, `git pull --rebase` and tells Claude the safe command. Silent otherwise |
+| Git guard (PreToolUse hook on Bash) | Only with `git_guard: on`: refuses `git stash`, `git add -A` / `.`, `git commit -a`, `git pull --rebase`, a force-push, `<cmd>; git commit`, `git reset --soft origin/…` and tells Claude the safe command. Silent otherwise |
 | `docs/orchestration/AGENT_BOARD.md` | The shared board: who is doing what, and which files they own |
 | `docs/orchestration/ORCHESTRATION.md` | Your project's settings: gate, deploy, team names, doc paths |
 | `docs/AI_CONTEXT.md` · `docs/timeline/build-log.md` | Status doc (read first by every session) · append-only history |
