@@ -87,7 +87,8 @@ blocks it) or `enforced` (the kit's PreToolUse hook blocks file edits in the mai
 `advised` if your workflow deliberately shares one tree or file between agents.
 `git_guard` is `off` or `on`. With `on` (and the `.kit-hooks` marker) the kit's PreToolUse Bash
 hook blocks `git stash` (except `list`/`show`), `git add -A`/`--all`/`.`/`-u` without paths,
-`git commit -a`/`--all` and `git pull --rebase`, telling Claude the safe alternative. Default:
+`git commit -a`/`--all`, `git pull --rebase`, a force-push (`-f`, `--force`, `--force-with-lease`, `--mirror`,
+`+branch`), a commit after `;` and `git reset --soft` onto a remote branch, telling Claude the safe alternative. Default:
 `off` until set; kit-init sets `on` when it starts a team (seat + siblings). A human can still
 run those in their own terminal.
 `ctx_guard` is `off` or `on`. With `on` (and the `.kit-hooks` marker) the kit's context guard
