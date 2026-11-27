@@ -62,6 +62,33 @@ human's explicit sign-off in-context:
 - `<e.g. balance constants in src/constants.ts>`
 - `<e.g. golden fixtures>`
 
+## Secrets (never read)
+
+Paths a session must never read, search or name in a command: key stores, token files, the locked copy of
+them. The kit's secrets guard (PreToolUse on Read, Grep and Bash; needs the `.kit-hooks` marker) refuses them
+with a one-line reason and tells the session to ask the human. **The list is the switch:** no entries, no
+guard. `~` is the home directory; a directory covers everything beneath it; an entry with `*` is a pattern
+matched against the whole path. It is a speed bump for an agent, not a sandbox (a path reached through a
+variable, a symlink or a script is not seen).
+
+```
+never_read:
+  - <e.g. ~/.config/<app>/secrets/>
+  - <e.g. ~/.config/<app>/secrets.tar.gpg>
+  - <e.g. *.pem>
+```
+
+To let ONE file under a listed path through (a key a tool must read), the human adds its exact path under
+`allow_read:`; it stays allowed until the line is removed. Only that file passes (Read, a Grep of that file, a
+Bash command naming it only as `NAME=<file> <program>`, `export NAME=<file>; <program>` or `cat <file> | wc -c`);
+the folder, its other files, a glob, a `..` / `//` spelling and any other command naming the file stay refused. An entry that
+is a directory, a symlink or a pattern is ignored. Leave it empty unless the human asks.
+
+```
+# allow_read:
+#   - <e.g. ~/.config/<app>/secrets/<one-key-file>>
+```
+
 ## Sessions
 
 ```

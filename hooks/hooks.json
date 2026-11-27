@@ -50,6 +50,11 @@
             "type": "command",
             "command": "command -v python3 >/dev/null 2>&1 || exit 0; exec python3 -I \"${CLAUDE_PLUGIN_ROOT}/hooks/conflict-marker-guard.py\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/secrets-guard.sh\"",
+            "timeout": 10
           }
         ]
       },
@@ -59,6 +64,16 @@
           {
             "type": "command",
             "command": "command -v python3 >/dev/null 2>&1 || exit 0; exec python3 -I \"${CLAUDE_PLUGIN_ROOT}/hooks/sendmessage-sha-guard.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/secrets-guard.sh\"",
             "timeout": 10
           }
         ]
