@@ -208,6 +208,25 @@ done
 has "assemble-train calls trial.sh" "trial.sh" "$(cat "$ASM/SKILL.md" 2>/dev/null)"
 has "assemble-train calls cptrial.sh" "cptrial.sh" "$(cat "$ASM/SKILL.md" 2>/dev/null)"
 has "audit-train calls audit.sh" "audit.sh" "$(cat "$AUD/SKILL.md" 2>/dev/null)"
+# ---- the regen tree check stages by path, not `git add -A` (the git guard refuses it) ----------------
+for s in "$ASM/SKILL.md" "$AUD/SKILL.md"; do
+  hasnt "$(basename "$(dirname "$s")"): no git add -A in a command" "git add -A &&" "$(cat "$s" 2>/dev/null)"
+  hasnt "$(basename "$(dirname "$s")"): no git add -A step" '`git add -A`, compare' "$(cat "$s" 2>/dev/null)"
+done
+stage="$(grep -o 'git ls-files -mo [^\\]*--stdin' "$AUD/SKILL.md" | head -n1)"
+[ -n "$stage" ] && ok || bad "audit-train: no ls-files | update-index staging line"
+has "assemble-train uses the same staging line" "$stage" "$(cat "$ASM/SKILL.md" 2>/dev/null)"
+gj="$(printf '{"tool_name":"Bash","tool_input":{"command":"%s && git write-tree"}}' "$stage")"
+gv="$(printf '%s' "$gj" | GIT_GUARD_CHECK_ONLY=1 bash "$ROOT/hooks/git-guard.sh" 2>/dev/null)"
+[ -z "$gv" ] && ok || bad "git guard refuses the staging line: $gv"
+SR="$TMP/stage"; git init -q -b main "$SR"
+( cd "$SR" && printf 'x\n' > keep && printf 'y\n' > gone && printf 'z\n' > edit && printf 'ign\n' > .gitignore \
+  && git add keep gone edit .gitignore && git commit -qm s ) >/dev/null
+( cd "$SR" && rm gone && printf 'z2\n' > edit && mkdir -p new/dir && printf 'n\n' > new/dir/f && printf 'i\n' > ign )
+want="$(cd "$SR" && GIT_INDEX_FILE="$TMP/stage-idx" git read-tree HEAD && GIT_INDEX_FILE="$TMP/stage-idx" git add -A && GIT_INDEX_FILE="$TMP/stage-idx" git write-tree)"
+got="$(cd "$SR" && eval "$stage" && git write-tree)"
+[ -n "$got" ] && [ "$got" = "$want" ] && ok || bad "staging line tree $got != git add -A tree $want (new, changed, deleted, ignored files)"
+
 priv="$(grep -nIiE 'pnpm|vitest|/home/|AIDriver|strandh' "$ASM"/* "$AUD"/* 2>/dev/null)"
 [ -z "$priv" ] && ok || bad "train skills carry project-specific text: $priv"
 

@@ -43,9 +43,12 @@ Exit 0 = every merge tree-equal (and approved); 1 = at least one line to explain
 ```bash
 git worktree add --detach "$SP/wt-regen" <REGEN_SHA>^ && cd "$SP/wt-regen" || exit 1
 # install + build derived artifacts, then the regen command(s) copied VERBATIM from the regen commit body
-git add -A && [ "$(git write-tree)" = "$(git rev-parse <REGEN_SHA>^{tree})" ] && echo REPRODUCED || echo DIFF
+git ls-files -mo --exclude-standard -z | git update-index --add --remove -z --stdin \
+ && [ "$(git write-tree)" = "$(git rev-parse <REGEN_SHA>^{tree})" ] && echo REPRODUCED || echo DIFF
 ```
-Pass = `REPRODUCED` (the whole tree, byte-identical) AND any hand edit in the commit is exactly the declared text (`git diff --word-diff <REGEN_SHA>^ <REGEN_SHA> -- <file>`). A generated file whose header stamps "the last commit touching its inputs" differs on the committed merge by that stamp alone: reproduce from the pre-commit state instead (`git checkout --detach <P1> && git merge --no-commit --no-ff <P2>`, regenerate, `git add -A`, compare `write-tree` with the merge's tree).
+The `ls-files | update-index` line stages every change by path (new, changed, deleted): the git guard refuses `git add -A`.
+
+Pass = `REPRODUCED` (the whole tree, byte-identical) AND any hand edit in the commit is exactly the declared text (`git diff --word-diff <REGEN_SHA>^ <REGEN_SHA> -- <file>`). A generated file whose header stamps "the last commit touching its inputs" differs on the committed merge by that stamp alone: reproduce from the pre-commit state instead (`git checkout --detach <P1> && git merge --no-commit --no-ff <P2>`, regenerate, stage with the `ls-files | update-index` line, compare `write-tree` with the merge's tree).
 
 ## 4. Gate deltas
 Cite the assembler's gate line; verify each count delta against the rider: run the rider's new or changed test files (or the stage) at P1 vs at the merge, with a fresh install and rebuilt derived artifacts at EACH checkout. An unexplained delta is a finding. A re-gate after an install fix supersedes provisional lines.
